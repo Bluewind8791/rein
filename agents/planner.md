@@ -89,7 +89,7 @@ Investigate the code as far as you need, then decide:
 2. **Detailed design**: every file to touch and, for each, what to do in it.
    - List **every** file. In `dev` a file that is not on the list cannot be changed.
    - A file may be in a repository outside the session root, when one change spans several repositories. Write its path absolute.
-   - When the session root is the run's git worktree (`<repository>/.claude/worktrees/<slug>`), write that repository's files relative to the session root, or absolute under the worktree; the hook refuses a path in the repository's main working tree. Write a repository outside the session root as its main working tree's path: when plan passes, the hook makes the run's worktree of it and dev writes there.
+   - Write every file at its main working tree's path, the session root's repository too: when plan passes, the hook makes the run's worktree of each repository named and dev writes there.
    - Put new files on the list too and mark them `— 새 파일`.
    - What the person must apply outside the repositories (a DB script, a manual setting) is not a design item. It goes under `## 넘길 것`: dev writes each file there into the run directory's `handoff/`, and the person applies it after land.
    - Put files to delete on the list too, with deleting as their task. A move lists both the old and the new path. dev's `rm` removes listed files only.

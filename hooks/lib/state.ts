@@ -22,10 +22,11 @@ export type Rule = { name: string; path: string; hash: string; paths: string[] |
 // a git worktree the run works in. repo is the repository's main working
 // tree, path the worktree under its .claude/worktrees/<runId> on branch,
 // start the branch the main tree was on when it was made (null: a detached
-// HEAD). root: the session root's own, which the session works in
-// (EnterWorktree); the others came with plan, for a repository the session
-// root does not hold. commit: land's commit in it; landed: that commit is
-// in the main tree too, so a retry skips the repository.
+// HEAD). Plan makes one for each repository it names; the session stays
+// in the main tree. root: a run from before that made the session root's
+// own at open_run and had the session work in it. commit: land's commit
+// in it; landed: that commit is in the main tree too, so a retry skips the
+// repository.
 export type Tree = { repo: string; path: string; branch: string; start: string | null; root?: true; commit?: string; landed?: true }
 
 // The run in $.store under runs:<project>/<runId>, while it is
@@ -226,7 +227,7 @@ export function renderRun(run: Run): string {
   if (run.failFile) lines.push(`failFile: ${run.failFile}`)
   if (run.planFiles) lines.push(`planFiles:`, ...run.planFiles.map(f => `- ${f}`))
   if (run.repos) lines.push(`repos:`, ...run.repos.map(r => `- ${r}`))
-  if (run.trees?.length) lines.push(`worktrees:`, ...run.trees.map(t => `- ${t.path} (${t.repo}, branch ${t.branch}, from ${t.start ?? "a detached HEAD"}${t.root ? ", the session works here" : ""}${t.landed ? ", landed" : ""})`))
+  if (run.trees?.length) lines.push(`worktrees:`, ...run.trees.map(t => `- ${t.path} (${t.repo}, branch ${t.branch}, from ${t.start ?? "a detached HEAD"}${t.landed ? ", landed" : ""})`))
   if (run.handoff?.length) lines.push(`handoff (D163, in the run directory's handoff/):`, ...run.handoff.map(h => `- ${h}`))
   if (run.writes.length > 0) lines.push(...writesLines(run.writes, run.planFiles))
   if (run.stage === "spec" && (run.asked || run.grades?.length)) lines.push(`questions asked (D175): ${run.asked ?? 0}`)

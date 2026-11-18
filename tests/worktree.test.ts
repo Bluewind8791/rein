@@ -6,17 +6,20 @@ import { fromPortable, toPortable } from "../hooks/lib/sync.ts"
 import { inTree, landMessage, treeTable } from "../hooks/lib/trees.ts"
 import { at, COVER, DIR, gitSub, planned, ran, REIN, relay, SPEC_TEXT, store, world, type Host } from "./world.ts"
 
-// Every run opened now works in its own git worktree,
-// <repository>/.claude/worktrees/<runId> on branch rein/<runId>, from HEAD.
-// The session enters it with EnterWorktree and the run goes on only from
-// there; plan adds a worktree for each other repository it names; land
-// commits there on the person's approval, cherry-picks the commit into the
-// main tree's branch and removes the worktree. A run from before (no trees
-// in its record) goes on as it did.
+// Every run works in its own git worktree of each repository its plan
+// names, <repository>/.claude/worktrees/<runId> on branch rein/<runId>, made
+// from HEAD when plan passes, the session root's repository too. The session
+// stays in the main tree: in a worktree Claude Code would refuse its writes
+// to the run's other worktrees. Land commits in each worktree on the
+// person's approval, cherry-picks the commit into the main tree's branch
+// and removes the worktree. A run from before worktrees (no trees in its
+// record) goes on as it did; one from before plan made them all (the
+// session root's made at open_run, marked root) goes on from the main tree.
 
 const TREE = "E:/proj/.claude/worktrees/login-fix"
 const BRANCH = "rein/login-fix"
-const HOME = { repo: "E:/proj", path: TREE, branch: BRANCH, start: "main", root: true as const }
+const HOME = { repo: "E:/proj", path: TREE, branch: BRANCH, start: "main" }
+const LEGACY = { ...HOME, root: true as const }
 const QA = JSON.stringify({ qa: ["npm test"] })
 // the .git file git writes in a linked worktree.
 const GITFILE = "gitdir: E:/proj/.git/worktrees/login-fix"
@@ -76,27 +79,16 @@ const ADVANCE = { tool: "mcp__rein__advance" } as never
 const PARK = { tool: "mcp__rein__park", reason: "사용자가 그만두자고 함" } as never
 const write = (file_path: string) => ({ tool: "Write", file_path, content: "x" }) as never
 
-describe("open_run makes the run's worktree", () => {
-  test("from HEAD, on rein/<runId>, kept out of git status, with worktree.setup run in it", async ($, on) => {
-    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": JSON.stringify({ qa: ["npm test"], worktree: { setup: ["npm ci"] } }) }
+describe("open_run makes no worktree", () => {
+  test("the session stays in the main tree, and the run's writes go on from there", async ($, on) => {
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "" }
     const log: string[][] = []
     world(on, files, undefined, null, gitHost(files, { "E:/proj": { branch: "main" } }, log))
     const r = await $.tool.call(OPEN)
-    expect(text(r)).toContain(`The run works in its own git worktree, ${TREE}, made from HEAD (branch main) on a new branch ${BRANCH}`)
-    expect(text(r)).toContain(`Call EnterWorktree with path ${TREE}`)
-    expect(log).toContainEqual(["E:/proj", "worktree", "add", "-b", BRANCH, TREE, "HEAD"])
-    expect(files["E:/proj/.git/info/exclude"]).toBe("/.claude/worktrees/\n")
-    expect(ran).toContainEqual({ argv: ["C:/Program Files/Git/bin/bash.exe", "-c", "npm ci"], cwd: TREE })
-    expect(record()?.trees).toEqual([HOME])
-  })
-
-  test("a config git does not track is copied from the main tree, and its worktree.setup run", async ($, on) => {
-    const config = JSON.stringify({ qa: ["npm test"], worktree: { setup: ["npm ci"] } })
-    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": config }
-    world(on, files, undefined, null, gitHost(files, { "E:/proj": { branch: "main", untracked: true } }, []))
-    await $.tool.call(OPEN)
-    expect(files[`${TREE}/.rein/config.json`]).toBe(config)
-    expect(ran).toContainEqual({ argv: ["C:/Program Files/Git/bin/bash.exe", "-c", "npm ci"], cwd: TREE })
+    expect(text(r)).not.toContain("EnterWorktree")
+    expect(log).toEqual([])
+    expect(record()?.trees).toEqual([])
+    expect(await $.tool.call(write(`${DIR}/1-spec.md`))).toEqual(expect.objectContaining({ result: "ok" }))
   })
 
   test("autopilot: true is kept on the run and said in the result", async ($, on) => {
@@ -105,48 +97,6 @@ describe("open_run makes the run's worktree", () => {
     const r = await $.tool.call({ tool: "mcp__rein__open_run", runId: "login-fix", autopilot: true } as never)
     expect(text(r)).toContain("This is an autopilot run: the spec's questions are asked as usual")
     expect(record()?.autopilot).toBe(true)
-  })
-
-  test("the run's tools and writes wait until the session is in the worktree", async ($, on) => {
-    const files: Record<string, string> = { "E:/proj/.git/HEAD": "" }
-    world(on, files, undefined, null, gitHost(files, { "E:/proj": { branch: "main" } }, []))
-    await $.tool.call(OPEN)
-    const away = `the run login-fix works in its own git worktree, ${TREE}, and this session is not in it. Call EnterWorktree with path ${TREE}`
-    expect(text(await $.tool.call(write(`${DIR}/1-spec.md`)))).toContain(away)
-    expect(text(await $.tool.call(ADVANCE))).toContain(away)
-    // status still answers where the run stands.
-    expect(text(await $.tool.call({ tool: "mcp__rein__status" } as never))).toContain(`- ${TREE} (E:/proj, branch ${BRANCH}, from main, the session works here)`)
-    at.root = TREE
-    expect(await $.tool.call(write(`${DIR}/1-spec.md`))).toEqual(expect.objectContaining({ result: "ok" }))
-  })
-
-  test("a worktree git cannot make opens no run", async ($, on) => {
-    const files: Record<string, string> = { "E:/proj/.git/HEAD": "" }
-    const repos = { "E:/proj": { branch: "main", fail: { worktree: "fatal: a branch named 'rein/login-fix' already exists" } } }
-    world(on, files, undefined, null, gitHost(files, repos, []))
-    const r = await $.tool.call(OPEN)
-    expect(text(r)).toContain("the run's git worktree could not be made, so no run was opened: `git worktree add -b rein/login-fix E:/proj/.claude/worktrees/login-fix HEAD` failed in E:/proj: fatal: a branch named 'rein/login-fix' already exists.")
-    expect(record()).toBeUndefined()
-  })
-
-  test("a failed worktree.setup is told and the run goes on", async ($, on) => {
-    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": JSON.stringify({ qa: ["npm test"], worktree: { setup: ["npm ci"] } }) }
-    world(on, files, undefined, null, gitHost(files, { "E:/proj": { branch: "main" } }, [], { run: () => ({ exitCode: 1, stderr: "npm ERR! missing lockfile" }) }))
-    const r = await $.tool.call(OPEN)
-    expect(text(r)).toContain(`worktree.setup failed, so the worktree may lack what it needs (dependencies, say); the run goes on.`)
-    expect(text(r)).toContain(`\`npm ci\` (in ${TREE}) exited 1:`)
-    expect(text(r)).toContain("> npm ERR! missing lockfile")
-    expect(record()?.stage).toBe("spec")
-  })
-
-  test("a session root that is no repository gets no worktree yet", async ($, on) => {
-    const files: Record<string, string> = {}
-    const log: string[][] = []
-    world(on, files, undefined, null, gitHost(files, {}, log))
-    const r = await $.tool.call(OPEN)
-    expect(text(r)).not.toContain("EnterWorktree")
-    expect(log).toEqual([])
-    expect(record()?.trees).toEqual([])
   })
 })
 
@@ -164,13 +114,61 @@ const PLAN = (file: string) => `# 로그인
 ${COVER}`
 
 describe("plan in worktrees", () => {
-  test("a design for the main tree is refused; one for the worktree passes", async ($, on) => {
-    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", [`${TREE}/.git`]: GITFILE, [`${TREE}/.rein/config.json`]: QA, [`${DIR}/1-spec.md`]: SPEC_TEXT }
-    world(on, files, undefined, { stage: "plan", runId: "login-fix", trees: [HOME] }, gitHost(files, {}, []))
-    at.root = TREE
-    expect(await planned($, PLAN("E:/proj/src/login.ts"))).toContain(`these files are in E:/proj, the main working tree, but the run works in its own worktree of it, ${TREE}: E:/proj/src/login.ts.`)
-    expect(await planned($, PLAN("src/login.ts"))).toContain("now in the dev stage")
+  test("the session root's repository gets its worktree from HEAD, kept out of git status, with the main tree's config and its worktree.setup; the files move into it", async ($, on) => {
+    const config = JSON.stringify({ qa: ["npm test"], worktree: { setup: ["npm ci"] } })
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": config, [`${DIR}/1-spec.md`]: SPEC_TEXT }
+    const log: string[][] = []
+    world(on, files, undefined, { stage: "plan", runId: "login-fix", trees: [] }, gitHost(files, { "E:/proj": { branch: "main", untracked: true } }, log))
+    const r = await planned($, PLAN("src/login.ts"))
+    expect(r).toContain("now in the dev stage")
+    expect(r).toContain(`The design's files: ${TREE}/src/login.ts.`)
+    expect(r).toContain(`(원래 경로 → 워크트리 경로): E:/proj → ${TREE}`)
+    expect(log).toContainEqual(["E:/proj", "worktree", "add", "-b", BRANCH, TREE, "HEAD"])
+    expect(files["E:/proj/.git/info/exclude"]).toBe("/.claude/worktrees/\n")
+    expect(files[`${TREE}/.rein/config.json`]).toBe(config)
+    expect(ran).toContainEqual({ argv: ["C:/Program Files/Git/bin/bash.exe", "-c", "npm ci"], cwd: TREE })
     expect(record()).toEqual(expect.objectContaining({ planFiles: [`${TREE}/src/login.ts`], repos: [TREE], trees: [HOME] }))
+  })
+
+  test("a repository inside the session root's gets its own worktree: each file goes into the worktree of its innermost repository, and both are written from the main tree", async ($, on) => {
+    const WEB = "E:/proj/web"
+    const WT = `${WEB}/.claude/worktrees/login-fix`
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": QA, [`${WEB}/.git/HEAD`]: "", [`${WEB}/.rein/config.json`]: QA, [`${DIR}/1-spec.md`]: SPEC_TEXT }
+    const log: string[][] = []
+    world(on, files, undefined, { stage: "plan", runId: "login-fix", trees: [] }, gitHost(files, { "E:/proj": { branch: "main" }, [WEB]: { branch: "develop" } }, log))
+    const plan = `# 로그인\n\n## 접근 방법\n\n로그인을 고친다.\n\n## 상세 설계\n\n### src/login.ts\n- 잠금을 더한다\n- 테스트 면제: 예시\n\n### web/src/a.ts\n- 잠금을 보인다\n- 테스트 면제: 예시\n${COVER}`
+    expect(await planned($, plan)).toContain("now in the dev stage")
+    expect(log).toContainEqual(["E:/proj", "worktree", "add", "-b", BRANCH, TREE, "HEAD"])
+    expect(log).toContainEqual([WEB, "worktree", "add", "-b", BRANCH, WT, "HEAD"])
+    expect(record()).toEqual(expect.objectContaining({ planFiles: [`${TREE}/src/login.ts`, `${WT}/src/a.ts`], trees: [HOME, { repo: WEB, path: WT, branch: BRANCH, start: "develop" }] }))
+    expect(await $.tool.call(write(`${TREE}/src/login.ts`))).toEqual(expect.objectContaining({ result: "ok" }))
+    expect(await $.tool.call(write(`${WT}/src/a.ts`))).toEqual(expect.objectContaining({ result: "ok" }))
+  })
+
+  test("a worktree git cannot make keeps the run in plan", async ($, on) => {
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": QA, [`${DIR}/1-spec.md`]: SPEC_TEXT }
+    const repos = { "E:/proj": { branch: "main", fail: { worktree: "fatal: a branch named 'rein/login-fix' already exists" } } }
+    world(on, files, undefined, { stage: "plan", runId: "login-fix", trees: [] }, gitHost(files, repos, []))
+    expect(await planned($, PLAN("src/login.ts"))).toContain("the run's git worktree could not be made, so the run stays in plan: `git worktree add -b rein/login-fix E:/proj/.claude/worktrees/login-fix HEAD` failed in E:/proj: fatal: a branch named 'rein/login-fix' already exists.")
+    expect(record()?.stage).toBe("plan")
+  })
+
+  test("a failed worktree.setup is told and the run goes on", async ($, on) => {
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": JSON.stringify({ qa: ["npm test"], worktree: { setup: ["npm ci"] } }), [`${DIR}/1-spec.md`]: SPEC_TEXT }
+    world(on, files, undefined, { stage: "plan", runId: "login-fix", trees: [] }, gitHost(files, { "E:/proj": { branch: "main" } }, [], { run: () => ({ exitCode: 1, stderr: "npm ERR! missing lockfile" }) }))
+    const r = await planned($, PLAN("src/login.ts"))
+    expect(r).toContain(`worktree.setup failed, so the worktree may lack what it needs (dependencies, say); the run goes on.`)
+    expect(r).toContain(`\`npm ci\` (in ${TREE}) exited 1:`)
+    expect(record()?.stage).toBe("dev")
+  })
+
+  test("a run from before, in the worktree open_run made, goes on from the main tree: its writes are not held, and plan moves a main-tree path into that worktree", async ($, on) => {
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": QA, [`${TREE}/.git`]: GITFILE, [`${TREE}/.rein/config.json`]: QA, [`${DIR}/1-spec.md`]: SPEC_TEXT }
+    const log: string[][] = []
+    world(on, files, undefined, { stage: "plan", runId: "login-fix", trees: [LEGACY] }, gitHost(files, {}, log))
+    expect(await planned($, PLAN("src/login.ts"))).toContain("now in the dev stage")
+    expect(record()).toEqual(expect.objectContaining({ planFiles: [`${TREE}/src/login.ts`], repos: [TREE], trees: [LEGACY] }))
+    expect(log.some(l => l[1] === "worktree")).toBe(false)
   })
 
   test("with a session root that is no repository, each repository named gets its worktree and the files move into it", async ($, on) => {
@@ -364,25 +362,32 @@ describe("park and resume in worktrees", () => {
     expect(log.some(l => l[1] === "worktree")).toBe(false)
   })
 
-  test("resume tells the session to enter the worktree, and refuses while it is gone", async ($, on) => {
+  test("resume goes on from the main tree, and refuses while a worktree is gone", async ($, on) => {
     const files: Record<string, string> = { [`${REIN}/defer/login-fix/1-spec.md`]: SPEC_TEXT }
     const stored = { v: 2, stage: "dev", runId: "login-fix", rules: [], writes: [], retries: 0, status: "defer", trees: [HOME] }
     world(on, files, () => "이어서 진행", null, { store: { "runs:proj/login-fix": stored } })
     const RESUME = { tool: "mcp__rein__resume", runId: "login-fix" } as never
     expect(text(await relay($, RESUME))).toContain(`D147: login-fix works in git worktrees that are gone: ${TREE}, so it cannot go on. Tell the user: while its branch ${BRANCH} is still there, \`git -C E:/proj worktree add ${TREE} ${BRANCH}\` brings the worktree back`)
     files[`${TREE}/.git`] = GITFILE
-    expect(text(await relay($, RESUME))).toContain(`Resumed login-fix in this session. The run is in the dev stage; its folder is ${DIR}. Call EnterWorktree with path ${TREE}`)
+    const r = text(await relay($, RESUME))
+    expect(r).toContain(`Resumed login-fix in this session. The run is in the dev stage; its folder is ${DIR}.`)
+    expect(r).not.toContain("EnterWorktree")
   })
 })
 
 describe("the worktree pieces", () => {
-  test("a path of a repository the run has a worktree of moves into it; the session's own tree and other paths stay", () => {
+  test("a path of a repository the run has a worktree of moves into it, the innermost repository's when they nest; paths in a worktree and other paths stay", () => {
     const web = { repo: "E:/ws/web", path: "E:/ws/web/.claude/worktrees/x", branch: "rein/x", start: "main" }
-    const trees = [HOME, web]
+    const inner = { repo: "E:/proj/web", path: "E:/proj/web/.claude/worktrees/login-fix", branch: BRANCH, start: "main" }
+    const trees = [HOME, web, inner]
     expect(inTree(trees, "E:/ws/web/src/a.ts")).toBe("E:/ws/web/.claude/worktrees/x/src/a.ts")
     expect(inTree(trees, "E:/ws/web/.claude/worktrees/x/src/a.ts")).toBe("E:/ws/web/.claude/worktrees/x/src/a.ts")
-    expect(inTree(trees, "E:/proj/src/a.ts")).toBe("E:/proj/src/a.ts")
-    expect(treeTable([HOME])).toBe("")
+    expect(inTree(trees, "E:/proj/src/a.ts")).toBe(`${TREE}/src/a.ts`)
+    expect(inTree(trees, "E:/proj/web/src/a.ts")).toBe("E:/proj/web/.claude/worktrees/login-fix/src/a.ts")
+    expect(inTree(trees, "E:/proj/web/.claude/worktrees/login-fix/src/a.ts")).toBe("E:/proj/web/.claude/worktrees/login-fix/src/a.ts")
+    expect(inTree(trees, "E:/other/a.ts")).toBe("E:/other/a.ts")
+    expect(treeTable([])).toBe("")
+    expect(treeTable([HOME])).toContain(`(원래 경로 → 워크트리 경로): E:/proj → ${TREE}.`)
   })
 
   test("6-land.md's commit message is the fenced block under its heading", () => {
@@ -399,8 +404,16 @@ describe("the worktree pieces", () => {
     expect(names(["E:/work/api/.claude/worktrees/x/src/A.java"])).toEqual(["api"])
   })
 
-  test("a run in the session root's worktree goes to the sync remote relative to it, wherever the session is", () => {
+  test("a run in the session root's worktree goes to the sync remote relative to the session root", () => {
     const run = { v: 2, stage: "dev", runId: "login-fix", rules: [], writes: [], retries: 0, planFiles: [`${TREE}/src/a.ts`], repos: [TREE], trees: [{ ...HOME, commit: "c1" }] } as Run
+    const out = toPortable(run, "E:/proj", REIN)
+    expect(out.portable).toBe(true)
+    expect(out.run.planFiles).toEqual(["{root}/.claude/worktrees/login-fix/src/a.ts"])
+    expect(out.run.trees).toEqual([{ repo: "{root}", path: "{root}/.claude/worktrees/login-fix", branch: BRANCH, start: "main" }])
+  })
+
+  test("a run from before, in the worktree open_run made, goes to the sync remote relative to that worktree, wherever the session is", () => {
+    const run = { v: 2, stage: "dev", runId: "login-fix", rules: [], writes: [], retries: 0, planFiles: [`${TREE}/src/a.ts`], repos: [TREE], trees: [{ ...LEGACY, commit: "c1" }] } as Run
     const out = toPortable(run, "E:/proj", REIN)
     expect(out.portable).toBe(true)
     expect(out.run.planFiles).toEqual(["{root}/src/a.ts"])

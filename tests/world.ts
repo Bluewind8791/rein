@@ -8,7 +8,8 @@ export const REIN = "C:/Users/u/.rein/proj"
 export const DIR = `${REIN}/active/login-fix`
 
 // the session root as the engine gives it now; a test moves it as
-// EnterWorktree would. Each world starts it at ROOT.
+// EnterWorktree would (a session from before Rein stopped entering
+// worktrees). Each world starts it at ROOT.
 export const at = { root: ROOT }
 
 // `## 범위` with every row of SCOPE_ROWS decided.

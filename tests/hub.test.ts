@@ -312,7 +312,7 @@ describe("hub (D219-D222)", () => {
     expect(added).toEqual([["E:/proj", "worktree", "add", "-b", "rein/login-fix", TREE, "HEAD"]])
     expect(r.result).toContain(`Its worktrees were made anew on this PC from HEAD: ${TREE} (from main).`)
     expect(files[`${TREE}/.rein/config.json`]).toBe(config)
-    expect(r.result).toContain(`Call EnterWorktree with path ${TREE}`)
+    expect(r.result).not.toContain("EnterWorktree")
     expect(store.get("runs:proj/login-fix")).toEqual(expect.objectContaining({ stage: "dev", planFiles: [`${TREE}/src/a.ts`], repos: [TREE], trees: [{ repo: "E:/proj", path: TREE, branch: "rein/login-fix", start: "main", root: true }] }))
   })
 

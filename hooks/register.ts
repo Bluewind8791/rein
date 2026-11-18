@@ -1472,19 +1472,10 @@ async function openRun($: EngineInterface, input: Record<string, unknown>): Prom
   const got = hub && (await hubFetch($, hub, "GET", runPath(project, runId)))
   const held = !got || "offline" in got || got.status !== 200 ? undefined : (got.json as { record?: HubRecord } | undefined)?.record
   if (held) return { deny: `the hub already has a run named ${runId} in this project (${held.state} on PC ${held.pc}). Choose another slug.` }
-  // the run works in its own worktree of the session root's repository (of
-  // the main one when the session sits in another run's worktree); a root
-  // that is no repository gets its worktrees when plan names repositories.
-  const root = await sessionRoot($)
-  const owner = treeOwner(root)
-  const repo = owner !== undefined && (await $.fs.exists(`${owner}/.git`)) ? owner : root
-  let tree: Tree | undefined
-  if (await $.fs.exists(`${repo}/.git`)) {
-    const made = await makeTree($, repo, runId, true)
-    if ("problem" in made) return { deny: `the run's git worktree could not be made, so no run was opened: ${made.problem}. Tell the user: a branch ${treeBranch(runId)} or a folder ${treePath(repo, runId)} left from before is theirs to remove, or choose another slug.` }
-    tree = made
-  }
-  const run: Run = { v: 2, stage: "spec", runId, status: "active", owner: session, uid: crypto.randomUUID(), trees: tree ? [tree] : [], rules: await freezeRules($), writes: [], retries: 0, ...(input.autopilot === true ? { autopilot: true as const } : {}) }
+  // the run gets a worktree of each repository plan names, the session
+  // root's own too, when plan passes; the session never enters one (Claude
+  // Code would then refuse writes to the run's other worktrees).
+  const run: Run = { v: 2, stage: "spec", runId, status: "active", owner: session, uid: crypto.randomUUID(), trees: [], rules: await freezeRules($), writes: [], retries: 0, ...(input.autopilot === true ? { autopilot: true as const } : {}) }
   const raced = await locked(async () => {
     const existing = await getRun($)
     if (existing) return existing
@@ -1492,12 +1483,7 @@ async function openRun($: EngineInterface, input: Record<string, unknown>): Prom
     await $.store.set(pointer, { project, runId })
     return undefined
   })
-  if (raced) {
-    if (tree) await removeTree($, tree)
-    return { deny: `D59: this session already has a run open (${raced.runId}, stage ${raced.stage}). A second run cannot be opened.` }
-  }
-  if (tree) await carryConfig($, tree)
-  const setup = tree ? await setupTree($, tree.path) : ""
+  if (raced) return { deny: `D59: this session already has a run open (${raced.runId}, stage ${raced.stage}). A second run cannot be opened.` }
   // a run is open: the last one's retrospective is over.
   closed = undefined
   const dir = await folderOf($, "active", runId)
@@ -1508,8 +1494,6 @@ async function openRun($: EngineInterface, input: Record<string, unknown>): Prom
     hooksEnv: (await $.env.get("CLAUDE_CODE_ENABLE_FUNCTION_HOOKS")) ?? null,
     rules: run.rules.map(r => ({ name: r.name, hash: r.hash, paths: r.paths })),
     ...(run.autopilot ? { autopilot: true } : {}),
-    ...(tree ? { worktree: tree.path, branch: tree.branch, start: tree.start } : {}),
-    ...(setup ? { setup: clip(setup) } : {}),
   })
   await trace($, run, { ev: "stage", from: null, to: "spec" })
   await writeInfo($, run, "active", "open")
@@ -1519,7 +1503,7 @@ async function openRun($: EngineInterface, input: Record<string, unknown>): Prom
   // the images pasted with the request the run opened on.
   await savePastes($, run)
   const pilot = run.autopilot ? " This is an autopilot run: the spec's questions are asked as usual, but where the user would type /rein:plan or /rein:dev, run /rein:e2e or approve the commit, the hook's result tells you to pass the answer yourself." : ""
-  const opened = `Run opened. runId: ${runId}.${pilot} Write the spec to ${dir}/1-spec.md, the only file this stage may write; rein:sketcher draws ${dir}/1-mockup.html beside it when a picture helps (D158).${tree ? ` The run works in its own git worktree, ${tree.path}, made from HEAD (${tree.start === null ? "a detached HEAD" : `branch ${tree.start}`}) on a new branch ${tree.branch}; changes in the main working tree that are not committed are not in it. ${enterLine(tree)}${setupLine(setup ? [setup] : [])}` : ""}`
+  const opened = `Run opened. runId: ${runId}.${pilot} Write the spec to ${dir}/1-spec.md, the only file this stage may write; rein:sketcher draws ${dir}/1-mockup.html beside it when a picture helps (D158).`
   // the deferred runs, so the spec agent can notice the request is one.
   const deferred = (await resumable($)).filter(r => r.state === "defer")
   const context: string[] = []
@@ -2736,11 +2720,10 @@ async function park($: EngineInterface, input: Record<string, unknown>): Promise
   const kept = (now.trees ?? []).filter(t => !t.landed)
   const removed: string[] = []
   if (to === "drop") for (const t of kept) removed.push(...(await removeTree($, t)))
-  const home = kept.find(t => t.root)
   const treeNote = kept.length === 0 ? ""
     : to === "drop"
       ? ` Its worktrees and branch ${treeBranch(now.runId)} were removed.${removed.length > 0 ? ` Removing them did not finish: ${removed.join("; ")}.` : ""}`
-      : ` Its worktrees stay: ${kept.map(t => t.path).join(", ")}.${home ? ` To work elsewhere meanwhile, call ExitWorktree with action "keep".` : ""}`
+      : ` Its worktrees stay: ${kept.map(t => t.path).join(", ")}.`
   const said = to === "defer"
     ? `The user put the run aside (보류). Its folder is now ${where}; mcp__rein__resume with runId ${now.runId} continues it later, from this session or another.`
     : to === "drop"
@@ -2854,9 +2837,8 @@ async function carryOn($: EngineInterface, resumed: Run, note: string): Promise<
   // 1-spec.md, 2-plan.md or the sealed files changed while it was parked.
   const changed = await drifted($)
   const skill = resumed.stage === "spec" ? "the rein:spec skill, skipping its step 0 (the run is open)" : `the ${SKILL[resumed.stage]} skill`
-  const away = await awayFrom($, resumed)
   return {
-    result: `Resumed ${resumed.runId} in this session. The run is in the ${resumed.stage} stage; its folder is ${c.dir}.${note}${away ? ` ${enterLine(away)}` : ""}`,
+    result: `Resumed ${resumed.runId} in this session. The run is in the ${resumed.stage} stage; its folder is ${c.dir}.${note}`,
     context: [`D147: invoke ${skill} to carry on. A judge agent that was recorded (arbiter, reviewer) is spawned again when the stage needs it. mcp__rein__status shows:\n${renderRun(resumed)}\nrun directory: ${c.dir}`, ...changed],
   }
 }
@@ -3030,13 +3012,6 @@ async function judgePlan($: EngineInterface, c: Ctx): Promise<PlanJudgment> {
   if (stray.length > 0) {
     const reason = `these files are not in a git repository, or lie under ${rein}: ${stray.join(", ")}.`
     return { ok: false, rule: "D51", reason, fix: again }
-  }
-  // the session works in the run's worktree, so the main tree of its
-  // repository is no place to design for.
-  const home = c.run.trees?.find(t => t.root)
-  if (home && repos.some(r => same(r, home.repo))) {
-    const named = parsed.files.filter(f => (same(f, home.repo) || under(f, home.repo)) && !(same(f, home.path) || under(f, home.path)))
-    return { ok: false, rule: "", reason: `these files are in ${home.repo}, the main working tree, but the run works in its own worktree of it, ${home.path}: ${named.join(", ")}. Name each file at its path in the worktree (a relative path is read from it).`, fix: again }
   }
   // a repository outside the session root, the first time 2-plan.md
   // names it, brings its project's rules (frozen now) and knowledge; when
@@ -4344,21 +4319,8 @@ async function sessionRoot($: EngineInterface): Promise<string> {
   return resolve(raw, raw)
 }
 
-// the session's own worktree of the run when the session is not in it:
-// the run's tools and writes wait until it is.
-async function awayFrom($: EngineInterface, run: Run): Promise<Tree | undefined> {
-  const home = run.trees?.find(t => t.root)
-  return home !== undefined && !same(await sessionRoot($), home.path) ? home : undefined
-}
-
-const enterLine = (t: Tree) =>
-  `Call EnterWorktree with path ${t.path} (the run's worktree, branch ${t.branch}) before anything else: Rein refuses the run's tools and writes from any other folder.`
-
-const awayDeny = (run: Run, t: Tree) =>
-  `the run ${run.runId} works in its own git worktree, ${t.path}, and this session is not in it. ${enterLine(t)} Then call this again.`
-
 // at plan's pass, the run's worktree of each repository 2-plan.md names
-// that the session root's tree does not hold and the run has none of yet,
+// that the run has no worktree of yet (the session root's own too),
 // each from its HEAD, and the judgment moved into the worktrees: the files,
 // the repositories, their configs and the files the checks name. Each
 // worktree gets the config the person approves (the main tree's, which may
@@ -5698,20 +5660,6 @@ export const register: Register = (on) => {
     } catch (err) {
       if (judged) return failClosed($, undefined, tool, err)
       throw err
-    }
-    // a run in its own worktree goes on only from there, up to land,
-    // which runs from the main tree so the worktree can go.
-    if (run && run.stage !== "land" && (isWrite || [ADVANCE, GOTO, PLAN_REVIEW].includes(tool as string))) {
-      try {
-        const away = await awayFrom($, run)
-        if (away) {
-          const deny = awayDeny(run, away)
-          await trace($, run, { ev: "tool", stage: run.stage, tool, agentId, decision: "deny", deny })
-          return { deny }
-        }
-      } catch (err) {
-        return failClosed($, run, tool, err)
-      }
     }
     if (isOwn) {
       const before = run
