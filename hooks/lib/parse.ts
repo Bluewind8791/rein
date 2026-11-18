@@ -438,9 +438,6 @@ export function checkConfig(text: string): string | undefined {
   const cfg = data as Record<string, unknown>
   const commands = (v: unknown) => Array.isArray(v) && v.every(x => typeof x === "string" && x.trim() !== "")
   if (!commands(cfg.qa) || (cfg.qa as unknown[]).length === 0) return "`qa` must be a non-empty array of command strings"
-  if (cfg["qa-integration"] !== undefined && !commands(cfg["qa-integration"])) {
-    return "`qa-integration` must be an array of command strings"
-  }
   // `worktree.setup`, when there: the commands run in a worktree just made.
   const worktree = cfg.worktree as Record<string, unknown> | undefined
   if (worktree !== undefined && (!worktree || typeof worktree !== "object" || Array.isArray(worktree) || (worktree.setup !== undefined && !commands(worktree.setup)))) {

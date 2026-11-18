@@ -3,8 +3,7 @@
 //
 // `{{name}}` is a value the hook fills; a line that is only `{{name}}` goes
 // when its value is empty. `<!-- check -->` … `<!-- /check -->` repeats once
-// per aside or ego check, `<!-- command -->` … `<!-- /command -->` once per
-// qa-integration command; a block the path does not use goes. `<...>` is
+// per aside or ego check, and goes on a path without checks. `<...>` is
 // what the completion reviewer fills.
 //
 // The hook reads its own lines back, so keep these as they are: the
@@ -29,12 +28,6 @@ export const QA_INTEGRATION_TEMPLATE = `## e2e
 
 {{images}}
 <!-- /check -->
-
-<!-- command -->
-- \`{{cmd}}\` ({{root}}) — exit {{exit}}
-<!-- /command -->
-
-{{output}}
 
 판정: {{verdict}}
 

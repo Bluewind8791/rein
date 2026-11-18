@@ -75,7 +75,7 @@ describe("the layout boxes of 5-checklist.md", () => {
     planFiles: ["E:/proj/src/login.ts"], repos: ["E:/proj"], writes: ["E:/proj/src/login.ts"], checks: [], layouts: [LAYOUT],
   }
   const SPEC = `# 로그인 잠금\n\n## 완료 판정\n\n${SPEC_LINE}\n`
-  const filesWith = (): Record<string, string> => ({ "E:/proj/.rein/config.json": JSON.stringify({ qa: ["npm test"], "qa-integration": ["npx playwright test"] }), [`${DIR}/1-spec.md`]: SPEC, [HTML]: DRAWN })
+  const filesWith = (): Record<string, string> => ({ "E:/proj/.rein/config.json": JSON.stringify({ qa: ["npm test"] }), [`${DIR}/1-spec.md`]: SPEC, [HTML]: DRAWN })
   const host: Host = {
     run: argv => {
       if (argv[0] === "aside") return { exitCode: 1 }

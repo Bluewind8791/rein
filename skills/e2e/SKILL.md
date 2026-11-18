@@ -26,7 +26,6 @@ The user may type it in this session or in a new one, with the run's slug (its r
    - `Aside`, only when the user asked for Aside, in the argument (`aside`, with or without a slug) or in their words: aside, the browser agent, runs each check and says what it saw; its screenshots are the evidence.
 2. Call `mcp__rein__advance` with `answer` set to `e2e 실행 (Ego)` or `e2e 실행 (Aside)`, and the user's words in `said`. The hook runs the integration qa entry in that browser; reruns of this run use it too.
    - The aside or ego path: invoke the `rein:qa` skill and follow its layer 2. Before you spawn the first agent, make sure the change is in the app the checks open, as that skill says.
-   - The command path (`qa-integration` commands, on Aside): the hook already ran them. Invoke the `rein:qa` skill.
    - `D141` (Aside unavailable): nothing ran and the run still waits. Tell the user: they start the Aside app and type `/rein:e2e` again, or test by `5-checklist.md` by hand.
    - A halt (`halt:` in status), `ego-unavailable` and `ego-profile-missing` included: invoke the `rein:qa` skill; its "When the run is halted" says what to ask.
    - `D50` (a config changed): follow what advance says; it asks the user first.

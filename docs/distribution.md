@@ -28,7 +28,6 @@ tests/            훅 시험
 
 - `<repository>/.rein/config.json` — 검증 명령. 사용자 확인 후 씀
   - `qa`(필수): 작업 qa 명령
-  - `qa-integration`: 통합 qa 명령 (e2e 대신)
   - `e2e`: 앱 URL·로그인, 운영 호스트(`production`, `backends`), 시간 제한, ego 프로필
 - `~/.rein/<project>/rules/`, `knowledge/` — 허브 서버의 카탈로그에서 고른 도메인의 룰과 지식
 - `~/.rein/rules/` — 모든 프로젝트에 적용할 공용 룰 (선택). 허브 서버와 주고받음

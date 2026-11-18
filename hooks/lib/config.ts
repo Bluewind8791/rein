@@ -22,7 +22,7 @@ export type E2e = {
 
 // setup: `worktree.setup`, what the hook runs in a worktree it just made
 // (installing dependencies, say); [] for none.
-export type Config = { qa: string[]; integration: string[]; e2e?: E2e; setup: string[] }
+export type Config = { qa: string[]; e2e?: E2e; setup: string[] }
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [])
 const text = (v: unknown) => (typeof v === "string" && v.trim() !== "" ? v : undefined)
@@ -62,7 +62,6 @@ export function readConfig(raw: string): Config {
   const worktree = data.worktree as Record<string, unknown> | undefined
   return {
     qa: strings(data.qa),
-    integration: strings(data["qa-integration"]),
     setup: worktree && typeof worktree === "object" ? strings(worktree.setup) : [],
     e2e:
       e2e && apps
@@ -83,13 +82,12 @@ export function readConfig(raw: string): Config {
 // field (where e2e may go, as whom, how long, on which model).
 export type ConfigView = {
   qa: string[]
-  integration: string[]
   e2e?: { apps: Record<string, App>; production: string[]; backends: string[]; timeout?: number; model?: string; effort?: string }
 }
 
 export function viewOf(config: Config): ConfigView {
   const e2e = config.e2e
-  const head = { qa: config.qa, integration: config.integration }
+  const head = { qa: config.qa }
   if (!e2e) return head
   const { apps, production, backends, timeout, model, effort } = e2e
   return { ...head, e2e: { apps, production, backends, timeout, model, effort } }
@@ -107,7 +105,6 @@ export function changeLines(path: string, before: ConfigView | undefined, now: s
   const show = (v: unknown) => (v === undefined ? "(없음)" : JSON.stringify(v))
   const fields: [string, (v: ConfigView) => unknown][] = [
     ["qa", v => v.qa],
-    ["qa-integration", v => v.integration],
     ["e2e.apps", v => v.e2e?.apps],
     ["e2e.production", v => v.e2e?.production],
     ["e2e.backends", v => v.e2e?.backends],
@@ -119,5 +116,5 @@ export function changeLines(path: string, before: ConfigView | undefined, now: s
     .filter(([, get]) => before === undefined || show(get(before)) !== show(get(after)))
     .map(([name, get]) => (before === undefined ? `  ${name}: ${show(get(after))}` : `  ${name}: ${show(get(before))} → ${show(get(after))}`))
   const head = before === undefined ? `${path} (비교할 승인 기록 없음, 지금 내용)` : path
-  return lines.length > 0 ? [head, ...lines] : [head, "  (qa·qa-integration·e2e 필드는 그대로, 그 밖의 필드만 바뀜)"]
+  return lines.length > 0 ? [head, ...lines] : [head, "  (qa·e2e 필드는 그대로, 그 밖의 필드만 바뀜)"]
 }

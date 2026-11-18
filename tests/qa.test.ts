@@ -211,17 +211,15 @@ describe("work qa", () => {
   })
 })
 
-describe("integration qa, command path", () => {
-  const PASSING = filesWith({ "qa-integration": ["npx playwright test"] })
+describe("integration qa, no e2e", () => {
+  const PASSING = filesWith()
 
-  test("the hook runs the e2e commands once, writes ## e2e, and the completion check moves the run to land", async ($, on) => {
+  test("the hook writes a passing ## e2e, and the completion check moves the run to land", async ($, on) => {
     const files = { ...PASSING }
     world(on, files, undefined, RUN, host())
     const r = await relay($, ADVANCE)
-    expect(context(r)).toContain("D73")
-    expect(ran.filter(x => x.argv[2] === "npx playwright test")).toHaveLength(1)
-    expect(files[QAI]).toContain("- `npx playwright test` (E:/proj) — exit 0")
-    expect(await status($)).toContain("e2e result: `npx playwright test` (E:/proj) — exit 0")
+    expect(context(r)).toContain("D72")
+    expect(files[QAI]).toContain("판정: 통과")
 
     await $.agent.spawn(spawnVerifier)
     const done = await $.tool.call(write(QAI, files[QAI] + completion(SPEC_LINE, "통과"), VERIFIER))
@@ -230,21 +228,6 @@ describe("integration qa, command path", () => {
     expect(s).toContain("stage: land")
     expect(s).toContain("heads:\n- E:/proj: abc123")
     expect(files[`${DIR}/agent/trace.jsonl`]).toContain(`"ev":"capture","stage":"land","heads":{"E:/proj":"abc123"}`)
-  })
-
-  test("a failing e2e command stops the run in qa-integration for the main session's decision; the hook wrote the failure", async ($, on) => {
-    const files = { ...PASSING }
-    world(on, files, undefined, RUN, host({ "npx playwright test": "1 failed: login.spec.ts:12" }))
-    const r = await relay($, ADVANCE)
-    expect(context(r)).toContain("D71")
-    expect(context(r)).toContain("failure-route")
-    expect(files[QAI]).toContain("판정: 실패")
-    expect(files[QAI]).toContain("login.spec.ts:12")
-    const s = await status($)
-    expect(s).toContain("stage: qa-integration")
-    expect(s).toContain("halt: failure-route:")
-    expect(store.get("runs:proj/login-fix")).toMatchObject({ stage: "qa-integration", retries: 0, halt: { rule: "failure-route", file: QAI } })
-    expect(files[`${DIR}/agent/trace.jsonl`]).toContain(`"ev":"halt","stage":"qa-integration"`)
   })
 
   test("the completion reviewer runs in the foreground on the hook's task", async ($, on) => {
@@ -305,8 +288,7 @@ describe("integration qa, command path", () => {
     await $.agent.spawn(spawnVerifier)
     await $.tool.call(write(QAI, files[QAI] + completion(SPEC_LINE, "실패"), VERIFIER))
     const again = await $.tool.call({ tool: "mcp__rein__goto", stage: "qa-integration" } as never)
-    expect(context(again)).toContain("D73")
-    expect(ran.filter(x => x.argv[2] === "npx playwright test")).toHaveLength(2)
+    expect(context(again)).toContain("D72")
     expect(ran.filter(x => x.argv[2] === "npm test")).toHaveLength(1)
     expect(await status($)).not.toContain("halt:")
     expect(files[QAI]!.split("## 이전 진입")[0]).not.toContain("완료 판정 대조")
@@ -335,19 +317,13 @@ describe("integration qa, command path", () => {
 })
 
 describe("integration qa, aside path", () => {
-  const ASIDE = filesWith({ e2e: E2E, "qa-integration": ["npx playwright test"] })
+  const ASIDE = filesWith({ e2e: E2E })
 
   test("aside needs both the app and an e2e key", async ($, on) => {
     const files = filesWith()
     world(on, files, undefined, RUN, host({}, 0))
     await relay($, ADVANCE)
     expect(await status($)).toContain("e2e: none")
-  })
-
-  test("without the app the command path runs instead", async ($, on) => {
-    world(on, { ...ASIDE }, undefined, RUN, host({}, 1))
-    await relay($, ADVANCE)
-    expect(await status($)).toContain("e2e: playwright")
   })
 
   test("a production url halts the run before any command is built", async ($, on) => {
@@ -442,7 +418,7 @@ describe("integration qa, aside path", () => {
   test("exit 124 past the check's limit halts the run and the hook stops the session the CLI left running", async ($, on) => {
     const timedOut = { result: "Error: Exit code 124\n", text: `Exit code 124\n\x1b[2mcreated new session: ${SESSION_ID}\x1b[0m\nstill working`, isError: true }
     const run = (argv: string[]) => (argv[0] === "aside" && argv[2] === "list" ? { exitCode: 0, stdout: `${SESSION_ID}  running  ephemeral  x  2026-10-02T00:00:00.000Z\n` } : argv[0] === "aside" ? { exitCode: 0 } : { exitCode: 0, stdout: "ok\n" })
-    const files = filesWith({ e2e: { ...E2E, timeout: 10 }, "qa-integration": ["npx playwright test"] })
+    const files = filesWith({ e2e: { ...E2E, timeout: 10 } })
     world(on, files, undefined, RUN, host({}, 0, { run, bash: c => (c.startsWith("timeout") ? timedOut : undefined) }))
     await relay($, ADVANCE)
     await $.agent.spawn(SPAWN_RUNNER)
@@ -464,7 +440,7 @@ describe("integration qa, aside path", () => {
   test("a stop that fails tells the user to stop the session", async ($, on) => {
     const timedOut = { result: "Error: Exit code 124\n", text: `Exit code 124\n\x1b[2mcreated new session: ${SESSION_ID}\x1b[0m`, isError: true }
     const run = (argv: string[]) => (argv[0] === "aside" && argv[2] === "list" ? { exitCode: 0, stdout: `${SESSION_ID}  running  ephemeral  x  t\n` } : argv[0] === "aside" ? { exitCode: argv[2] === "stop" ? 1 : 0 } : { exitCode: 0, stdout: "ok\n" })
-    world(on, filesWith({ e2e: { ...E2E, timeout: 10 }, "qa-integration": ["npx playwright test"] }), undefined, RUN, host({}, 0, { run, bash: c => (c.startsWith("timeout") ? timedOut : undefined) }))
+    world(on, filesWith({ e2e: { ...E2E, timeout: 10 } }), undefined, RUN, host({}, 0, { run, bash: c => (c.startsWith("timeout") ? timedOut : undefined) }))
     await relay($, ADVANCE)
     await $.agent.spawn(SPAWN_RUNNER)
     const r = await $.tool.call(asRunner(EXEC()))
@@ -540,12 +516,11 @@ describe("re-entry and the person's exits", () => {
     expect(s).not.toContain("e2e capture")
   })
 
-  test("on the command path the entry leaves only the hook's ## e2e", async ($, on) => {
-    const files = { ...filesWith({ "qa-integration": ["npx playwright test"] }), [QAI]: OLD }
+  test("with no e2e the entry leaves only the hook's ## e2e", async ($, on) => {
+    const files = { ...filesWith(), [QAI]: OLD }
     world(on, files, undefined, { ...RUN, verifier: "agent-old" }, host())
     await relay($, ADVANCE)
     expect(files[QAI].split("## 이전 진입")[0]).not.toContain("완료 판정 대조")
-    expect(files[QAI]).toContain("- `npx playwright test` (E:/proj) — exit 0")
     expect(files[QAI].endsWith(`판정: 통과\n\n${KEPT}`)).toBe(true)
     expect(await status($)).not.toContain("verifier:")
   })
@@ -588,10 +563,10 @@ describe("re-entry and the person's exits", () => {
   })
 
   const nothing = (more: Host = {}) => host({}, 1, { run: argv => (gitSub(argv) === "status" ? { exitCode: 0, stdout: "" } : argv[0] === "git" ? { exitCode: 0, stdout: "abc123\n" } : { exitCode: 0 }), ...more })
-  const NONE_RUN = { ...RUN, stage: "qa-integration", e2e: { path: "none", written: e2eSection(undefined) } }
+  const NONE_RUN = { ...RUN, stage: "qa-integration", e2e: { path: "none", written: e2eSection() } }
 
   test("nothing to commit: the reviewer reports it; advance asks, and plan으로 되돌림 sends the run to plan (D95, D62)", async ($, on) => {
-    const files = { ...filesWith(), [QAI]: e2eSection(undefined) }
+    const files = { ...filesWith(), [QAI]: e2eSection() }
     world(on, files, () => "plan으로 되돌림", NONE_RUN, nothing())
     await $.agent.spawn(spawnVerifier)
     const done = context(await $.tool.call(write(QAI, files[QAI] + completion(SPEC_LINE, "통과"), VERIFIER)))
@@ -606,7 +581,7 @@ describe("re-entry and the person's exits", () => {
   })
 
   test("nothing to commit: run 종료 ends the run without a commit (D95)", async ($, on) => {
-    const files: Record<string, string> = { ...filesWith(), [QAI]: e2eSection(undefined) + completion(SPEC_LINE, "통과") }
+    const files: Record<string, string> = { ...filesWith(), [QAI]: e2eSection() + completion(SPEC_LINE, "통과") }
     world(on, files, () => "run 종료", NONE_RUN, nothing())
     const r = await relay($, ADVANCE)
     expect(context(r)).toContain("D95: the run ended without a commit")
@@ -703,7 +678,7 @@ describe("e2e without Aside, production backends, and the environment rerun (D14
     world(on, files, undefined, RUN, switchable({ up: false }))
     const r = await relay($, ADVANCE)
     expect(context(r)).toContain("D72: the qa commands passed; there is no e2e to run")
-    expect(files[QAI]).toBe(e2eSection(undefined))
+    expect(files[QAI]).toBe(e2eSection())
   })
 
   test("a halted integration qa rerun that finds Aside gone halts under D141, and advance then asks about Aside", async ($, on) => {

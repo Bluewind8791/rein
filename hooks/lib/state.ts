@@ -141,14 +141,13 @@ export type QaFailure = { root: string; cmd: string; exit: number; tail: string 
 
 // the e2e path; on the aside path every check of
 // 2-plan.md's `## e2e 확인` with its runner and what was captured for it;
-// the results of the commands it ran; the `## e2e` section the hook wrote
+// the `## e2e` section the hook wrote
 // itself (every path). wait: the hook wrote 5-checklist.md and nothing ran
 // yet; the person tests by hand or runs /rein:e2e. manual: the person
 // checked every box of 5-checklist.md.
 export type E2eState = {
-  path: "aside" | "ego" | "playwright" | "none" | "wait" | "manual"
+  path: "aside" | "ego" | "none" | "wait" | "manual"
   checks?: CheckRun[]
-  results?: { root: string; cmd: string; exit: number }[]
   written?: string
 }
 
@@ -286,7 +285,6 @@ export function renderRun(run: Run): string {
       for (const k of checks.filter(x => isOpen(x) && x.ego?.resumed)) lines.push(`e2e resume: the user finished check ${k.name}'s hand-off; resume its rein:ego-driver ${k.runner} with SendMessage, if you have not.`)
       for (const k of checks.filter(x => isOpen(x) && x.ego?.returned !== undefined)) lines.push(`e2e missing evidence: send rein:ego-driver ${k.runner} of check ${k.name} with SendMessage what its judge found missing: ${k.ego!.returned}`)
     }
-    for (const r of e2e.results ?? []) lines.push(`e2e result: \`${r.cmd}\` (${r.root}) — exit ${r.exit}`)
   }
   if (run.heads) lines.push("heads:", ...Object.entries(run.heads).map(([repo, head]) => `- ${repo}: ${head}`))
   if (run.landRepos) lines.push(`land repositories: ${run.landRepos.join(", ")}`)

@@ -3438,7 +3438,7 @@ const servedFrom = (run: Run, list: string) => {
 // the path needs before the agent does anything: aside (one command
 // per check of 2-plan.md's `## e2e 확인`, after the completion line, the production check on
 // the apps' urls and the backends and the reachability probe of
-// each app), the qa-integration commands once, a halt when e2e is
+// each app), a halt when e2e is
 // configured but only a missing aside could run it, or nothing (2-plan.md
 // checks no screen; with noE2e, the person's choice to go
 // on without e2e), in every repository of the run. Whether 2-plan.md's
@@ -3503,7 +3503,6 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
   // none, so its completion line is its one check, as aside got it before.
   const checks: Check[] = !e2e ? [] : (run.checks ?? [{ name: "completion", app: Object.keys(e2e.apps)[0]!, todo: `Check whether this statement is true: ${completion}`, expect: "the statement is true", saves: false }])
   const asideWanted = e2e !== undefined && checks.length > 0 && !noE2e
-  const commands = repos.some(r => (configs[r]?.integration.length ?? 0) > 0)
   // a pass of this visit, or of an earlier one whose files are unchanged,
   // stands, and so does a check the person tested by 5-checklist.md, every
   // box of its expectation checked; with every check's standing, Aside is
@@ -3518,7 +3517,7 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
   const allKept = checks.length > 0 && checks.every(k => kept(k) !== undefined)
   // ego unless the user chose Aside (/rein:e2e): the checks run there, whatever else could.
   const path = asideWanted && run.browser !== "aside" ? "ego"
-    : asideWanted && (allKept || (await asideAvailable($))) ? "aside" : commands ? "playwright" : asideWanted ? "unavailable" : "none"
+    : asideWanted && (allKept || (await asideAvailable($))) ? "aside" : asideWanted ? "unavailable" : "none"
 
   if (path === "ego") {
     // each to-be screen whose box is still empty is an ego check of its
@@ -3560,37 +3559,12 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
     return `D56: ${lead}. The run is now in the qa-integration stage, aside path, with ${left} check${left === 1 ? "" : "s"} to run, each by a rein:e2e-runner agent, up to ${AT_ONCE} at once. Invoke the rein:qa skill; mcp__rein__status says how many runners to spawn now.`
   }
 
-  if (path === "playwright") {
-    const ran = await runAll($, repos, r => configs[r]?.integration ?? [], 600_000)
-    const drift = await configDrift($, (await getRun($)) ?? run)
-    const results = drift.length > 0 ? [...ran, rewrote(drift)] : ran
-    const failed = results.some(r => r.exit !== 0)
-    const written = e2eSection(results)
-    let context = ""
-    const moved = await mutate($, r => {
-      if (!ready(r)) return undefined
-      const entered: Run = { ...r, stage: "qa-integration", halt: undefined, busy: undefined, verifier: undefined, qaVisit: undefined, e2e: { path: "playwright", results: stored(results), written } }
-      if (!failed) return entered
-      const held = holdRoute(entered, file, "the qa-integration commands failed (D71)")
-      context = held.context
-      return held.run
-    })
-    if (!moved) return `The run left ${from} before the e2e entry.`
-    await writeE2e($, file, written, true)
-    await trace($, run, { ev: "stage", from, to: "qa-integration", e2e: "playwright", results: stored(results) })
-    if (failed) {
-      await trace($, run, { ev: "halt", stage: "qa-integration", halt: moved.halt, retries: moved.retries })
-      return `D71: ${lead}, but the hook ran the e2e commands and one failed:\n${commandReport(results)}\nIt wrote ## e2e in ${file}. ${context}`
-    }
-    return `D73: ${lead} and the hook ran the e2e commands; all passed and ## e2e is in ${file}. The run is now in the qa-integration stage. Invoke the rein:qa skill.`
-  }
-
   // e2e is configured and only aside could run it: halt where the run
   // is, unless the person chose to go on without it.
   if (path === "unavailable") {
     // asked for from the wait, it leaves the run waiting: the person may still test by hand.
-    if (waited) return `D141: Aside is unavailable (\`aside session list\` did not exit 0) and there is no qa-integration command to run instead, so nothing ran; the run still waits in qa-integration. Tell the user: they start Aside and run /rein:e2e again, or test by ${c.dir}/5-checklist.md by hand.`
-    const halt = { rule: "D141" as const, reason: "`aside session list` did not exit 0, and there is no qa-integration command to run instead" }
+    if (waited) return `D141: Aside is unavailable (\`aside session list\` did not exit 0), so nothing ran; the run still waits in qa-integration. Tell the user: they start Aside and run /rein:e2e again, or test by ${c.dir}/5-checklist.md by hand.`
+    const halt = { rule: "D141" as const, reason: "`aside session list` did not exit 0" }
     // From qa the entry runs only after the qa commands passed a hook rerun.
     const moved = await mutate($, r => (ready(r) ? { ...r, halt, ...(from === "qa" ? { qaVisit: { ...(r.qaVisit ?? { reruns: 0 }), passed: true as const } } : {}) } : undefined))
     if (!moved) return `The run left ${from} before the e2e entry.`
@@ -3599,7 +3573,7 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
     return `D141: ${lead}, but e2e is configured and Aside is unavailable, so the run is halted in ${from}; it does not pass without e2e. Tell the user: they start Aside, or decide to go on without e2e. Then call mcp__rein__advance: it says what to ask them (D200).`
   }
 
-  const written = noE2e ? E2E_SKIPPED : e2e ? E2E_NONE : e2eSection(undefined)
+  const written = noE2e ? E2E_SKIPPED : e2e ? E2E_NONE : e2eSection()
   const moved = await enter({ e2e: { path: "none", written } })
   if (!moved) return `The run left ${from} before the e2e entry.`
   await writeE2e($, file, written, true)

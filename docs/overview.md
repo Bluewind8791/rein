@@ -72,7 +72,7 @@ run마다 자기 git 워크트리에서 작업합니다. 같은 저장소에서 
 | `~/.rein/<project>/rules/` | 프로젝트 룰. `paths:` glob으로 적용 대상을 정함. run을 열 때 동결 |
 | `~/.rein/rules/` | 공용 룰. 모든 프로젝트의 run이 프로젝트 룰과 함께 동결하고, run이 고치는 모든 저장소에 적용. review에서는 `rules:<이름>`으로 부름 |
 | `~/.rein/<project>/knowledge/` | 도메인 지식. 에이전트가 화면·기능의 파일을 찾을 때 먼저 봄 |
-| `<repository>/.rein/config.json` | 저장소의 검증 명령 (`qa`, `qa-integration`, `e2e`)과 워크트리 준비 명령 (`worktree.setup`) |
+| `<repository>/.rein/config.json` | 저장소의 검증 명령 (`qa`, `e2e`)과 워크트리 준비 명령 (`worktree.setup`) |
 | `<repository>/.claude/worktrees/<runId>/` | run의 워크트리. land나 `폐기`에서 지움 |
 | `~/.claude/plugins/store/rein_*.json` | run 상태 (`$.store`) |
 

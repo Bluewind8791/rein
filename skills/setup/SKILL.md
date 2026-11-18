@@ -27,7 +27,6 @@ If `<repository root>/.rein/config.json` already exists, read it and check it ag
 
 - It is a JSON object.
 - `qa` is a non-empty array of non-empty command strings.
-- `qa-integration`, when present, is an array of command strings.
 - `worktree`, when present, is an object whose `setup`, if given, is an array of non-empty command strings.
 - `e2e`, when present, is an object with `apps` (at least one app, each an http(s) `url` and, if given, a `login` string, a `note` string, a `profile` string and a `profiles` object of strings), a `production` array of hosts (it may be empty), a `backends` array of hosts (empty only when the apps call no backend), and, if given, a `timeout` that is a whole number from 1 to 60. An older `e2e` has one `url` and an `account` instead of `apps`; the hook still reads it as one app named `app`. Offer to rewrite it as `apps` only when the user wants to name a second app or a login.
 
@@ -47,7 +46,7 @@ Show the `qa` candidates and ask with `AskUserQuestion` whether to run them once
 
 If the user says no, go to step 4 and let them approve the commands as text, the way they did before. Long commands and a half-set-up environment are reasons to say no.
 
-If they say yes, run the `qa` commands with `Bash`, in the order they are listed, from the repository root. Run **only** `qa`: `qa-integration` drives the apps, and the production guards only start working once the config is written.
+If they say yes, run the `qa` commands with `Bash`, in the order they are listed, from the repository root. Run **only** `qa`: the production guards only start working once the config is written.
 
 Give each command at most 10 minutes, the same as a run gives it, and put no cap on the total: what the user sees here has to predict what the run will do. For each command report the exit code, how long it took, and the last 20 lines of its output.
 
@@ -58,7 +57,6 @@ A failure does not block anything. It may be the environment, and the call is th
 Ask with `AskUserQuestion`, the candidates as options. **Never write the file without the user's confirmation.**
 
 - `qa`: fast commands such as typecheck and unit tests. Required.
-- `qa-integration`: e2e commands. May be empty or left out.
 - `e2e`: what the e2e agent needs to drive the apps. Leave it out if the user says there is no app to drive. When present:
   - `apps`, required: one entry per app, `"<name>": {"url": "...", "login": "..."}`. The name is what `2-plan.md`'s checks say under `- 앱:` (a short word: `admin`, `mobile`). `url` is the address to drive; never offer a production address as a candidate. `login`, optional, is one free sentence: the account, its password, and how to log in (for example "tester / test-pass, log in with the id and password form, not the user picker"). When every test account shares one password, the sentence can give only the way in and that password ("id and password form; the password is test-pass for every account"): each check in `2-plan.md` then names its account under `- 계정:`, so runs that test as different accounts need no config change. Tell the user the login goes into every aside command and stays in Rein's trace and in the Aside session, so it must be a test account. `note`, optional, is one free sentence of what every check of the app must mind, for example "after login a 「공지를 확인하시겠습니까?」 dialog appears; press [닫기], since [확인] marks the notice as read". The hook puts it into every aside and ego command and once per page into `5-checklist.md`, so checks do not repeat it in their steps. Ask whether the app has such a thing; never put a password in it, since the person reads it.
   - `production`, required: the list of production hosts, `[]` if none. **Always ask for it**: the hook checks each app's `url` and every `backends` host against it and blocks e2e on production. The match is by host only (case, port, user info and a trailing dot ignored): `app.example.com` matches that host exactly, and `*.example.com` matches every host under `example.com` (not `example.com` itself; list it too if it is production).
@@ -76,7 +74,6 @@ Write the confirmed values to `<repository root>/.rein/config.json`:
 ```json
 {
   "qa": ["npm run typecheck", "npm test"],
-  "qa-integration": ["npx playwright test"],
   "e2e": {
     "apps": {
       "admin": { "url": "http://localhost:8090", "login": "tester / test-pass, id and password form", "note": "after login press [닫기] on the notice dialog", "profile": "Tester1", "profiles": { "staff01": "Tester2" } },

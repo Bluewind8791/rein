@@ -195,14 +195,13 @@ describe("plan", () => {
       ["[]", "it is not a JSON object"],
       [JSON.stringify({ qa: [] }), "`qa` must be a non-empty array of command strings"],
       [JSON.stringify({ qa: ["npm test", 3] }), "`qa` must be a non-empty array of command strings"],
-      [JSON.stringify({ qa: ["npm test"], "qa-integration": "npx playwright test" }), "`qa-integration` must be an array of command strings"],
       [JSON.stringify({ qa: ["npm test"], e2e: { url: "http://localhost:5173", production: [] } }), "`e2e.backends` must be an array of the hosts the app sends requests to (empty only when it calls no backend)"],
     ]
     for (const [text, reason] of cases) {
       files["E:/proj/.rein/config.json"] = text
       expect(await planned($, PLAN)).toContain(`E:/proj/.rein/config.json (${reason})`)
     }
-    files["E:/proj/.rein/config.json"] = `\uFEFF${JSON.stringify({ qa: ["npm test"], "qa-integration": [] })}`
+    files["E:/proj/.rein/config.json"] = `\uFEFF${JSON.stringify({ qa: ["npm test"] })}`
     expect(await planned($, PLAN)).toContain("now in the dev stage")
   })
 

@@ -60,7 +60,7 @@ The result of advance, or the triage's answer and `mcp__rein__status`, tells you
 - `dev`: the triage judged the failure an implementation problem (`qa.md`). Invoke the `rein:dev` skill.
 - `plan`: the triage judged the failure a design problem (`## 실패 원인` of `qa.md`). Tell the user what failed, with the evidence the failure files give (an output line, a `path:line`); a cause no file shows is your guess: say `추측` and how to check it. Then invoke the `rein:plan` skill; the revised plan is approved through `mcp__rein__advance`.
 - still `qa`, `halt: failure-route`: the run stopped for your decision. See "When the run is halted" below.
-- still `qa`, `D141`, status shows `halt: D141`: the commands passed a hook run (status: `qa visit: a hook rerun passed`), but a repository's config has `e2e`, Aside is not available, and there are no `qa-integration` commands to run instead. The run does not pass without e2e. Tell the user: they start the Aside app, or decide to go on without e2e. Then ask them `Aside를 켰음, 다시 확인` or `e2e 없이 진행` through `mcp__rein__advance`.
+- still `qa`, `D141`, status shows `halt: D141`: the commands passed a hook run (status: `qa visit: a hook rerun passed`), but a repository's config has `e2e` and Aside is not available. The run does not pass without e2e. Tell the user: they start the Aside app, or decide to go on without e2e. Then ask them `Aside를 켰음, 다시 확인` or `e2e 없이 진행` through `mcp__rein__advance`.
   - `Aside를 켰음, 다시 확인`: the hook checks Aside again. Still down: the run stays halted. Up: the entry runs, and it can still halt on a production url or backend or an app that does not answer; the result says which. Then see "When the run is halted".
   - `e2e 없이 진행`: the hook writes a `## e2e` that says so and enters integration qa; the completion check then has only the code to go on.
 - still `qa`, `halt: failure-route`, with a result saying a command rewrote `.rein/config.json`: the code under test changed its own checks. That counts as a failing qa that no agent judged: decide dev or plan as `failure-route` below says; at the next qa the user approves the changed config or not.
@@ -146,9 +146,9 @@ Each time an agent finishes, call `mcp__rein__status` and act on it the same way
 
 Do not drive a check or write a round, a result or `## e2e` yourself: only the agents' work counts. The hook closes a check's space when its time runs out (the check closes with no verdict, `D101`), closes a passed check's space, and closes every space of the run when it leaves integration qa, is put aside or dropped.
 
-### e2e: playwright or none
+### e2e: none
 
-The hook already ran the `qa-integration` commands once and wrote `## e2e` into `e2e.md`. Do not run them and do not change that section. If they failed, the run is halted with `failure-route`; see "When the run is halted".
+There was no e2e to run, and the hook wrote a passing `## e2e` into `e2e.md`. Do not change that section.
 
 ### The completion check
 
@@ -178,7 +178,7 @@ When `## e2e` says `판정: 통과`, spawn `rein:reviewer` and wait for it. The 
 
 That form, and the form of `## e2e`, come from one template, `hooks/stages/qaTemplate.ts` in the plugin.
 
-If `## e2e` says `판정: 실패`, do not spawn the reviewer: on the command path the run is halted (`failure-route`); on the aside path the run is halted for the user.
+If `## e2e` says `판정: 실패`, do not spawn the reviewer: the run is halted for the user.
 
 ### The hook decides
 
@@ -208,7 +208,7 @@ Status shows `halt:` with the reason. Advance moves nothing while it stands, unt
 - `D141` (Aside unavailable with e2e configured): ask `Aside를 켰음, 다시 확인` or `e2e 없이 진행`, as in layer 1. If `.rein/config.json` changed since it was frozen, advance first gives the change: ask `새 config 승인` or `그대로`; after an approval, ask the Aside question.
 - `completion-failed` (the completion check failed): advance does not release it; see "The hook decides" above.
 - `layout-unchecked` (integration qa passed, and a layout box is still empty): see "Comparing the layout" below.
-- `failure-route` (in review, qa or qa-integration: a failure no agent judged, a command rewriting `.rein/config.json` during qa or the `qa-integration` commands failing, or implementation failures at the hook's limit): read the reason and the failure file status and advance give, decide whether the code or the design must change, and call `mcp__rein__advance` with `dev로 보냄` or `plan으로 보냄`. When you cannot decide it alone, ask the user with `AskUserQuestion`. Then invoke the skill of the stage the run went to.
+- `failure-route` (in review, qa or qa-integration: a failure no agent judged, a command rewriting `.rein/config.json` during qa, or implementation failures at the hook's limit): read the reason and the failure file status and advance give, decide whether the code or the design must change, and call `mcp__rein__advance` with `dev로 보냄` or `plan으로 보냄`. When you cannot decide it alone, ask the user with `AskUserQuestion`. Then invoke the skill of the stage the run went to.
 
 Every entry into integration qa starts `e2e.md` over: empty on the aside and ego paths until a check closes (from then on the hook rewrites `## e2e` with each check so far, open ones `결과: 진행 중`, the section `판정: 미정`, until every check has its verdict), only the hook's `## e2e` on the other paths. What the file held moves to `## 이전 진입` at its end, headings one level down; leave that section as it is. `goto qa-integration` is refused while a check is still open: wait for its agents. A rerun in the same visit (`다시 돌리기`, `실패 항목만 다시 돌리기`) keeps the checks that passed and runs only the others. After a move back to dev or review, a check that passed keeps its pass while none of the files it rests on changed (those on its `- 파일:`, or every planned file when it names none), or when `rein:impact` found the change does not touch it: its box in `5-checklist.md` comes checked, and with every check's pass kept the run goes straight to the completion check. A box the user unchecks again has that check run at `/rein:e2e`.
 
@@ -224,5 +224,5 @@ If the user wants to stop, put aside or abandon the run, call `mcp__rein__park` 
 
 - Fix the code. A code failure goes to `dev` through the triage's `qa.md`.
 - Read `qa-output.log` to sort out a failure yourself. `rein:triage` does.
-- Run the qa commands or the e2e commands in place of the hook, or an aside or ego check in place of its agents: only their runs count.
+- Run the qa commands in place of the hook, or an aside or ego check in place of its agents: only their runs count.
 - Judge the completion line yourself, or write `## 완료 판정 대조`. Only the reviewer's write is a verdict; to go on past a failed one, use `mcp__rein__goto`.

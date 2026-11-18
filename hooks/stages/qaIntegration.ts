@@ -7,7 +7,6 @@ import { itemsOf, listed, type Check, type Layout } from "../lib/parse.ts"
 import { same } from "../lib/paths.ts"
 import type { CheckRun, Ctx, Passed, Run, Seal, StageSpec } from "../lib/state.ts"
 import { CHECKLIST_TEMPLATE } from "./checklistTemplate.ts"
-import { failedTail, type CommandResult } from "./qa.ts"
 import { QA_INTEGRATION_TEMPLATE } from "./qaTemplate.ts"
 
 // the integration reviewer's row: e2e.md; Bash only reads, as the reviewer's.
@@ -192,7 +191,7 @@ function fill(text: string, values: Values): string {
 // the `## e2e` section from E2E_TEMPLATE: each block once per item of its
 // name, blank lines between items, at most one blank line in a row outside
 // code blocks.
-function renderE2e(values: Values, blocks: Record<"check" | "command", Values[]>): string {
+function renderE2e(values: Values, blocks: Record<"check", Values[]>): string {
   let text = E2E_TEMPLATE
   for (const [name, items] of Object.entries(blocks)) {
     text = text.replace(blockOf(name), (_, body: string) => items.map(item => fill(body, item)).join("\n"))
@@ -469,8 +468,8 @@ export function keptPasses(run: Run, checks: Check[], hashes: Record<string, str
 
 // whether the configs as they are now (their hashes and views) give every
 // e2e check what the frozen ones gave: the same repositories, and the `e2e`
-// of each as the person last approved it (configSeen). qa, qa-integration
-// and worktree.setup do not change what a check sees. A repository with no
+// of each as the person last approved it (configSeen). qa and
+// worktree.setup do not change what a check sees. A repository with no
 // approved view kept is compared by its whole file.
 export function sameE2e(run: Run, hashes: Record<string, string>, views: Record<string, ConfigView>): boolean {
   const was = run.configHashes ?? {}
@@ -503,13 +502,9 @@ export function unchecked(text: string): string[] {
   return out
 }
 
-// the `## e2e` section the hook writes itself on the command path
-// or when there is no e2e at all.
-export function e2eSection(results: CommandResult[] | undefined): string {
-  if (!results) return renderE2e({ method: "없음 — e2e 설정도 qa-integration 명령도 없음", verdict: "통과" }, { check: [], command: [] })
-  const verdict = results.every(r => r.exit === 0) ? "통과" : "실패"
-  const command = results.map(r => ({ cmd: r.cmd, root: r.root, exit: String(r.exit) }))
-  return renderE2e({ method: "qa-integration 명령 실행", output: failedTail(results) ?? "", verdict }, { check: [], command })
+// the `## e2e` section the hook writes itself when there is no e2e at all.
+export function e2eSection(): string {
+  return renderE2e({ method: "없음 — e2e 설정 없음", verdict: "통과" }, { check: [] })
 }
 
 // the 증거 of a check aside passed with no screenshot.
@@ -569,19 +564,19 @@ function checksSection(checks: CheckRun[], method: string, sessionLabel: string,
     images: (k.shots ?? []).map(s => `![](${fromAgent(s).replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29")})`).join("\n"),
   }))
   const verdict = overall ?? (checks.every(k => k.verdict === "통과" || k.person) ? "통과" : "실패")
-  return renderE2e({ method, verdict }, { check, command: [] })
+  return renderE2e({ method, verdict }, { check })
 }
 
 // the `## e2e` section when 2-plan.md's `## e2e 확인` says 없음.
-export const E2E_NONE = renderE2e({ method: "없음 — 2-plan.md에 화면 확인 항목이 없음", verdict: "통과" }, { check: [], command: [] })
+export const E2E_NONE = renderE2e({ method: "없음 — 2-plan.md에 화면 확인 항목이 없음", verdict: "통과" }, { check: [] })
 
 // the `## e2e` section when the person ran the checks of 5-checklist.md
 // by hand and checked every box.
-export const E2E_MANUAL = renderE2e({ method: "사용자가 5-checklist.md대로 직접 확인함 — 모든 칸 체크", verdict: "통과" }, { check: [], command: [] })
+export const E2E_MANUAL = renderE2e({ method: "사용자가 5-checklist.md대로 직접 확인함 — 모든 칸 체크", verdict: "통과" }, { check: [] })
 
 // the `## e2e` section when e2e was configured but aside could not run
 // and the person chose to go on without it.
-export const E2E_SKIPPED = renderE2e({ method: "없음 — aside를 쓸 수 없어 사용자가 e2e 없이 진행하기로 함", verdict: "통과" }, { check: [], command: [] })
+export const E2E_SKIPPED = renderE2e({ method: "없음 — aside를 쓸 수 없어 사용자가 e2e 없이 진행하기로 함", verdict: "통과" }, { check: [] })
 
 // what an entry the person asked for left, in one sentence, from the
 // run as it stands after it.
@@ -593,7 +588,7 @@ export function entryOutcome(run: Run | undefined, noE2e: boolean): string {
     if (run.e2e?.path === "aside") return "Aside is available; the run is in qa-integration on the aside path."
     if (run.e2e?.path === "ego") return "Ego is available; the run is in qa-integration on the ego path."
     if (run.e2e?.path === "none") return noE2e ? "The user chose to go on without e2e." : "The run is in qa-integration with no e2e to run."
-    return "The run is in qa-integration on the command path."
+    return "The run is in qa-integration."
   }
   return `The integration entry moved the run to ${run.stage}.`
 }
@@ -711,9 +706,8 @@ export type IntegrationOutcome =
 // ① `## e2e` and `## 완료 판정 대조` ② one `판정: 통과|실패` each ③ the
 // quote is the spec's completion line ④ `## e2e` is the hook's own, as it
 // wrote it, and passed: on the aside path every check passed or
-// the person passed it; on the command path every stored exit is 0. An e2e
-// failure never reaches here as a pass: a failed command went to dev at the
-// entry, a failed check halted the run for the person. A
+// the person passed it. An e2e failure never reaches here as a pass: a
+// failed check halted the run for the person. A
 // completion 실패 halts the run; the main session decides where it goes. e2e passed with no completion
 // section yet: stay for the reviewer. While the run waits for the person's
 // choice nothing has run; on the manual path the boxes they checked are the
@@ -734,7 +728,6 @@ export function judgeIntegration(text: string, run: Run, completion: string | un
     const why = path === "aside" || path === "ego" ? "a browser check failed: call mcp__rein__advance, it says what to ask the user (D173, D200)." : "`## e2e` must stay exactly as the hook wrote it (D73)."
     return { kind: "stay", reason: why }
   }
-  if (path !== "aside" && path !== "ego" && !(run.e2e?.results ?? []).every(r => r.exit === 0)) return { kind: "stay", reason: "`## e2e` must stay exactly as the hook wrote it (D73)." }
   // the person checked every box by hand: their check is the verdict.
   if (path === "manual") return { kind: "land" }
   const done = s["완료 판정 대조"]

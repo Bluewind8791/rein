@@ -462,22 +462,6 @@ describe("a config the run's code rewrote is never approved silently (D120, D132
     expect(files[QA]).toContain("config changed while the commands ran")
   })
 
-  test("a rewrite during the qa-integration commands fails the entry and stops the run in qa-integration", async ($, on) => {
-    const files = filesWith({ "qa-integration": ["npx playwright test"] })
-    const hash = await sha256Text(files[CFG]!)
-    let calls = 0
-    const onRun = () => {
-      calls++
-      if (calls > 1) files[CFG] = config() // the e2e command, not the qa one
-    }
-    world(on, files, undefined, { ...RUN, configHashes: { "E:/proj": hash } }, rewriting(onRun))
-    const r = context(await relay($, ADVANCE))
-    expect(r).toContain("D71")
-    expect(files[QAI]).toContain("판정: 실패")
-    expect(await status($)).toContain("stage: qa-integration")
-    expect(saved()).toMatchObject({ stage: "qa-integration", halt: { rule: "failure-route", file: QAI } })
-  })
-
   test("N2: a failing advance run drops the visit's pass; unasked, it counts no rerun", async ($, on) => {
     world(on, filesWith(), () => "다시 돌림", { ...RUN, qaVisit: PASSED }, host({ set: new Set(["npm test"]) }, { up: false }))
     await relay($, ADVANCE)
@@ -675,7 +659,7 @@ describe("the last config checks and the quoting (review 8)", () => {
 
   test("T7 (M5): an edit during a long advance run stops the run in qa, worded as by the code or by hand", async ($, on) => {
     const files = filesWith()
-    const h = asideHost(() => {}, () => { files[CFG] = config({ "qa-integration": [] }) })
+    const h = asideHost(() => {}, () => { files[CFG] = config({ qa: ["true"] }) })
     world(on, files, () => "다시 돌림", { ...RUN, configHashes: { "E:/proj": await sha256Text(files[CFG]!) } }, h)
     const r = await relay($, ADVANCE)
     expect(r).toEqual(answered("The config changed while the qa commands ran (by the code or by hand); the run does not pass."))

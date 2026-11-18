@@ -583,13 +583,6 @@ describe("handoff files before e2e (D178)", () => {
     expect(questions).toHaveLength(0)
   })
 
-  test("the command path runs its commands at once too", async ($, on) => {
-    const files = { "E:/proj/.rein/config.json": JSON.stringify({ qa: ["npm test"], "qa-integration": ["npx playwright test"] }), [`${DIR}/1-spec.md`]: SPEC_TEXT }
-    world(on, files, undefined, { ...RUN, checks: [], handoff: ["a.sql"] }, { run: () => ({ exitCode: 0, stdout: "ok\n" }) })
-    expect(context(await relay($, ADVANCE))).toContain("D73")
-    expect(ran.filter(x => x.argv.join(" ").includes("playwright"))).toHaveLength(1)
-  })
-
   test("a run halted on D174 before D178 is asked the rerun question, and the entry runs", async ($, on) => {
     const questions: string[] = []
     const halted = { ...RUN, stage: "qa-integration", handoff: ["a.sql"], browser: "aside", e2e: { path: "aside" }, halt: { rule: "D174", reason: "2-plan.md's `## 넘길 것` names files the user applies by hand (a.sql); e2e runs once they say these are applied" } }
