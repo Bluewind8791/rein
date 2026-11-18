@@ -19,15 +19,12 @@ If the working tree has changes the user asked to ship, commit them first as usu
 CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test
 claude plugin validate .
 tsc --noEmit -p .
-node --check hooks/check-update.js hooks/plugin-update.js hooks/domain-sync.js
-node --check frame/server.js
-node --check frame/view.js
-node --check frame/text.js
+for f in $(git ls-files '*.js' '*.mjs' ':!tests/*'); do node --check "$f" || exit 1; done
 node --test tests/node/*.test.js
 grep -n '^const VERSION' hooks/register.ts
 ```
 
-All tests must pass. `validate` may warn about the missing author and marketplace description, the missing plugin icon (`ICON_MISSING`) and license (`LICENSE_MISSING`), both plugin directory checks, that the root `CLAUDE.md` is not loaded as plugin context (it is for working on this repository), and TypeScript errors in `hooks/` and `tests/` such as `TS5097` (`.ts` import paths) or `TS2304` (`setTimeout`), which come from checking each file without `tsconfig.json`; `tsc --noEmit -p .` is the type check that counts, and it must report no errors. Anything else is a failure. `VERSION` in `hooks/register.ts` must equal `version` in `.claude-plugin/plugin.json`; if it does not, set it to that and commit it as `fix: sync the hook's VERSION with plugin.json` before going on.
+All tests must pass. `validate` may warn about the missing author and marketplace description, the missing plugin icon (`ICON_MISSING`), a plugin directory check, that the root `CLAUDE.md` is not loaded as plugin context (it is for working on this repository), and TypeScript errors in `hooks/` and `tests/` such as `TS5097` (`.ts` import paths) or `TS2304` (`setTimeout`), which come from checking each file without `tsconfig.json`; `tsc --noEmit -p .` is the type check that counts, and it must report no errors. Anything else is a failure. `VERSION` in `hooks/register.ts` must equal `version` in `.claude-plugin/plugin.json`; if it does not, set it to that and commit it as `fix: sync the hook's VERSION with plugin.json` before going on.
 
 ## 3. Decide the version
 
