@@ -1,4 +1,4 @@
-// Pure text helpers shared by the frame, the hub and hooks/domain-sync.js.
+// Pure text helpers shared by the frame and the hub.
 //
 // Zero dependencies; Node 18 or later.
 "use strict"

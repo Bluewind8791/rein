@@ -1,13 +1,9 @@
-// /rein:update. Refreshes the marketplace, updates the installed plugin in
-// the scope it was installed in, then brings the domains each project took up
-// to the new catalog, except the domains the hub ~/.rein/sync.json names
-// has: the local server syncs those. The session needs /reload-plugins after.
+// /rein:update. Refreshes the marketplace and updates the installed plugin in
+// the scope it was installed in. The session needs /reload-plugins after.
 const fs = require("fs")
 const os = require("os")
 const path = require("path")
 const { spawnSync } = require("child_process")
-const { syncDomains } = require("./domain-sync.js")
-const { makeClient, serverOf, readBase } = require("../frame/sync.js")
 
 // A skill's ! block gets no CLAUDE_PLUGIN_ROOT in its env; this file sits in <root>/hooks.
 const root = process.env.CLAUDE_PLUGIN_ROOT || path.dirname(__dirname)
@@ -69,58 +65,6 @@ async function main() {
     return
   }
   console.log("Updated. Run /reload-plugins to load the new version.")
-  await domains(name)
-}
-
-// the ids of the domains the hub has; an empty set when no hub is set. When
-// the hub does not answer within 3 s, the domains this PC synced with it
-// before (a tree of theirs in ~/.rein/.hub/base.json) are its.
-async function hubDomains(reinDir) {
-  const server = serverOf(reinDir)
-  if (!server) return new Set()
-  const late = new Promise(resolve => setTimeout(resolve, 3000, null).unref())
-  const r = await Promise.race([makeClient({ server, client: "update" }).json("GET", "/api/catalog").catch(() => null), late])
-  if (r && r.status === 200 && r.json && Array.isArray(r.json.domains)) return new Set(r.json.domains.map(d => d.id))
-  const tree = /^(?:[^/]+\/(?:rules|knowledge)|\.hub\/catalog)\/([^/]+)$/
-  return new Set(Object.keys(readBase(reinDir)).map(k => tree.exec(k)).filter(Boolean).map(m => m[1]))
-}
-
-// The new version sits in its own cache folder; installed_plugins.json names it.
-async function domains(name) {
-  const install = pick(name)
-  if (!install || !install.installPath) {
-    console.log("Domains: the updated install has no installPath. Domains not synced.")
-    return
-  }
-  const home = process.env.USERPROFILE || process.env.HOME || os.homedir()
-  const skip = await hubDomains(path.join(home, ".rein"))
-  if (skip.size) console.log(`Domains on the hub, synced by the local server: ${[...skip].join(", ")}`)
-  let result
-  try {
-    result = syncDomains(root, install.installPath, path.join(home, ".rein"), skip)
-  } catch (e) {
-    console.log(`Domains: sync failed: ${e && e.message ? e.message : e}`)
-    return
-  }
-  const { done, conflicts, paths } = result
-  if (!done.length && !conflicts.length && !paths.length) {
-    console.log("Domains: up to date.")
-    return
-  }
-  console.log("Domains:")
-  for (const d of done) console.log(`  ${d.action}: ${d.file}`)
-  for (const c of conflicts) {
-    if (c.reason === "changed") console.log(`  conflict, local copy changed: ${c.file} (catalog: ${c.catalog})`)
-    else console.log(`  conflict, gone from the catalog but local copy changed: ${c.file}`)
-  }
-  for (const p of paths) {
-    console.log(`  paths changed in the catalog, local paths kept: ${p.file}`)
-    const show = globs => (globs ?? "(none)").replace(/\n/g, "\n             ")
-    console.log(`    local:   ${show(p.local)}`)
-    console.log(`    catalog: ${show(p.catalog)}`)
-  }
 }
 
 if (require.main === module) main().catch(e => console.log(`Update failed: ${e && e.message ? e.message : e}`))
-
-module.exports = { hubDomains }

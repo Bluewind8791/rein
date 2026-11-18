@@ -64,7 +64,6 @@ node scripts/import-rein-runs.js --remote <원격 URL> --root <폴더> [--dry-ru
 
 - 세션 시작 시 `hooks/check-update.js`가 설치본 version과 원격의 `rein--v<버전>` 태그를 비교해 알립니다.
 - `/rein:update`로 적용하고 `/reload-plugins`를 실행합니다.
-- 적용 뒤 `hooks/domain-sync.js`가 받은 도메인 파일을 새 카탈로그에 맞춥니다. 로컬에서 고친 파일은 덮지 않고 사용자에게 묻습니다. 허브 서버에 있는 도메인은 건너뛰고, 로컬 frame 서버가 서버와 맞춥니다.
 - private 저장소의 백그라운드 업데이트는 credential helper가 필요합니다 (`gh auth setup-git` 등).
 
 ## 제거

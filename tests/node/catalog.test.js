@@ -323,28 +323,3 @@ test("the local server syncs the catalog at start and on kick, not on a plain re
   await up.kick()
   assert.ok(h.log.includes("GET /api/catalog"))
 })
-
-// ---------- /rein:update ----------
-
-const { hubDomains } = require("../../hooks/plugin-update.js")
-
-test("/rein:update leaves the hub's domains to the local server, and with the hub silent the ones this PC synced with it", async t => {
-  const h = await hubOn(t)
-  h.put("domain.json", JSON.stringify({ name: "Dom" }))
-  const home = homeOf(t, h.url)
-  assert.deepStrictEqual([...(await hubDomains(home))], ["dom"])
-  // the hub does not answer: the domains with a base are left alone, others go as before
-  const silent = homeOf(t, "http://127.0.0.1:1")
-  write(silent, ".hub/base.json", JSON.stringify({
-    "proj/rules/d1": { "a.md": "x" },
-    "proj/knowledge/d2": { "b.md": "x" },
-    ".hub/catalog/d3": { "domain.json": "x" },
-    rules: { "c.md": "x" },
-    "retro:proj/run1": { "retro.md": "x" },
-  }))
-  assert.deepStrictEqual([...(await hubDomains(silent))].sort(), ["d1", "d2", "d3"])
-  // no hub set: none
-  const none = tmp(t, "rein-home-")
-  write(none, ".hub/base.json", JSON.stringify({ "proj/rules/d1": {} }))
-  assert.deepStrictEqual([...(await hubDomains(none))], [])
-})
