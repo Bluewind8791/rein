@@ -1,0 +1,16 @@
+{
+  "description": "Rein: enforces all six stages (spec, plan, dev, review, qa, land) with per-stage write and Bash allowlists (D46) and records every hook decision to a trace (D104). A SessionStart command hook tells the user when a newer release exists (D159).",
+  "modules": ["./register.ts"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/check-update.js\""
+          }
+        ]
+      }
+    ]
+  }
+}

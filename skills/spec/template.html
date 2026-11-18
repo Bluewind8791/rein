@@ -1,0 +1,189 @@
+<!doctype html>
+<!--
+  1-mockup.html scaffold. rein:sketcher copies this file and fills it from 1-spec.md and the code.
+  - Replace every FILL marker (FILL comments, FILL in an id or the title) and delete every EXAMPLE
+    section that does not apply. No FILL marker or EXAMPLE comment may be left in 1-mockup.html.
+  - The shell (header, legend, notes, .screen, .compare, .phone) keeps the variables below and
+    follows light and dark. A screen itself is drawn inside .canvas, in the service's own look.
+  - No external fonts, scripts, images or CDN.
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FILL: 1-spec.md 의 # 줄</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f6f8; --panel: #ffffff; --ink: #1a1c1f; --muted: #5b6169;
+    --line: #d9dde3; --head: #eef1f5; --accent: #2563eb; --link: #2563eb;
+    --rule-bg: #e8f0fe; --rule-line: #2563eb; --rule-ink: #143a86;
+    --open-bg: #fdecec; --open-line: #d92d20; --open-ink: #8a1c14;
+    --ask-bg: #fff7e6; --ask-line: #d97706; --ask-ink: #7c4a03;
+    --before: #f3f4f6; --after: #eafaf1; --after-line: #16a34a;
+  }
+  /* light by default; the header's button switches to dark */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #16181d; --panel: #1e2128; --ink: #e6e8eb; --muted: #9aa1ab;
+    --line: #333844; --head: #262a33; --accent: #5b8bff; --link: #9db9ff;
+    --rule-bg: #16233f; --rule-line: #5b8bff; --rule-ink: #bcd2ff;
+    --open-bg: #3a1d1a; --open-line: #ff6b5e; --open-ink: #ffc7c0;
+    --ask-bg: #33270f; --ask-line: #f0b429; --ask-ink: #ffdf9e;
+    --before: #23262d; --after: #16281f; --after-line: #35c07a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+  a, a:visited { color: var(--link); }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  header h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: var(--muted); }
+  .theme-btn { flex: none; cursor: pointer; background: var(--panel); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font-size: 12px; }
+  .disclaimer { font-size: 12px; color: var(--muted); margin: 8px 0 20px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; border: 1px solid; }
+  .swatch.rule { background: var(--rule-bg); border-color: var(--rule-line); }
+  .swatch.open { background: var(--open-bg); border-color: var(--open-line); }
+  .swatch.ask { background: var(--ask-bg); border-color: var(--ask-line); }
+  .swatch.changed { border: 2px dashed var(--after-line); }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; background: var(--head);
+    border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  /* every .screen has an id: questions point at 1-mockup.html#<id> */
+  .screen { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px;
+    margin: 20px 0; scroll-margin-top: 12px; }
+  .screen > h2 { font-size: 16px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+  .screen > h2 .anchor { font-size: 12px; font-weight: normal; color: var(--muted); margin-left: 8px; }
+  /* notes: blue = a rule 1-spec.md settles, red = a line of ## 미해결 질문 (one to one),
+     yellow = a [?] still to be asked (as-is only) */
+  .note { border-left: 4px solid; border-radius: 0 6px 6px 0; padding: 8px 12px; margin: 8px 0; font-size: 12.5px; }
+  .note b { margin-right: 6px; }
+  .note.rule { border-color: var(--rule-line); background: var(--rule-bg); color: var(--rule-ink); }
+  .note.open { border-color: var(--open-line); background: var(--open-bg); color: var(--open-ink); }
+  .note.ask { border-color: var(--ask-line); background: var(--ask-bg); color: var(--ask-ink); }
+  /* as-is above, to-be below: a wide screen squeezed side by side reads badly */
+  .compare { display: flex; flex-direction: column; gap: 12px; }
+  .before, .after { border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+  .before { background: var(--before); }
+  .after { background: var(--after); border-color: var(--after-line); }
+  .compare-arrow { text-align: center; color: var(--muted); font-size: 18px; line-height: 1; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
+    margin-bottom: 8px; background: var(--head); color: var(--muted); }
+  .after > .tag { background: var(--after-line); color: #fff; }
+  .changed { outline: 2px dashed var(--after-line); outline-offset: 2px; }
+  .muted { color: var(--muted); }
+  /* the screen itself: the service's own look, the same in light and dark */
+  .canvas { color-scheme: light; overflow-x: auto; background: #fff; color: #222; border: 1px solid #ccc; }
+  /* a mobile screen: the canvas inside a phone-width frame */
+  .phone { width: 390px; max-width: 100%; margin: 0 auto; padding: 14px 10px 18px;
+    border: 2px solid var(--muted); border-radius: 28px; background: var(--head); }
+  .phone > .canvas { min-height: 480px; border-radius: 6px; }
+  svg text { fill: var(--ink); font-size: 12px; }
+  svg .box { fill: var(--panel); stroke: var(--line); }
+  svg .box.changed-box { stroke: var(--after-line); stroke-dasharray: 5 3; stroke-width: 2; }
+  svg .edge { stroke: var(--muted); fill: none; }
+  svg .arrowhead { fill: var(--muted); }
+
+  /* FILL: the service's look, read from its stylesheets (the source as a comment above each
+     group). Every selector starts with .canvas, so the shell keeps its own look. */
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1><!-- FILL: 1-spec.md 의 # 줄 --></h1>
+      <div class="sub"><!-- FILL: as-is (질문 전) 또는 as-is · to-be — 그린 화면이나 흐름의 이름 --></div>
+    </div>
+    <button class="theme-btn" type="button"
+      onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">라이트 / 다크</button>
+  </header>
+  <div class="disclaimer">
+    화면의 배치와 모양은 서비스 코드와 스타일에서 읽어 본뜬 그림입니다. 값은 모두 예시입니다. 기준은 <code>1-spec.md</code>입니다.
+    <div class="legend">
+      <span><span class="swatch rule"></span>파랑 = 1-spec.md가 정한 규칙</span>
+      <span><span class="swatch open"></span>빨강 = 미해결 질문</span>
+      <!-- EXAMPLE (as-is only): delete this legend item in to-be -->
+      <span><span class="swatch ask"></span>노랑 = 질문 예정</span>
+      <!-- EXAMPLE (to-be only): delete this legend item in as-is -->
+      <span><span class="swatch changed"></span>점선 = 바뀌는 곳</span>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- EXAMPLE A: an existing screen, as-is only (as-is mode).             -->
+  <!-- ================================================================== -->
+  <section class="screen" id="FILL-screen-code">
+    <h2><!-- FILL: 화면 이름 --><span class="anchor">#FILL-screen-code</span></h2>
+    <!-- as-is source: FILL path:line, path:line -->
+    <div class="canvas">
+      <!-- FILL: the screen as its code lays it out, in the service's parts and look -->
+    </div>
+    <div class="note ask"><b>질문 예정</b><!-- FILL: the [?] word for word, then one line on what is to be decided --></div>
+  </section>
+
+  <!-- ================================================================== -->
+  <!-- EXAMPLE B: an existing screen that changes (to-be mode).            -->
+  <!-- ================================================================== -->
+  <section class="screen" id="FILL-screen-code">
+    <h2><!-- FILL: 화면 이름 --><span class="anchor">#FILL-screen-code</span></h2>
+    <div class="compare">
+      <div class="before">
+        <span class="tag">AS-IS (현행)</span>
+        <!-- as-is source: FILL path:line, path:line -->
+        <div class="canvas"><!-- FILL: the screen as it is now --></div>
+      </div>
+      <div class="compare-arrow">▼</div>
+      <div class="after">
+        <span class="tag">TO-BE</span>
+        <div class="canvas"><!-- FILL: the screen as 1-spec.md says it, each changed part with class="changed" --></div>
+      </div>
+    </div>
+    <div class="note rule"><b>규칙</b><!-- FILL: the rule as 1-spec.md words it --></div>
+    <div class="note open"><b>미해결</b><!-- FILL: the ## 미해결 질문 line word for word --></div>
+  </section>
+
+  <!-- ================================================================== -->
+  <!-- EXAMPLE C: a new mobile screen, nothing before it (to-be mode).     -->
+  <!-- A desktop screen leaves out the .phone frame.                       -->
+  <!-- ================================================================== -->
+  <section class="screen" id="FILL-screen-code">
+    <h2><!-- FILL: 화면 이름 --><span class="anchor">#FILL-screen-code</span></h2>
+    <p class="muted">현행 없음 — 새 화면</p>
+    <div class="after">
+      <span class="tag">TO-BE</span>
+      <div class="phone"><div class="canvas"><!-- FILL: the screen as 1-spec.md describes it --></div></div>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <!-- EXAMPLE D: a flow, states or how data moves, in inline SVG.          -->
+  <!-- ================================================================== -->
+  <section class="screen" id="FILL-flow-name">
+    <h2><!-- FILL: 흐름 이름 --><span class="anchor">#FILL-flow-name</span></h2>
+    <svg viewBox="0 0 520 90" width="520" height="90" role="img" aria-label="FILL: 흐름 설명">
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path class="arrowhead" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+      <rect class="box" x="10" y="25" width="140" height="40" rx="6"/><text x="80" y="50" text-anchor="middle">단계 1</text>
+      <rect class="box changed-box" x="190" y="25" width="140" height="40" rx="6"/><text x="260" y="50" text-anchor="middle">바뀌는 단계</text>
+      <rect class="box" x="370" y="25" width="140" height="40" rx="6"/><text x="440" y="50" text-anchor="middle">단계 3</text>
+      <path class="edge" d="M150,45 L190,45" marker-end="url(#arrow)"/>
+      <path class="edge" d="M330,45 L370,45" marker-end="url(#arrow)"/>
+    </svg>
+  </section>
+
+  <!-- ================================================================== -->
+  <!-- EXAMPLE E: open questions that belong to no screen or flow above.    -->
+  <!-- ================================================================== -->
+  <section class="screen" id="open-questions">
+    <h2>화면 밖의 미해결 질문<span class="anchor">#open-questions</span></h2>
+    <div class="note open"><b>미해결</b><!-- FILL: the ## 미해결 질문 line word for word --></div>
+  </section>
+
+</div>
+</body>
+</html>

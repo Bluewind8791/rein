@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rein</title>
+<link rel="icon" type="image/png" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="frame">
+  <header class="rtabs">
+    <div class="brandbox"><canvas class="cv c24" width="24" height="24" data-anim="still"></canvas><span class="brand">REIN</span></div>
+    <select class="proj" id="proj" title="프로젝트"></select>
+    <nav class="tabs" id="tabs"></nav>
+    <a class="hubst" id="hubst" target="_blank" rel="noopener" hidden></a>
+    <button class="allruns" id="allruns" type="button"></button>
+    <div class="menu" id="menu" hidden></div>
+  </header>
+  <div class="body">
+    <aside class="tl" id="left"></aside>
+    <div class="split work one" id="work">
+      <main class="main" id="main"><div class="empty">불러오는 중…</div></main>
+      <div class="sgrip" id="grip" role="separator" aria-orientation="vertical" title="끌어서 너비 조절" hidden></div>
+      <aside class="sbrief" id="side" hidden></aside>
+    </div>
+  </div>
+</div>
+<div class="cmenu" id="cmenu" hidden><button type="button" data-side>우측 탭으로 띄우기</button></div>
+<script src="mascot.js"></script>
+<script src="md.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

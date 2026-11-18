@@ -1,0 +1,13 @@
+{
+  "name": "rein",
+  "owner": {
+    "name": "Bluewind8791"
+  },
+  "plugins": [
+    {
+      "name": "rein",
+      "source": "./",
+      "description": "Workflow harness that enforces the spec, plan, dev, review, qa and land stages with function hooks."
+    }
+  ]
+}
