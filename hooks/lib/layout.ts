@@ -1,6 +1,6 @@
 import { toBeScreens, type Check, type Layout } from "./parse.ts"
 
-// The layout check of a Rein run (issue #56): rein:layout-verifier compares
+// The layout check of a Rein run: rein:layout-verifier compares
 // pictures of a screen, the way Claude Design's verifier does, and answers
 // 맞음 or 다름 per screen. In spec it compares each to-be of 1-mockup.html
 // with the planning document's picture it is drawn from, and a 다름 sends the

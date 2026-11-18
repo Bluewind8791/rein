@@ -80,7 +80,7 @@ export type Run = {
   grader?: string // agentId of the rein:grader spawned in spec
   sketcher?: string // agentId of the rein:sketcher spawned last in spec
   sketched?: { spec: string; html: string } // sha256 of 1-spec.md and of 1-mockup.html when the sketcher last wrote it; either one changed since means the picture is not of 1-spec.md as it is
-  layoutChecks?: Check[] // the ego checks of integration qa made from `## 배치 대조`, one per to-be screen whose box was empty at the entry (issue #56)
+  layoutChecks?: Check[] // the ego checks of integration qa made from `## 배치 대조`, one per to-be screen whose box was empty at the entry
   layoutFails?: Record<string, number> // per to-be screen, the layout checks in a row that found the screen as built different from the to-be
   sketchCheck?: SketchCheck // the to-be screens drawn from a planning-document picture, and rein:layout-verifier's comparison of the last drawing with it
   asked?: number // the questions the main session asked the user in spec
@@ -103,7 +103,7 @@ export type PlanVerdict = { hash: string; pass: boolean; why?: string }
 // the seal of its files it was given on.
 export type ReviewGroup = { title: string; files: string[]; reviewer?: string; verdict?: { pass: boolean; seal: Seal; cause?: Cause } }
 
-// spec's layout check of 1-mockup.html (issue #56): the drawing it is of
+// spec's layout check of 1-mockup.html: the drawing it is of
 // (SHA-256), its to-be screens with a planning-document picture and their
 // rendered PNGs (relative to the run), the rein:layout-verifier on it, the
 // state, and the drawings in a row that came out different.

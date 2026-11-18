@@ -2396,7 +2396,7 @@ async function tickLayoutBox($: EngineInterface, dir: string, id: string): Promi
 }
 
 // when every ego check has its verdict and the only ones that failed are
-// layout checks, the run goes back to dev on its own (issue #56), counted
+// layout checks, the run goes back to dev on its own, counted
 // as an implementation failure: the worker reads LAYOUT_FAILS. What the
 // main session is told, or undefined when that is not the case.
 async function layoutsBack($: EngineInterface, dir: string, run: Run, settled: ReturnType<typeof settleEgo>): Promise<string | undefined> {
@@ -3522,7 +3522,7 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
 
   if (path === "ego") {
     // each to-be screen whose box is still empty is an ego check of its
-    // own, judged by rein:layout-verifier against the to-be (issue #56).
+    // own, judged by rein:layout-verifier against the to-be.
     const unticked = (run.layouts ?? []).filter(l => ticked === undefined || openLayouts(ticked, [l]).length > 0)
     const extra = unticked.map(l => layoutCheck(l, appFor(run, l.page, e2e!), (run.layoutFails?.[l.anchor] ?? 0) >= MEASURE_AT - 1))
     await mutate($, r => (ready(r) ? { ...r, layoutChecks: extra.length > 0 ? extra : undefined } : undefined))
@@ -5066,7 +5066,7 @@ async function sketchExit($: EngineInterface, c: Ctx, result: ToolCallResult): P
 }
 
 // a to-be drawn from a planning-document picture is rendered and compared
-// with it (issue #56): the hook renders each such screen and has the main
+// with it: the hook renders each such screen and has the main
 // session spawn rein:layout-verifier. What the main session is told, or
 // undefined when no to-be screen names a picture.
 async function checkSketch($: EngineInterface, dir: string, html: string, hash: string): Promise<string | undefined> {

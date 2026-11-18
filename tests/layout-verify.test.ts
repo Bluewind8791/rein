@@ -6,7 +6,7 @@ import { devTask } from "../hooks/stages/dev.ts"
 import type { Run } from "../hooks/lib/state.ts"
 import { DIR, gitSub, grade, ran, relay, SPEC_TEXT, spawned, store, world, type Host } from "./world.ts"
 
-// spec's layout check (issue #56): a to-be drawn from a planning-document
+// spec's layout check: a to-be drawn from a planning-document
 // picture is rendered with a headless Chrome, rein:layout-verifier compares it
 // with the picture, and a drawing that differs goes back to the sketcher.
 
@@ -158,7 +158,7 @@ describe("spec's layout check", () => {
   })
 })
 
-// integration qa's layout check (issue #56): on the ego path each to-be
+// integration qa's layout check: on the ego path each to-be
 // screen of `## 배치 대조` is an ego check, 배치-<id>, judged by
 // rein:layout-verifier against the rendered to-be; a match checks the screen's
 // box, and when only layout checks failed the run goes back to dev on its own.

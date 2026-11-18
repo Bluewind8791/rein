@@ -82,7 +82,7 @@ e2e가 통과하면 `rein:reviewer`가 spec의 완료 판정 줄이 이제 참�
 `2-plan.md`에 `## 배치 대조`가 있으면 e2e 여부와 상관없이 `5-checklist.md` 끝에 `배치 <id>` 칸이 생깁니다.
 칸이 비어 있으면 통합 qa가 통과해도 land로 가지 않습니다(`layout-unchecked`).
 
-Ego로 돌리면 훅이 사람 대신 비교합니다(이슈 #56).
+Ego로 돌리면 훅이 사람 대신 비교합니다.
 
 - 빈 칸의 화면마다 ego 체크 `배치-<id>`를 하나씩 더합니다. 앱은 같은 페이지를 여는 e2e 항목의 앱입니다.
 - `rein:ego-driver`가 그 화면을 열어 찍고, `rein:layout-verifier`가 judge로서 헤드리스 Chrome으로 렌더링한 to-be와 비교합니다. 기준은 배치와 디자인이고, 데이터는 보지 않습니다.
