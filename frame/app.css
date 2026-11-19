@@ -190,6 +190,22 @@ blockquote { margin: 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--li
 .split.drag iframe { pointer-events: none; }
 .split.one { grid-template-columns: minmax(0, 1fr); }
 .split > .sdoc { overflow: auto; min-height: 0; }
+/* 1-mockup.html: its planning documents on the left ("Rein Frame 목업 코멘트", option 1c) */
+.split.left { grid-template-columns: var(--bwl, 360px) 6px minmax(0, 1fr); }
+.split.left.one { grid-template-columns: minmax(0, 1fr); }
+.split.left > .sbrief { order: -2; border-left: 0; border-right: 1px solid var(--line); }
+.split.left > .sgrip { order: -1; }
+.body.railed { grid-template-columns: 52px minmax(0, 1fr); }
+.body.railed .tl { padding: 12px 0; align-items: center; cursor: pointer; }
+.body.railed .tl:hover { background: oklch(0.94 0.005 260); }
+.body.railed .rail { flex: none; }
+.body.railed .rail .stem { flex: none; height: 18px; }
+.rlx { font: 600 14px var(--mono); color: var(--mute); margin-bottom: 14px; }
+.rlx:hover { color: var(--ink); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { padding: 1px 9px; color: var(--ink2); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--ink); color: var(--paper); }
 .doc h2 .cnt { font: 400 11.5px var(--mono); color: var(--mute); margin-left: 6px; }
 .scope { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; font-size: 12.5px; color: var(--ink2); }
 .scope .lab { font: 600 11px var(--mono); padding: 1px 8px; border-radius: 10px; flex: none; }
@@ -229,6 +245,10 @@ button.brow:hover { background: oklch(0.975 0.01 255); }
 .bhd .bx:hover { color: var(--ink); }
 .bhd .fn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bhd .pg { flex: none; color: var(--mute); }
+.btabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
+.btab { flex: none; max-width: 160px; padding: 2px 8px; border-radius: 6px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btab:hover { background: oklch(0.93 0.005 260); color: var(--ink2); }
+.btab.on { background: var(--ink); color: var(--paper); }
 .bhd a { margin-left: auto; flex: none; }
 .bview { flex: 1; min-height: 0; margin: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: auto; }
 .bview iframe { display: block; width: 100%; height: 100%; border: 0; }

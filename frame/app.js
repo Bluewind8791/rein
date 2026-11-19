@@ -42,6 +42,12 @@ let doc = null // { src, run } of the markdown on screen
 let drawn = null // { run, a, src, plan } of the spec or land view on screen
 let ui = {} // what the person picked in the drawn view: tab, page, row, filter, why
 const folded = { active: false, complete: false, defer: true, drop: true }
+// 1-mockup.html is shown between the planning documents on its left and a
+// timeline folded into a rail; the rail opens on a click until another
+// artifact is picked. mockShow: the part of each screen shown.
+let railOpen = false
+let mockShow = "after" // "before" | "after" | "both"
+const isMock = (run) => !!run && sel.key === "1-mockup"
 
 // ---------- location hash: #<project>/<slug>/<artifact>[/md][&r=<artifact on the right>] ----------
 
@@ -220,8 +226,12 @@ function render() {
   document.title = run ? `${run.slug} · Rein` : "Rein"
   renderTop(run, tabs)
   renderHub()
-  renderLeft(run)
-  if (run && sel.key === "1-mockup") autoSide(run)
+  const mock = isMock(run)
+  if (!mock) railOpen = false
+  document.querySelector(".body").classList.toggle("railed", mock && !railOpen)
+  $("work").classList.toggle("left", mock)
+  renderLeft(run, mock && !railOpen)
+  if (mock) autoSide(run)
   renderMain(run)
   renderSide(run)
   writeHash()
@@ -375,8 +385,17 @@ function summary(run) {
   return parts ? `<div class="sum">${parts}</div>` : ""
 }
 
-function renderLeft(run) {
+// rail: the timeline folded to its stage marks, while 1-mockup.html is shown
+function renderLeft(run, rail = false) {
   if (!run) return setHTML($("left"), `<div class="empty">run이 없습니다</div>`)
+  if (rail) {
+    const marks = CHAIN.map((s, i) => {
+      const tone = run.tones[s] || "wait"
+      const stem = i === CHAIN.length - 1 ? "" : `<div class="stem${tone === "done" ? " done" : ""}"></div>`
+      return `<div class="rail" title="${s} · ${KO[s]}"><div class="node ${tone}">${tone === "done" ? "✓" : tone === "bad" ? "!" : ""}</div>${stem}</div>`
+    }).join("")
+    return setHTML($("left"), `<button type="button" class="rlx" title="타임라인 펼치기">»</button>${marks}`)
+  }
   const steps = CHAIN.map((s, i) => {
     const tone = run.tones[s] || "wait"
     const glyph = tone === "done" ? "✓" : tone === "bad" ? "!" : ""
@@ -417,8 +436,40 @@ function crumb(run, a, view) {
     for (const v of views) if (v !== view) right += `<button type="button" data-view="${v === views[0] ? "" : v}">${VIEW_LABEL[v]}</button><span>·</span>`
     const f = view === "html" ? a.html : view === "md" || view === "draw" ? a.md : a.file
     right += `<a href="${fileUrl(run, f.name)}" target="_blank" rel="noopener">새 탭 ↗</a>`
+    if (isMock(run)) right = `${showSeg()}<span>·</span>${right}`
   }
   return `<div class="mhd"><div class="crumb">${path}<span class="sp"></span>${right}</div></div>`
+}
+
+// ---------- 1-mockup.html: which part of each screen, and its planning document ----------
+
+const SHOW = { before: "현재", after: "목표", both: "둘 다" }
+const showSeg = () => `<span class="seg">${Object.entries(SHOW).map(([k, l]) => `<button type="button" class="${k === mockShow ? "on" : ""}" data-show="${k}">${l}</button>`).join("")}</span>`
+
+// The server sandboxes a run's page, so the frame and the mockup talk by
+// message (skills/spec/template.html's script): the frame says which part
+// of each screen to show; the mockup says which screen was clicked, with
+// its `to-be source`, and the planning document opens at that page.
+function dressMock(iframe) {
+  try { iframe.contentWindow.postMessage({ rein: "show", show: mockShow }, "*") } catch {}
+}
+
+addEventListener("message", (e) => {
+  const f = $("main").querySelector(".pane iframe")
+  const run = findRun(sel.project, sel.slug)
+  if (!f || e.source !== f.contentWindow || !isMock(run) || !e.data || e.data.rein !== "screen") return
+  const src = sourceOf(String(e.data.source || ""))
+  const doc = src && briefDocs(run).find((x) => x.id === src.file || x.show.name === src.file)
+  if (doc) openSide(doc.id, doc.ext === "pdf" ? src.page : null)
+})
+
+// a `to-be source:` value, `brief/<file> (<page>)`: the file, relative to the
+// run folder, and the page (its number before 쪽, else its first number)
+function sourceOf(text) {
+  const m = /^\s*(.+?)\s*(?:\((.*)\))?\s*$/s.exec(text)
+  if (!m || !m[1]) return null
+  const p = m[2] ? /(\d+)\s*쪽/.exec(m[2]) || /(\d+)/.exec(m[2]) : null
+  return { file: m[1], page: p ? Number(p[1]) : null }
 }
 
 function renderMain(run) {
@@ -589,28 +640,32 @@ function drawSpec(pane, d, keep) {
   }
 }
 
-// the right tab's width: dragged by the bar on its left edge, kept in this
-// browser for the next page.
+// the side tab's width: dragged by the bar beside it, kept in this browser
+// for the next page; the right tab and the planning documents left of
+// 1-mockup.html each keep their own.
 const BRIEF_W = "rein.sideWidth"
+const BRIEF_LW = "rein.leftWidth"
 function dragWidth(grip) {
   const split = grip.parentElement
-  const set = (w) => {
+  const set = (w, left) => {
     const max = split.clientWidth ? Math.max(260, split.clientWidth - 320) : Infinity
     w = Math.round(Math.min(Math.max(w, 260), max))
-    split.style.setProperty("--bw", `${w}px`)
+    split.style.setProperty(left ? "--bwl" : "--bw", `${w}px`)
     return w
   }
-  try { const w = Number(localStorage.getItem(BRIEF_W)); if (w) set(w) } catch {}
+  try { const w = Number(localStorage.getItem(BRIEF_W)); if (w) set(w, false) } catch {}
+  try { const w = Number(localStorage.getItem(BRIEF_LW)); if (w) set(w, true) } catch {}
   grip.addEventListener("pointerdown", (e) => {
     e.preventDefault()
     grip.setPointerCapture(e.pointerId)
     split.classList.add("drag")
+    const left = split.classList.contains("left")
     const w0 = split.querySelector(".sbrief").offsetWidth
-    const move = (ev) => set(w0 + e.clientX - ev.clientX)
+    const move = (ev) => set(left ? w0 + ev.clientX - e.clientX : w0 + e.clientX - ev.clientX, left)
     const up = () => {
       grip.removeEventListener("pointermove", move)
       split.classList.remove("drag")
-      try { localStorage.setItem(BRIEF_W, String(set(split.querySelector(".sbrief").offsetWidth))) } catch {}
+      try { localStorage.setItem(left ? BRIEF_LW : BRIEF_W, String(set(split.querySelector(".sbrief").offsetWidth, left))) } catch {}
     }
     grip.addEventListener("pointermove", move)
     grip.addEventListener("pointerup", up, { once: true })
@@ -841,9 +896,14 @@ function renderSide(run) {
     else if (d.how === "frame") reloadFrame(aside.querySelector("iframe"))
     else if (d.how === "img") aside.querySelector("img").src = `${url}?v=${enc(ver)}`
   }
-  const head = `<div class="bhd"><span class="fn" title="${esc(d.file.name)}">${esc(d.file.name)}</span>` +
+  // a planning document among several shows them all as tabs
+  const docs = briefDocs(run)
+  const name = docs.length > 1 && docs.some((x) => x.id === a.key)
+    ? `<span class="btabs">${docs.map((x) => `<button type="button" class="btab${x.id === a.key ? " on" : ""}" data-btab="${esc(x.id)}" title="${esc(x.id)}">${esc(baseOf(x.id))}</button>`).join("")}</span>`
+    : `<span class="fn" title="${esc(d.file.name)}">${esc(d.file.name)}</span>`
+  const head = `<div class="bhd">${name}` +
     `${page ? `<span class="pg">${page}쪽</span>` : ""}<a href="${url}" target="_blank" rel="noopener">새 탭 ↗</a>` +
-    `<button type="button" class="bx" data-sidex title="우측 탭 닫기">×</button></div>`
+    `<button type="button" class="bx" data-sidex title="${$("work").classList.contains("left") ? "기획서 닫기" : "우측 탭 닫기"}">×</button></div>`
   const [dlAct, dlLabel] = d.dl ? fileAct(d.dl.name) : []
   const foot = [
     sideAt.req ? `<span>선택한 줄: <b>${Md.inline(sideAt.req, { href: (u) => u })}</b></span>` : "",
@@ -1253,12 +1313,23 @@ $("cmenu").addEventListener("click", (e) => {
 })
 
 $("side").addEventListener("click", (e) => {
-  if (e.target.closest("[data-sidex]")) closeSide()
+  if (e.target.closest("[data-sidex]")) return closeSide()
+  const t = e.target.closest("[data-btab]")
+  if (t && t.dataset.btab !== sel.side) openSide(t.dataset.btab)
 })
 
 dragWidth($("grip"))
 
+// the mockup's page, each time it loads (a load does not bubble: caught on its way down)
+$("main").addEventListener("load", (e) => {
+  if (e.target.tagName === "IFRAME" && isMock(findRun(sel.project, sel.slug))) dressMock(e.target)
+}, true)
+
 $("left").addEventListener("click", (e) => {
+  if (document.querySelector(".body.railed")) {
+    railOpen = true
+    return render()
+  }
   const q = e.target.closest("[data-sumq]")
   if (q) {
     const id = q.dataset.sumq
@@ -1269,6 +1340,7 @@ $("left").addEventListener("click", (e) => {
   if (!a) return
   sel.key = a.dataset.key
   sel.view = null
+  railOpen = false
   render()
 })
 
@@ -1277,6 +1349,14 @@ $("main").addEventListener("click", (e) => {
   if (v) {
     sel.view = v.dataset.view || null
     return render()
+  }
+  const s = e.target.closest("[data-show]")
+  if (s) {
+    mockShow = s.dataset.show
+    for (const b of $("main").querySelectorAll("[data-show]")) b.classList.toggle("on", b === s)
+    const f = $("main").querySelector(".pane iframe")
+    if (f) dressMock(f)
+    return
   }
   const b = e.target.closest(".bdg[data-ev]")
   if (b && doc) return openEvidence(doc.run, b.dataset.ev, b.dataset.title, b.dataset.name)
