@@ -48,7 +48,7 @@ export const chip = (a: Activity): string => {
 }
 
 const CHAIN: Stage[] = ["spec", "plan", "dev", "review", "qa", "qa-integration", "land"]
-const SHORT: Partial<Record<Stage, string>> = { "qa-integration": "qa-int" }
+const SHORT: Partial<Record<Stage, string>> = { "qa-integration": "e2e" }
 
 // a stage as the chain shows it: passed, the one the run is in, the one it is
 // in while halted or with a design problem, or still to come.

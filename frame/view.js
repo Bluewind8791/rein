@@ -122,7 +122,7 @@ function scanTrace(file) {
   return c
 }
 
-const SHORT = { "qa-integration": "qa-int" }
+const SHORT = { "qa-integration": "e2e" }
 
 // the stage the trace ends in, when each stage was last entered, when the run
 // opened and when it closed.

@@ -3,17 +3,17 @@
 // is fetched again whenever /api/events says something changed.
 "use strict"
 
-const CHAIN = ["spec", "plan", "dev", "review", "qa", "qa-int", "land"]
-const KO = { spec: "명세", plan: "설계", dev: "구현", review: "리뷰", qa: "검증", "qa-int": "통합 확인", land: "반영" }
+const CHAIN = ["spec", "plan", "dev", "review", "qa", "e2e", "land"]
+const KO = { spec: "명세", plan: "설계", dev: "구현", review: "리뷰", qa: "검증", e2e: "통합 확인", land: "반영" }
 const STATUS = { run: "진행 중", ask: "질문 대기", halt: "멈춤", done: "완료", defer: "보류", drop: "버림" }
 const TAB_ST = { ask: "질문", halt: "멈춤" }
 const ANIM = { run: "walk", ask: "idle", halt: "halt", done: "done", defer: "still", drop: "still" }
 const CARD = { run: "", ask: "ask", halt: "halt", done: "done", defer: "held", drop: "held" }
 // files every run is expected to write, shown dimmed until they exist
-const EXPECTED = { "1-spec": "spec", "2-plan": "plan", "5-checklist": "qa-int", "6-land": "land" }
+const EXPECTED = { "1-spec": "spec", "2-plan": "plan", "5-checklist": "e2e", "6-land": "land" }
 const NUM_STAGE = { 1: "spec", 2: "plan", 3: "dev", 4: "review", 5: "qa", 6: "land", 7: "land" }
 // runs opened before the numbered names kept these at the root
-const LEGACY = { spec: "spec", plan: "plan", dev: "dev", "qa-integration": "qa-int", land: "land" }
+const LEGACY = { spec: "spec", plan: "plan", dev: "dev", "qa-integration": "e2e", land: "land" }
 const AGENT_FILE = /^(grade|review(-\d+|-groups)?|qa|e2e|test-plan|dev-items|dev-diff|deviation|retro|land-review)$/
 const GROUPS = [["active", "진행 중"], ["complete", "완료"], ["defer", "보류"], ["drop", "버림"]]
 const VIEWABLE = new Set(["pdf", "png", "jpg", "jpeg", "gif", "svg", "webp", "txt", "json"])
@@ -26,7 +26,7 @@ const SUB_STAGE = { brief: "spec", handoff: "land" }
 const $ = (id) => document.getElementById(id)
 const esc = Md.esc
 const enc = encodeURIComponent
-const shortOf = (s) => (s === "qa-integration" ? "qa-int" : s)
+const shortOf = (s) => (s === "qa-integration" ? "e2e" : s)
 
 let data = null // [{ name, runs: [run] }]
 let skew = 0 // server clock minus ours
@@ -121,9 +121,9 @@ function artifacts(r) {
     if (ext === "jsonl" || ext === "log" || ext === "json" || (twin && AGENT_FILE.test(base))) continue
     const num = /^(\d)-/.exec(f.name)
     let stage
-    if (/^5-checklist\./.test(f.name)) stage = "qa-int"
+    if (/^5-checklist\./.test(f.name)) stage = "e2e"
     else if (num) stage = NUM_STAGE[num[1]] || "other"
-    else if (ext === "xlsx") stage = "qa-int"
+    else if (ext === "xlsx") stage = "e2e"
     else if (twin && LEGACY[base]) stage = LEGACY[base]
     else stage = "other"
     const key = twin ? base : f.name

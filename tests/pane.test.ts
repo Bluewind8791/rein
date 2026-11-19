@@ -287,14 +287,14 @@ describe("what the frame shows", () => {
       { name: "dev", tone: "now" },
       { name: "review", tone: "wait" },
       { name: "qa", tone: "wait" },
-      { name: "qa-int", tone: "wait" },
+      { name: "e2e", tone: "wait" },
       { name: "land", tone: "wait" },
     ])
   })
 
   test("a halted run marks the stage it is in, and says so", async () => {
     const v = progressView(RUN({ stage: "qa-integration", halt: { rule: "D173", reason: "x" } }), new Map())
-    expect(v.stages[5]).toEqual({ name: "qa-int", tone: "bad" })
+    expect(v.stages[5]).toEqual({ name: "e2e", tone: "bad" })
     expect(v.marks).toEqual(["멈춤 D173"])
   })
 
