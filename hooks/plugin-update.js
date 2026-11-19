@@ -64,7 +64,20 @@ async function main() {
     console.log("Plugin update failed.")
     return
   }
+  restartFrame(name)
   console.log("Updated. Run /reload-plugins to load the new version.")
+}
+
+// A frame server left running from the old version keeps serving the old
+// page. The new version's kick makes it give way to one of the new version.
+function restartFrame(name) {
+  const rein = path.resolve(process.env.REIN_HOME || path.join(os.homedir(), ".rein"))
+  if (!fs.existsSync(path.join(rein, "frame", "server.json"))) return
+  const now = pick(name)
+  const server = now && now.installPath && path.join(now.installPath, "frame", "server.js")
+  if (!server || !fs.existsSync(server)) return
+  const r = spawnSync(process.execPath, [server, "kick"], { encoding: "utf8", windowsHide: true, timeout: 15000 })
+  console.log(r.status === 0 ? "The Rein frame now runs the new version." : `The Rein frame was not restarted: ${(r.stderr || r.stdout || "").trim().split(/\r?\n/).pop() || r.error?.message}`)
 }
 
 if (require.main === module) main().catch(e => console.log(`Update failed: ${e && e.message ? e.message : e}`))

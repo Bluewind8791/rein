@@ -535,15 +535,16 @@ const getJson = (port, p) => new Promise((resolve, reject) => {
 
 // a server from before the protocol version for root, in its own process: its
 // ping has no v and it answers POST /api/quit 405, as frame servers before
-// protocol 2 do. It writes server.json; resolves with its { child, port, asked() }.
-async function oldServer(t, root) {
+// protocol 2 do; ping adds to its ping answer. It writes server.json; resolves
+// with its { child, port, asked() }.
+async function oldServer(t, root, ping = {}) {
   const src = `
     const http = require("http"), fs = require("fs"), path = require("path")
     const root = ${JSON.stringify(root)}
     const s = http.createServer((q, r) => {
       if (q.method === "POST") { console.log("asked"); r.writeHead(405, { "content-type": "text/plain" }); return r.end("method not allowed") }
       r.setHeader("content-type", "application/json")
-      r.end(q.url === "/api/ping" ? JSON.stringify({ rein: true, root }) : "{}")
+      r.end(q.url === "/api/ping" ? JSON.stringify({ rein: true, root, ...${JSON.stringify(ping)} }) : "{}")
     })
     s.listen(0, "127.0.0.1", () => {
       fs.writeFileSync(path.join(root, "frame", "server.json"), JSON.stringify({ port: s.address().port, pid: process.pid }))
@@ -581,6 +582,32 @@ test("kick ends an older server that refuses to quit and starts one; kicking a r
     const before = listings()
     assert.deepStrictEqual(await kick(), { started: false })
     await until(() => listings() > before)
+  } finally {
+    const i = info()
+    if (i && i.pid !== oldPid) {
+      try { process.kill(i.pid) } catch {}
+      await until(() => getJson(i.port, "/api/ping").then(() => false, () => true))
+    }
+  }
+})
+
+test("kick ends a server of an older plugin version on the same protocol and starts one of this version", async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rein-frame-"))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const old = await oldServer(t, dir, { v: 2, version: "0.0.1" })
+  const kick = () => new Promise(resolve => {
+    execFile(process.execPath, [SERVER, "kick"], { env: { ...process.env, REIN_HOME: dir } }, (err, stdout) => resolve(JSON.parse(stdout.trim().split(/\r?\n/).pop())))
+  })
+  const info = () => readJsonFile(path.join(dir, "frame", "server.json"))
+  const oldPid = info().pid
+  const mine = readJsonFile(path.join(__dirname, "..", "..", ".claude-plugin", "plugin.json")).version
+  try {
+    assert.deepStrictEqual(await kick(), { started: true })
+    assert.ok(old.asked())
+    await old.exited
+    const { port } = await until(() => { const i = info(); return i && i.pid !== oldPid && i })
+    assert.strictEqual((await getJson(port, "/api/ping")).version, mine)
+    assert.deepStrictEqual(await kick(), { started: false })
   } finally {
     const i = info()
     if (i && i.pid !== oldPid) {

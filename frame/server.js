@@ -37,6 +37,10 @@ const UNSENT_MS = 12 * 60 * 60 * 1000
 // the frame protocol; ensure and kick ask a server that answers an older
 // one (or none) to quit, so one started before an update gives way
 const V = 2
+// the plugin version this copy belongs to. A server of an older one gives way
+// too, so a plugin update shows its frame without waiting for the old server
+// to idle out.
+const VERSION = (readJson(path.join(__dirname, "..", ".claude-plugin", "plugin.json")) || {}).version || null
 
 // the hub's uploader while sync.json names one
 let uploader = null
@@ -72,7 +76,7 @@ function handler(port) {
       const origin = req.headers.origin
       if (origin && !hosts.has(origin.replace(/^https?:\/\//, ""))) return send(res, 403, "text/plain", "forbidden")
       const p = new URL(req.url, "http://x").pathname
-      if ((req.method === "GET" || req.method === "HEAD") && p === "/api/ping") return json(res, 200, { rein: true, root: ROOT, v: V })
+      if ((req.method === "GET" || req.method === "HEAD") && p === "/api/ping") return json(res, 200, { rein: true, root: ROOT, v: V, version: VERSION })
       if (req.method === "POST" && p === "/api/hub/kick") {
         if (uploader) uploader.kick()
         return json(res, 200, { ok: true, hub: uploader !== null })
@@ -110,7 +114,17 @@ async function ping(port, timeout) {
   return j && j.rein === true && SAME_ROOT(j.root) ? j : null
 }
 
-const current = j => typeof j.v === "number" && j.v >= V
+// whether version a ("x.y.z") is older than b
+function older(a, b) {
+  const x = String(a).split(".").map(Number)
+  const y = String(b).split(".").map(Number)
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i]
+  return false
+}
+
+// a server is current when it speaks this protocol and its plugin is not
+// older than this one; one from before the version was in the ping is older
+const current = j => typeof j.v === "number" && j.v >= V && !(VERSION && (typeof j.version !== "string" || older(j.version, VERSION)))
 
 function listen(server, port) {
   return new Promise((resolve, reject) => {
