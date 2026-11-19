@@ -37,7 +37,7 @@ It opens with a front matter block, before the title:
 - `작성일`: today, as `YYYY-MM-DD`.
 - `참조`: the reference (below), in double quotes.
 
-1. **Problem**: what is wrong and why.
+1. **Problem**: what is wrong and why. When the request asks for two or more results that can each be done or fail on its own (a screen change, an export, a notification), list them below it under `결과물 (사용자 확인, YYYY-MM-DD):`, one per line, so that a result told in detail does not hide the ones told in a few words. With one result, leave the list out. See Results.
 2. **Premise check**: what you checked of the request's own claims, and what the code says (see Doubt the request).
 3. **Current behaviour**: how it works today and which files and places are involved, as `path:line`. Include the edge cases you found while investigating: empty or missing input, boundary values, failure paths, concurrent use, and behaviour around the change that must stay as it is. Say whether the code handles each one today, with `path:line`. Write only what applies. These are facts, not requirements.
 4. **Completion check**: what being done looks like, in **one line**. `qa` checks against this line and nothing else, so write observable behaviour. "Works correctly" cannot be checked; do not write that. If an edge case must hold when the work is done, name it in this line, for example "... also when the list is empty". Edge cases left out of this line are checked by no one after the user approves it.
@@ -70,6 +70,14 @@ The request is a claim, not a fact. A planning document says a screen is new; a 
 - Never write that something does not exist from a look at one menu or one folder.
 
 When a check contradicts the request (the bug does not happen as reported, or the new thing already exists), ask the user with `AskUserQuestion` at once, before any other question: show what you found, and ask whether to go on as asked, change the request, or drop the run. Write their answer on that line.
+
+## Results (`결과물` in `## 문제`)
+
+A request often tells one result in detail and the others in a few words, and the questions then follow the detailed one. Before the first grade, read the request for the results it asks for, each one something that can be done or fail on its own. Do not count the steps or fields of one result as results.
+
+When there are two or more, confirm the list with the user with `AskUserQuestion` before the first grade: the first question, after any premise question (see Doubt the request). Show the list and ask whether a result is missing, or should be merged, split or left out of this run. Write the confirmed list into `## 문제`. A result the user leaves out stays on the list as `- <result> — 제외 (사용자, YYYY-MM-DD: <why>)`.
+
+The grader checks that the completion line covers every result on the list not marked `제외`.
 
 ## Planning document (`## 기획서 대조`)
 
@@ -137,12 +145,17 @@ A grader that sees only `1-spec.md` scores it, and you close its gaps one questi
 3. Otherwise do what the summary says:
    - A fact with a gap (현행 동작, 영향 범위): read the code and fill it in. Never ask the user for a fact.
    - Ask the user **one** question with `AskUserQuestion`, on the first gap of the weakest dimension the summary names, citing the anchor of the screen region it is about when there is a picture. One question per call; the hook refuses more.
+   - Open the question with one line on where the grading stands, so the user sees why they are asked: the dimension it is about, its score and the ambiguity of the last grade, for example `[완료 판정 0.4 · 모호도 0.42]`.
+   - Put the option you recommend first, with `(추천)` at the end of its label, and word the question so that choosing it is a plain yes: the user never has to say no to something first to take it. Recommend only what the code, the planning document or another screen's precedent supports, and say which in the option's description. When nothing supports one option over the others, recommend none.
    - Write the question for someone who knows the screens, not the code. Its first sentence says how it works now and what would change, in the words the screen shows; leave out column, table and class names. A word the screen does not show (a status code such as `01`, a term from the code or the data), and a term of the business the user may not know even when the screen shows it (an accounting term such as 감가상각누계액 or 유동자산), gets its meaning in the same sentence, with a small example in numbers. When the options give different numbers or rows, show a few real rows of each side by side.
    - When the question settles how a screen behaves in a state the planning document does not draw (no data for the period, a failed lookup, a missing value), first find how other screens of the same app show that state, in the same menu first. Offer those as the options, each with its `path:line`. If the user picks a way no screen uses, say so on the spec line: `(선례 없음)`.
    - Write the answer into `1-spec.md` at once, before the next question.
    - The user may answer with a question of their own instead: what a word or an option means, how it works today, whether the planning document says so, how another screen does it, or a request to explain it more simply. That is not an answer, even when it leans one way ("X만 빼면 되는 거 아니야?"). Do not write it into `1-spec.md` as a decision, and do not move on to another gap. Investigate if it needs the code or the data, then answer it in text, in the screen's words. End with your question again, reworded with what you just explained, and stop the turn. Their next message answers it; write that into `1-spec.md`. When they ask for simpler words, keep to them for every question after, not only this one.
    - After 3 questions, spawn the grader again. The hook refuses a 4th question until a grade comes in.
-   - If the summary says the last three grades barely moved, ask from another angle: another dimension, or concrete options to choose from.
+   - If the summary says the last three grades barely moved, the questions are going in circles. Ask from another angle, one of these, each at most once per run:
+     - **The opposite**: question the assumption under the gap. "If this condition did not hold, would the answer change?" It shows whether the condition is a real requirement or a habit.
+     - **The smallest version**: ask what the smallest result is that would still be worth having. When the user narrows the request, rewrite the completion line to match; whatever they leave for later goes to `## 미해결 질문` only when they say so.
+     - **The core**: when the words for the thing keep shifting between answers (a screen, a list and a report for the same thing), ask which one screen, value or record the request is about, before any detail.
 4. If the user says it is enough (`충분`, or the like), move each gap still open to `## 미해결 질문`, then go to End. Show them the ambiguity left, as advance gives it, when the run stops for their approval.
 
 ## Moving the run
@@ -156,7 +169,7 @@ If the user wants to stop, put aside or abandon the run, at any point, call `mcp
 ## Do not
 
 - Propose or design a solution. That is `plan`'s job.
-- Split scope into "in / out" lists. Two exceptions: the rows of `## 범위`, one per part of the system, and the `제외` lines of `## 기획서 대조`, the user's own decisions about a planning document.
+- Split scope into "in / out" lists. Three exceptions: the rows of `## 범위`, one per part of the system, the `제외` lines of `## 기획서 대조`, the user's own decisions about a planning document, and the `제외` lines of the results in `## 문제`, the user's own decisions about the request.
 - Turn the completion check into a list of acceptance criteria. It is one line, even when it names edge cases.
 - Edit source code. The worker writes it in dev.
 

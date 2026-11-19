@@ -90,7 +90,7 @@ export const DIMENSIONS: Dimension[] = [
     },
   },
   {
-    name: "완료 판정", fact: false, asks: "the `## 완료 판정` line states behaviour someone can observe and check, with nothing left to choose",
+    name: "완료 판정", fact: false, asks: "the `## 완료 판정` line states behaviour someone can observe and check, with nothing left to choose, for every result `## 문제` lists under `결과물` but those marked 제외 (a result the line leaves out is a gap)",
     weight: { feature: 0.3, bugfix: 0.25, improvement: 0.25 },
     anchors: {
       feature: ["no line, or \"works correctly\"", "the behaviour is named, but a value, a message or a condition is left open", "one line of observable behaviour: what a person does and what they see, with its values, nothing left to choose"],
@@ -218,7 +218,7 @@ export function gradeSummary(grades: Grade[], specText: string): string {
     ...(scope.length > 0 ? [`Hard gate: ${scope.join("; ")}. Give every row 대상 or 제외 (<why>): from the code where the work plainly does not reach that part, by asking the user where the request leaves it open.`] : []),
     ...(facts.length > 0 ? [`Fill these facts by reading the code, never by asking: ${facts.map(d => `${d.name}: ${d.gap}`).join("; ")}.`] : []),
     ...(weakest ? [`Ask the user one question on the weakest dimension asked of them, ${weakest.name}: ${weakest.gap}`] : []),
-    ...(steady(grades) ? ["The last three grades moved the ambiguity by 0.05 or less: ask from another angle (another dimension, or concrete options to choose from)."] : []),
+    ...(steady(grades) ? ["The last three grades moved the ambiguity by 0.05 or less: the questions are going in circles. Ask from another angle the skill has not used in this run: the opposite (would the answer change if the condition did not hold), the smallest version still worth having, or the core (which one screen, value or record the request is about)."] : []),
     `At most ${EVERY} questions before the next grade. Write each answer into 1-spec.md before the next question.`,
   ]
   return `${head} ${steps.join(" ")}`
