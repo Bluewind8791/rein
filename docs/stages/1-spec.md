@@ -11,7 +11,7 @@ run이 열려 있지 않으면 훅은 아무것도 막지 않습니다. run을 �
 
 1. `mcp__rein__status` — 이 세션에 열린 run이 있는지, 이어 갈 run이 있는지 봅니다.
 2. `rein:slug` 에이전트가 요청을 보고 슬러그를 하나 만듭니다. 이것이 `runId`입니다.
-3. `mcp__rein__open_run` — 훅이 형식·중복을 확인하고 run을 엽니다.
+3. `mcp__rein__open_run` — 훅이 형식·중복을 확인하고 run을 엽니다. 세션 루트 저장소에 쓸 수 있는 `.rein/config.json`이 없으면 거부하고, 세션은 `rein:setup`으로 config를 쓴 뒤 다시 엽니다.
    - run 폴더: `~/.rein/<project>/active/<runId>/`
    - 프로젝트 룰(`~/.rein/<project>/rules/*.md`)과 공용 룰(`~/.rein/rules/*.md`)을 이 시점에 동결합니다. run 도중 룰 파일이 바뀌어도 이 run에는 영향이 없습니다.
    - 공용 룰은 `rules:<이름>`으로 부르고, 세션 루트와 run이 고치는 바깥 저장소 모두에 적용합니다. `paths:` glob은 파일이 든 저장소 기준입니다.

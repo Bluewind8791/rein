@@ -1456,6 +1456,10 @@ async function openRun($: EngineInterface, input: Record<string, unknown>): Prom
   if (typeof runId !== "string" || runId.length > 64 || !RUN_ID.test(runId)) {
     return { deny: "D58: runId must be a slug of lowercase letters, digits and single hyphens, at most 64 characters." }
   }
+  // the session root's repository was never set up: plan would stop on it
+  // only after the whole spec, so the run does not open until it is.
+  const bare = await unsetRepo($)
+  if (bare) return { deny: `${bare.path} ${bare.problem}, so ${bare.repo} has not been set up for Rein. Invoke the rein:setup skill for ${bare.repo} (it asks the user before it writes), then call open_run again with the same runId.` }
   // a slug names one run in every state, and a v0.2.0 folder too.
   const base = await projectDir($)
   if (RESERVED.has(runId)) return { deny: `D144: ${runId} names a folder of ${base} itself. Choose another slug.` }
@@ -4311,6 +4315,21 @@ async function removeTree($: EngineInterface, t: Tree): Promise<string[]> {
   const branch = await gitQuiet($, t.repo, ["branch", "-D", t.branch])
   if (branch.exitCode !== 0) problems.push(`\`git -C ${t.repo} branch -D ${t.branch}\`: ${firstLine(branch)}`)
   return problems
+}
+
+// the session root's repository (the nearest .git, the root's own or
+// above it) when its .rein/config.json is missing or unusable; undefined
+// when it is usable or the session root is in no repository.
+async function unsetRepo($: EngineInterface): Promise<{ repo: string; path: string; problem: string } | undefined> {
+  const root = await sessionRoot($)
+  for (const repo of [root, ...repoCandidates(root)]) {
+    if (!(await $.fs.exists(`${repo}/.git`))) continue
+    const path = `${repo}/.rein/config.json`
+    if (!(await $.fs.exists(path))) return { repo, path, problem: "does not exist" }
+    const bad = checkConfig(await $.fs.read(path))
+    return bad === undefined ? undefined : { repo, path, problem: `is not usable (${bad})` }
+  }
+  return undefined
 }
 
 // the session root, resolved.

@@ -81,7 +81,7 @@ const write = (file_path: string) => ({ tool: "Write", file_path, content: "x" }
 
 describe("open_run makes no worktree", () => {
   test("the session stays in the main tree, and the run's writes go on from there", async ($, on) => {
-    const files: Record<string, string> = { "E:/proj/.git/HEAD": "" }
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": QA }
     const log: string[][] = []
     world(on, files, undefined, null, gitHost(files, { "E:/proj": { branch: "main" } }, log))
     const r = await $.tool.call(OPEN)
@@ -92,11 +92,33 @@ describe("open_run makes no worktree", () => {
   })
 
   test("autopilot: true is kept on the run and said in the result", async ($, on) => {
-    const files: Record<string, string> = { "E:/proj/.git/HEAD": "" }
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": QA }
     world(on, files, undefined, null, gitHost(files, { "E:/proj": { branch: "main" } }, []))
     const r = await $.tool.call({ tool: "mcp__rein__open_run", runId: "login-fix", autopilot: true } as never)
     expect(text(r)).toContain("This is an autopilot run: the spec's questions are asked as usual")
     expect(record()?.autopilot).toBe(true)
+  })
+
+  test("a session root's repository without a usable config.json opens no run until rein:setup wrote one", async ($, on) => {
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "" }
+    world(on, files, undefined, null, gitHost(files, { "E:/proj": { branch: "main" } }, []))
+    expect(await $.tool.call(OPEN)).toEqual({
+      deny: "E:/proj/.rein/config.json does not exist, so E:/proj has not been set up for Rein. Invoke the rein:setup skill for E:/proj (it asks the user before it writes), then call open_run again with the same runId.",
+    })
+    files["E:/proj/.rein/config.json"] = JSON.stringify({ qa: [] })
+    expect(await $.tool.call(OPEN)).toEqual({ deny: expect.stringContaining("E:/proj/.rein/config.json is not usable (`qa` must be a non-empty array of command strings)") })
+    expect(record()).toBeUndefined()
+    files["E:/proj/.rein/config.json"] = QA
+    expect(text(await $.tool.call(OPEN))).toContain("Run opened")
+  })
+
+  test("the session root's nearest repository is the one checked, and a root in no repository opens as before", async ($, on) => {
+    const files: Record<string, string> = { "E:/proj/.git/HEAD": "" }
+    world(on, files, undefined, null, gitHost(files, { "E:/proj": { branch: "main" } }, []))
+    at.root = "E:/proj/web"
+    expect(await $.tool.call(OPEN)).toEqual({ deny: expect.stringContaining("E:/proj/.rein/config.json does not exist, so E:/proj has not") })
+    delete files["E:/proj/.git/HEAD"]
+    expect(text(await $.tool.call(OPEN))).toContain("Run opened")
   })
 })
 

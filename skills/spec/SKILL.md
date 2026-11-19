@@ -20,6 +20,7 @@ If `mcp__rein__status` is not available, not even as a deferred tool, the hook m
 3. Call `mcp__rein__open_run` with `{ "runId": "<slug>" }`.
    - If it refuses because the session already has a run, **stop here**. Tell the user which run and stage are open. Do not open a second one.
    - If it refuses because the slug is taken or malformed, ask `rein:slug` again with the refusal text and retry.
+   - If it refuses because the session root's repository has not been set up for Rein, invoke the `rein:setup` skill for the repository it names, then call `open_run` again with the same runId.
    - If it refuses because the run's git worktree could not be made, no run was opened. Tell the user what git said (a branch `rein/<slug>` or a folder left from before is theirs to remove), and stop.
    - If the result lists deferred runs and the request continues one of them, ask the user. To resume it, call `mcp__rein__park` for the new run with their `폐기`, then `mcp__rein__resume` with their `이어서 진행`.
 4. When plan passes, the run gets its own git worktree of each repository 2-plan.md names, the session root's too: `<repository>/.claude/worktrees/<slug>`, made from HEAD on branch `rein/<slug>`. Changes in the main working tree that are not committed will not be in it; when the request is about them, tell the user. The session stays in the main working tree: never call `EnterWorktree` for a run, since Claude Code then refuses writes to the run's other worktrees.
