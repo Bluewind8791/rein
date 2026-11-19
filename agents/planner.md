@@ -81,6 +81,8 @@ Read `1-spec.md`: the problem, the current behaviour, the completion check (`## 
 
 Each line under `## 미해결 질문` is a question the user saw and chose to leave open when they approved the spec. Do not ask it again under `사람에게`, and do not settle it silently: give it a row of `## 결정 사항`, the question as 결정, what you assume as 채택, and `가정: <why this one>` as 근거. The user sees these rows when they approve `2-plan.md`.
 
+A `[?]` left in another section of `1-spec.md` (a line of `## 기획서 대조`, a row of `## 범위`, a sentence anywhere) is undecided too: the spec passed its grade with it still open. Treat it the same way: a row of `## 결정 사항` with what is undecided as 결정, what you assume as 채택 and `가정: <why this one>` as 근거, and design on that assumption.
+
 ### 2. Approach and detailed design
 
 Investigate the code as far as you need, then decide:
@@ -152,7 +154,7 @@ Write `2-plan.md` with `Write` in the first call, unless the design was approved
 It has two readers. The user reads its top, from the title to `## 접근 방법`, to decide whether to approve: what changes where, and what was decided. The worker and the reviewer read the rest. Keep the top short enough to read at a glance; detail goes below.
 
 - `## 변경 요약`: one row per `###` item of `## 상세 설계`, in the same order, the path as the heading writes it. `종류` is `수정`, `새 파일` or `삭제`. `무엇이 어떻게` is one line: what the file does now and what it will do, not why.
-- `## 결정 사항`, optional: what you settled that the user may want to know, one row each. A choice the user made goes here too, with their words as the reason, and so does an assumption for each line of `1-spec.md`'s `## 미해결 질문` (step 1). Without any, leave the section out.
+- `## 결정 사항`, optional: what you settled that the user may want to know, one row each. A choice the user made goes here too, with their words as the reason, and so does an assumption for each line of `1-spec.md`'s `## 미해결 질문` and each `[?]` left in it (step 1). Without any, leave the section out.
 - `## 실패한 시도의 전제`, only when the run came back because a failure was judged a design problem (Coming back to plan): the premise, what you looked at to test it and what it showed, and what the design changes for it. When the tries share no premise, the section holds only `없음 — <what each try failed on>`.
 - `## 접근 방법`: how the problem is solved, in a few short paragraphs. What a file does in detail goes under its item.
 - Under each `###` item of a file that exists (not a new file), add the expected diff in a `diff` fence after its bullets: the code as it is now with `-`, the code it becomes with `+`, a few unchanged lines around with a leading space, and `@@ <method or block> @@ <why>` above each hunk: after the block name, one short sentence saying why this hunk changes, so the person reviewing reads the reason beside the code. The hook builds `2-plan.html` from these hunks, a side-by-side view of each file as it is and as it becomes, so keep the unchanged and `-` lines exactly as in the file: a hunk whose lines it cannot find is shown as not applied. Copy the `-` lines from the file as you read them, never from memory. Show only the blocks that change, not the whole file. A file whose change is not code (a setting, a document) needs none.
