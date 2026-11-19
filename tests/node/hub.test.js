@@ -317,6 +317,8 @@ test("the hub page is read-only and names each run's PC", async t => {
   assert.match(String(page.buf), /<html|<!doctype/i)
   const check = await h.call("POST", "/api/checklist", { body: {}, headers: { "content-type": "application/json" } })
   assert.strictEqual(check.status, 405)
+  const opened = await h.call("POST", "/api/open", { body: {}, headers: { "content-type": "application/json" } })
+  assert.strictEqual(opened.status, 405)
   const info = await h.call("GET", "/api/info")
   assert.deepStrictEqual([info.json.rein, info.json.hub, info.json.v, info.json.imported], [true, true, 1, null])
 })

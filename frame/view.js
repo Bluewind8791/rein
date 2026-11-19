@@ -1,9 +1,10 @@
 // The Rein frame's view of one root: it reads the runs under it and serves
 // the page, the run list, the run files and the change events.
 //
-//   makeView({ root, readOnly, recordOf, debounceMs, extra })
+//   makeView({ root, readOnly, recordOf, debounceMs, extra, opener })
 //
-// readOnly refuses checklist writes; recordOf(project, slug) gives a run's
+// readOnly refuses checklist writes and opening files; opener(full) opens a
+// file on this PC (openFile unless given); recordOf(project, slug) gives a run's
 // record, whose pc the run list then carries; extra() gives more fields of
 // the run list.
 //
@@ -12,6 +13,7 @@
 
 const fs = require("fs")
 const path = require("path")
+const { spawn } = require("child_process")
 const { NAME_OK } = require("./text.js")
 
 const STATES = ["active", "complete", "defer", "drop"]
@@ -50,6 +52,9 @@ const INLINE = new Set([".md", ".txt", ".log", ".html", ".htm", ".json", ".pdf",
 // origin of their own, so they cannot call this server's API as the page
 const SANDBOX = new Set([".html", ".htm", ".svg"])
 const SANDBOX_CSP = "sandbox allow-scripts allow-popups"
+// opened on this PC, by the program the OS gives the type; only types that
+// carry no code a click would run
+const OPEN = new Set([".xlsx", ".xls", ".csv", ".sql", ".docx", ".pptx"])
 
 // ---------- reading runs ----------
 
@@ -374,7 +379,21 @@ function serveFile(res, f) {
   streamFile(res, f.full, headers, () => send(res, 404, "text/plain", "not found"))
 }
 
-function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUNCE_MS, extra = null }) {
+// the file opened by the program the OS gives its type, not waited for. On
+// Windows the path goes through the environment to the shell's own open:
+// explorer.exe splits it at commas, and cmd's start reads & and ^ in it.
+function openFile(full) {
+  const [cmd, args] = process.platform === "win32"
+    ? ["powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "[void][Diagnostics.Process]::Start($env:REIN_OPEN)"]]
+    : process.platform === "darwin" ? ["open", [full]]
+    : ["xdg-open", [full]]
+  // not detached: a detached PowerShell starts no program (Excel stayed shut)
+  const c = spawn(cmd, args, { stdio: "ignore", windowsHide: true, env: { ...process.env, REIN_OPEN: full } })
+  c.on("error", () => {})
+  c.unref()
+}
+
+function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUNCE_MS, extra = null, opener = openFile }) {
   const ROOT = path.resolve(root)
 
   // a project is a folder directly under the root with a run state folder.
@@ -473,6 +492,19 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
     json(res, 200, { ok: true, text: parts[i] })
   }
 
+  // open a run file the page names by its /files/ URL on this PC
+  async function open(req, res) {
+    if (!/^application\/json\b/.test(req.headers["content-type"] || "")) return json(res, 415, { error: "json only" })
+    let b
+    try { b = JSON.parse(await readBody(req)) } catch { return json(res, 400, { error: "bad body" }) }
+    const file = b && b.file
+    const f = typeof file === "string" && file.startsWith("/files/") ? filePath(file) : null
+    if (!f || f.dir) return json(res, 404, { error: "no file" })
+    if (!OPEN.has(path.extname(f.file).toLowerCase())) return json(res, 400, { error: "not a type this opens" })
+    opener(f.full)
+    json(res, 200, { ok: true })
+  }
+
   const clients = new Set()
 
   function broadcast() {
@@ -499,6 +531,11 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
         // only the run's own PC writes its folder
         if (readOnly) return send(res, 405, "text/plain", "read only")
         return await checklist(req, res)
+      }
+      if (req.method === "POST" && p === "/api/open") {
+        // the file is on the PC that serves the page, not the one viewing it
+        if (readOnly) return send(res, 405, "text/plain", "read only")
+        return await open(req, res)
       }
       if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "text/plain", "method not allowed")
       if (p === "/api/runs") return json(res, 200, { now: Date.now(), ...(extra ? extra() : {}), ...snapshot() })

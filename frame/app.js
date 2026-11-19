@@ -18,6 +18,8 @@ const AGENT_FILE = /^(grade|review(-\d+|-groups)?|qa|e2e|test-plan|dev-items|dev
 const GROUPS = [["active", "진행 중"], ["complete", "완료"], ["defer", "보류"], ["drop", "버림"]]
 const VIEWABLE = new Set(["pdf", "png", "jpg", "jpeg", "gif", "svg", "webp", "txt", "json"])
 const IMAGE = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp"])
+// what the server opens on this PC (view.js OPEN)
+const OPENABLE = new Set(["xlsx", "xls", "csv", "sql", "docx", "pptx"])
 // run subfolders and the stage each belongs to
 const SUB_STAGE = { brief: "spec", handoff: "land" }
 
@@ -201,6 +203,10 @@ function setHTML(el, html) {
 
 // name is a path in the run folder: "1-spec.md", "brief/a.pdf", "agent/e2e.md"
 const fileUrl = (run, name) => `/files/${[run.project, run.state, run.slug, ...name.split("/")].map(enc).join("/")}`
+// what a link to a run file does: the local page has the server open the
+// types it can on this PC; anything else, and every file on the hub's page,
+// is downloaded
+const fileAct = (name) => (!ro && OPENABLE.has(extOf(name)) ? ["data-open", "열기"] : ["download", "내려받기"])
 
 function render() {
   const run = resolve()
@@ -449,8 +455,9 @@ function renderMain(run) {
     setHTML(main, head + `<div class="pane"><div class="doc"></div></div>`)
     showMd(run, file, false)
   } else {
+    const [act, label] = fileAct(file.name)
     setHTML(main, head + `<div class="pane"><div class="doc"><div class="dl"><span class="fn">${esc(file.name)}</span>` +
-      `<span class="meta">${fmtSize(file.size)} · ${fmtDate(file.mtime)}</span><a class="btn" href="${url}" download>내려받기</a></div></div></div>`)
+      `<span class="meta">${fmtSize(file.size)} · ${fmtDate(file.mtime)}</span><a class="btn" href="${url}" ${act}>${label}</a></div></div></div>`)
   }
 }
 
@@ -817,7 +824,10 @@ function renderSide(run) {
     if (d.how === "frame") view = `<iframe src="${url}${page ? `#page=${page}` : ""}" title="${esc(d.file.name)}"></iframe>`
     else if (d.how === "img") view = `<div class="bimg"><img src="${url}" alt="${esc(d.file.name)}"></div>`
     else if (d.how === "md") view = `<div class="doc"></div>`
-    else view = `<div class="dl"><span class="fn">${esc(d.file.name)}</span><span class="meta">${fmtSize(d.file.size)}</span><a class="btn" href="${url}" download>내려받기</a></div>`
+    else {
+      const [act, label] = fileAct(d.file.name)
+      view = `<div class="dl"><span class="fn">${esc(d.file.name)}</span><span class="meta">${fmtSize(d.file.size)}</span><a class="btn" href="${url}" ${act}>${label}</a></div>`
+    }
     aside.innerHTML = `<div class="bhead"></div><div class="bview">${view}</div><div class="bft"></div>`
     if (d.how === "md") sideMd(run, d.file, aside, sig, false)
   } else if (aside._ver !== ver) {
@@ -829,9 +839,10 @@ function renderSide(run) {
   const head = `<div class="bhd"><span class="fn" title="${esc(d.file.name)}">${esc(d.file.name)}</span>` +
     `${page ? `<span class="pg">${page}쪽</span>` : ""}<a href="${url}" target="_blank" rel="noopener">새 탭 ↗</a>` +
     `<button type="button" class="bx" data-sidex title="우측 탭 닫기">×</button></div>`
+  const [dlAct, dlLabel] = d.dl ? fileAct(d.dl.name) : []
   const foot = [
     sideAt.req ? `<span>선택한 줄: <b>${Md.inline(sideAt.req, { href: (u) => u })}</b></span>` : "",
-    d.dl ? `<span>원본 <a href="${fileUrl(run, d.dl.name)}" download>${esc(baseOf(d.dl.name))}</a> 내려받기</span>` : "",
+    d.dl ? `<span>원본 <a href="${fileUrl(run, d.dl.name)}" ${dlAct}>${esc(baseOf(d.dl.name))}</a> ${dlLabel}</span>` : "",
   ].filter(Boolean).join("")
   setHTML(aside.querySelector(".bhead"), head)
   setHTML(aside.querySelector(".bft"), foot)
@@ -960,11 +971,16 @@ function drawLand(pane, d) {
       const f = hfiles.find((x) => x.name === "handoff/" + n)
       const what = todo.get(n)
       return `<div class="hcard"><div class="top"><span class="ftag">${esc(extOf(n).toUpperCase() || "FILE")}</span><span class="nm">${esc(n)}</span>` +
-        (f ? `<a class="go" href="${fileUrl(run, f.name)}" target="_blank" rel="noopener" title="새 탭에서 열기">↗</a>` : `<span class="go s">파일 없음</span>`) + `</div>` +
+        (!f ? `<span class="go s">파일 없음</span>`
+          : fileAct(f.name)[0] === "data-open" ? `<a class="go" href="${fileUrl(run, f.name)}" data-open title="이 PC에서 열기">↗</a>`
+          : `<a class="go" href="${fileUrl(run, f.name)}" target="_blank" rel="noopener" title="새 탭에서 열기">↗</a>`) + `</div>` +
         (what && what.some((x) => x.trim()) ? `<div class="hb">${md(what.join("\n"))}</div>` : "") + `</div>`
     }).join("")
   }
-  for (const f of xlsx) l += `<a class="xl" href="${fileUrl(run, f.name)}" download><span class="ftag x">XLSX</span>${esc(f.name)}<span class="s">내려받기</span></a>`
+  for (const f of xlsx) {
+    const [act, label] = fileAct(f.name)
+    l += `<a class="xl" href="${fileUrl(run, f.name)}" ${act}><span class="ftag x">XLSX</span>${esc(f.name)}<span class="s">${label}</span></a>`
+  }
 
   const TAG = { A: "추가", M: "수정", D: "삭제" }
   const row = (p, f) => {
@@ -1313,6 +1329,26 @@ $("main").addEventListener("change", async (e) => {
     load()
   } finally {
     cb.disabled = false
+  }
+})
+
+// a file the server opens on this PC; when it cannot, the file is downloaded
+document.addEventListener("click", async (e) => {
+  const a = e.target.closest("a[data-open]")
+  if (!a) return
+  e.preventDefault()
+  try {
+    const res = await fetch("/api/open", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ file: a.getAttribute("href") }),
+    })
+    if (!res.ok) throw new Error(String(res.status))
+  } catch {
+    const d = document.createElement("a")
+    d.href = a.href
+    d.download = ""
+    d.click()
   }
 })
 
