@@ -58,7 +58,7 @@ function fakeHub(url: string, init?: HttpInit): ReturnType<NonNullable<Host["fet
   if (!url.startsWith(SERVER)) return true
   const path = url.slice(SERVER.length)
   const method = init?.method ?? "GET"
-  hub.calls.push({ method, path, pc: init?.headers?.["x-rein-pc"], ...(init?.body !== undefined ? { body: JSON.parse(init.body) } : {}) })
+  hub.calls.push({ method, path, pc: init?.headers?.["x-rein-pc"], ...(init?.body !== undefined ? { body: JSON.parse(init.body as string) } : {}) })
   if (hub.online !== true) return hub.online
   const listed = /^\/api\/hub\/runs\?project=(.+)$/.exec(path)
   if (listed) {
@@ -77,7 +77,7 @@ function fakeHub(url: string, init?: HttpInit): ReturnType<NonNullable<Host["fet
   if (m[3] === "/docs") return answer(200, { files: hub.docs.get(key) ?? {}, skipped: [] })
   if (hub.claim === "refused") return false
   if (typeof hub.claim === "number") return answer(hub.claim, hub.claim === 422 ? { error: "closed" } : { error: "changed", record: rec })
-  if ((JSON.parse(init!.body!) as { gen: number }).gen !== rec.gen) return answer(409, { error: "changed", record: rec })
+  if ((JSON.parse(init!.body as string) as { gen: number }).gen !== rec.gen) return answer(409, { error: "changed", record: rec })
   const now = { ...rec, pc: init!.headers!["x-rein-pc"]!, state: "active" as const, gen: rec.gen + 1 }
   hub.records.set(key, now)
   return hub.claim === "hang" ? "hang" : answer(200, { record: now })
