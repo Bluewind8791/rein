@@ -3,9 +3,10 @@
   1-mockup.html scaffold. rein:sketcher copies this file and fills it from 1-spec.md and the code.
   - Replace every FILL marker (FILL comments, FILL in an id or the title) and delete every EXAMPLE
     section that does not apply. No FILL marker or EXAMPLE comment may be left in 1-mockup.html.
-  - The shell (header, legend, notes, .screen, .compare, .phone) keeps the variables below and
+  - The shell (header, legend, pins, .screen, .compare, .phone) keeps the variables below and
     follows light and dark. A screen itself is drawn inside .canvas, in the service's own look.
-  - No external fonts, scripts, images or CDN.
+  - No external fonts, scripts, images or CDN. Keep the script at the end of <body>: it shows a
+    pin's note in a bubble, and talks with Rein's frame when the page is shown there.
 -->
 <html lang="ko">
 <head>
@@ -17,9 +18,8 @@
     color-scheme: light;
     --bg: #f5f6f8; --panel: #ffffff; --ink: #1a1c1f; --muted: #5b6169;
     --line: #d9dde3; --head: #eef1f5; --accent: #2563eb; --link: #2563eb;
-    --rule-bg: #e8f0fe; --rule-line: #2563eb; --rule-ink: #143a86;
-    --open-bg: #fdecec; --open-line: #d92d20; --open-ink: #8a1c14;
-    --ask-bg: #fff7e6; --ask-line: #d97706; --ask-ink: #7c4a03;
+    --pin-ask: #d97706; --pin-open: #d92d20; --pin-rule: #6b7280;
+    --bubble-bg: #1a1c1f; --bubble-ink: #ffffff;
     --before: #f3f4f6; --after: #eafaf1; --after-line: #16a34a;
   }
   /* light by default; the header's button switches to dark */
@@ -27,9 +27,8 @@
     color-scheme: dark;
     --bg: #16181d; --panel: #1e2128; --ink: #e6e8eb; --muted: #9aa1ab;
     --line: #333844; --head: #262a33; --accent: #5b8bff; --link: #9db9ff;
-    --rule-bg: #16233f; --rule-line: #5b8bff; --rule-ink: #bcd2ff;
-    --open-bg: #3a1d1a; --open-line: #ff6b5e; --open-ink: #ffc7c0;
-    --ask-bg: #33270f; --ask-line: #f0b429; --ask-ink: #ffdf9e;
+    --pin-ask: #f0b429; --pin-open: #ff6b5e; --pin-rule: #9aa1ab;
+    --bubble-bg: #e6e8eb; --bubble-ink: #16181d;
     --before: #23262d; --after: #16281f; --after-line: #35c07a;
   }
   * { box-sizing: border-box; }
@@ -46,9 +45,6 @@
   .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .swatch { width: 11px; height: 11px; border-radius: 3px; border: 1px solid; }
-  .swatch.rule { background: var(--rule-bg); border-color: var(--rule-line); }
-  .swatch.open { background: var(--open-bg); border-color: var(--open-line); }
-  .swatch.ask { background: var(--ask-bg); border-color: var(--ask-line); }
   .swatch.changed { border: 2px dashed var(--after-line); }
   code { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; background: var(--head);
     border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
@@ -57,13 +53,30 @@
     margin: 20px 0; scroll-margin-top: 12px; }
   .screen > h2 { font-size: 16px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
   .screen > h2 .anchor { font-size: 12px; font-weight: normal; color: var(--muted); margin-left: 8px; }
-  /* notes: blue = a rule 1-spec.md settles, red = a line of ## 미해결 질문 (one to one),
-     yellow = a [?] still to be asked (as-is only) */
-  .note { border-left: 4px solid; border-radius: 0 6px 6px 0; padding: 8px 12px; margin: 8px 0; font-size: 12.5px; }
-  .note b { margin-right: 6px; }
-  .note.rule { border-color: var(--rule-line); background: var(--rule-bg); color: var(--rule-ink); }
-  .note.open { border-color: var(--open-line); background: var(--open-bg); color: var(--open-ink); }
-  .note.ask { border-color: var(--ask-line); background: var(--ask-bg); color: var(--ask-ink); }
+  /* pins: a note on the region they sit in, its text in a bubble on hover or click.
+     yellow ? = a [?] still to be asked, red ! = a line of ## 미해결 질문 or 현행 배치 미확인,
+     gray i = a rule 1-spec.md settles. A .pins group sits inside the top-right corner of the
+     element it is the last child of, so it never moves the layout. */
+  :has(> .pins) { position: relative; }
+  .pins { position: absolute; top: 2px; right: 2px; z-index: 5; display: inline-flex; gap: 3px; }
+  .pins.inline { position: static; vertical-align: middle; }
+  .pins.list { position: static; display: flex; flex-wrap: wrap; gap: 6px; }
+  .pins > .pin { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; margin: 0; padding: 0; border: 2px solid #fff; border-radius: 50%;
+    font: 700 11px/1 -apple-system, "Segoe UI", sans-serif; color: #fff; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+  .pins > .pin:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .pins > .pin.ask { background: var(--pin-ask); }
+  .pins > .pin.ask::before { content: "?"; }
+  .pins > .pin.open { background: var(--pin-open); }
+  .pins > .pin.open::before { content: "!"; }
+  .pins > .pin.rule { background: var(--pin-rule); }
+  .pins > .pin.rule::before { content: "i"; }
+  .pin-note { display: none; }
+  #pin-bubble { position: fixed; z-index: 100; max-width: 320px; padding: 8px 10px; border-radius: 6px;
+    background: var(--bubble-bg); color: var(--bubble-ink); font-size: 12.5px; line-height: 1.45;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .25); pointer-events: none; }
+  #pin-bubble b { margin-right: 6px; }
   /* as-is above, to-be below: a wide screen squeezed side by side reads badly */
   .compare { display: flex; flex-direction: column; gap: 12px; }
   .before, .after { border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
@@ -97,7 +110,7 @@
   <header>
     <div>
       <h1><!-- FILL: 1-spec.md 의 # 줄 --></h1>
-      <div class="sub"><!-- FILL: as-is (질문 전) 또는 as-is · to-be — 그린 화면이나 흐름의 이름 --></div>
+      <div class="sub"><!-- FILL: 그린 화면이나 흐름의 이름 --></div>
     </div>
     <button class="theme-btn" type="button"
       onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">라이트 / 다크</button>
@@ -105,29 +118,18 @@
   <div class="disclaimer">
     화면의 배치와 모양은 서비스 코드와 스타일에서 읽어 본뜬 그림입니다. 값은 모두 예시입니다. 기준은 <code>1-spec.md</code>입니다.
     <div class="legend">
-      <span><span class="swatch rule"></span>파랑 = 1-spec.md가 정한 규칙</span>
-      <span><span class="swatch open"></span>빨강 = 미해결 질문</span>
-      <!-- EXAMPLE (as-is only): delete this legend item in to-be -->
-      <span><span class="swatch ask"></span>노랑 = 질문 예정</span>
-      <!-- EXAMPLE (to-be only): delete this legend item in as-is -->
+      <span><span class="pins inline"><span class="pin ask"></span></span>물어볼 것</span>
+      <span><span class="pins inline"><span class="pin open"></span></span>미해결 질문 · 현행 미확인</span>
+      <span><span class="pins inline"><span class="pin rule"></span></span>1-spec.md가 정한 규칙</span>
       <span><span class="swatch changed"></span>점선 = 바뀌는 곳</span>
+      <span class="muted">핀에 마우스를 올리거나 누르면 내용이 보입니다.</span>
     </div>
   </div>
 
   <!-- ================================================================== -->
-  <!-- EXAMPLE A: an existing screen, as-is only (as-is mode).             -->
-  <!-- ================================================================== -->
-  <section class="screen" id="FILL-screen-code">
-    <h2><!-- FILL: 화면 이름 --><span class="anchor">#FILL-screen-code</span></h2>
-    <!-- as-is source: FILL path:line, path:line -->
-    <div class="canvas">
-      <!-- FILL: the screen as its code lays it out, in the service's parts and look -->
-    </div>
-    <div class="note ask"><b>질문 예정</b><!-- FILL: the [?] word for word, then one line on what is to be decided --></div>
-  </section>
-
-  <!-- ================================================================== -->
-  <!-- EXAMPLE B: an existing screen that changes (to-be mode).            -->
+  <!-- EXAMPLE A: an existing screen that changes.                          -->
+  <!-- A pin group is the last child of the element it is about (a div, a  -->
+  <!-- td, a th, a label), never directly inside a table, tr or ul.        -->
   <!-- ================================================================== -->
   <section class="screen" id="FILL-screen-code">
     <h2><!-- FILL: 화면 이름 --><span class="anchor">#FILL-screen-code</span></h2>
@@ -140,15 +142,21 @@
       <div class="compare-arrow">▼</div>
       <div class="after">
         <span class="tag">TO-BE</span>
-        <div class="canvas"><!-- FILL: the screen as 1-spec.md says it, each changed part with class="changed" --></div>
+        <div class="canvas">
+          <!-- FILL: the screen as 1-spec.md says it, each changed part with class="changed".
+               On the element a note is about, as its last child: -->
+          <span class="pins">
+            <span class="pin ask" tabindex="0"><span class="pin-note"><b>질문 예정</b><!-- FILL: the [?] word for word, then one line on what is to be decided --></span></span>
+            <span class="pin rule" tabindex="0"><span class="pin-note"><b>규칙</b><!-- FILL: the rule as 1-spec.md words it --></span></span>
+            <span class="pin open" tabindex="0"><span class="pin-note"><b>미해결</b><!-- FILL: the ## 미해결 질문 line word for word --></span></span>
+          </span>
+        </div>
       </div>
     </div>
-    <div class="note rule"><b>규칙</b><!-- FILL: the rule as 1-spec.md words it --></div>
-    <div class="note open"><b>미해결</b><!-- FILL: the ## 미해결 질문 line word for word --></div>
   </section>
 
   <!-- ================================================================== -->
-  <!-- EXAMPLE C: a new mobile screen, nothing before it (to-be mode).     -->
+  <!-- EXAMPLE B: a new mobile screen, nothing before it.                 -->
   <!-- A desktop screen leaves out the .phone frame.                       -->
   <!-- ================================================================== -->
   <section class="screen" id="FILL-screen-code">
@@ -161,7 +169,7 @@
   </section>
 
   <!-- ================================================================== -->
-  <!-- EXAMPLE D: a flow, states or how data moves, in inline SVG.          -->
+  <!-- EXAMPLE C: a flow, states or how data moves, in inline SVG.          -->
   <!-- ================================================================== -->
   <section class="screen" id="FILL-flow-name">
     <h2><!-- FILL: 흐름 이름 --><span class="anchor">#FILL-flow-name</span></h2>
@@ -177,13 +185,67 @@
   </section>
 
   <!-- ================================================================== -->
-  <!-- EXAMPLE E: open questions that belong to no screen or flow above.    -->
+  <!-- EXAMPLE D: open questions that belong to no screen or flow above.    -->
   <!-- ================================================================== -->
   <section class="screen" id="open-questions">
     <h2>화면 밖의 미해결 질문<span class="anchor">#open-questions</span></h2>
-    <div class="note open"><b>미해결</b><!-- FILL: the ## 미해결 질문 line word for word --></div>
+    <span class="pins list">
+      <span class="pin open" tabindex="0"><span class="pin-note"><b>미해결</b><!-- FILL: the ## 미해결 질문 line word for word --></span></span>
+    </span>
   </section>
 
 </div>
+<div id="pin-bubble" hidden></div>
+<script>
+  // a pin's note in a bubble beside it, on hover or click (focus)
+  (function () {
+    var bubble = document.getElementById("pin-bubble")
+    function pinOf(e) { return e.target.closest ? e.target.closest(".pin") : null }
+    function show(pin) {
+      var note = pin.querySelector(".pin-note")
+      if (!note) return
+      bubble.innerHTML = note.innerHTML
+      bubble.hidden = false
+      var r = pin.getBoundingClientRect(), w = bubble.offsetWidth, h = bubble.offsetHeight
+      // right of the pin, or left of it where the right has no room
+      var x = r.right + 6 + w <= innerWidth - 8 ? r.right + 6 : r.left - 6 - w
+      bubble.style.left = Math.max(8, x) + "px"
+      bubble.style.top = Math.max(8, Math.min(r.top, innerHeight - h - 8)) + "px"
+    }
+    function hide() {
+      var f = document.activeElement
+      if (f && f.closest && f.closest(".pin")) show(f.closest(".pin"))
+      else bubble.hidden = true
+    }
+    document.addEventListener("mouseover", function (e) { var p = pinOf(e); if (p) show(p) })
+    document.addEventListener("mouseout", function (e) { if (pinOf(e)) hide() })
+    document.addEventListener("focusin", function (e) { var p = pinOf(e); if (p) show(p) })
+    document.addEventListener("focusout", function () { bubble.hidden = true })
+    addEventListener("scroll", function () { bubble.hidden = true }, true)
+  })()
+  // in Rein's frame: the frame picks the part of each screen shown, and hears
+  // which screen was clicked, to open the planning-document page it is drawn from
+  ;(function () {
+    if (parent === window) return
+    var HIDE = { before: ".compare > .after, .compare > .compare-arrow, .screen > .after", after: ".compare > .before, .compare > .compare-arrow" }
+    var style = document.createElement("style")
+    document.head.appendChild(style)
+    addEventListener("message", function (e) {
+      if (e.source !== parent || !e.data || e.data.rein !== "show") return
+      style.textContent = HIDE[e.data.show] ? HIDE[e.data.show] + " { display: none !important; }" : ""
+    })
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest || e.target.closest(".pin, a, button, input, select, textarea")) return
+      var sec = e.target.closest("section.screen")
+      if (!sec) return
+      var walk = document.createTreeWalker(sec, NodeFilter.SHOW_COMMENT), n, source = ""
+      while ((n = walk.nextNode())) {
+        var m = /^\s*to-be source:\s*([\s\S]*?)\s*$/.exec(n.nodeValue)
+        if (m) { source = m[1]; break }
+      }
+      parent.postMessage({ rein: "screen", id: sec.id, source: source }, "*")
+    })
+  })()
+</script>
 </body>
 </html>

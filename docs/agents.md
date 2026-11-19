@@ -19,7 +19,7 @@
 |---|---|---|---|
 | `rein:slug` | spec | 요청을 보고 runId 슬러그 생성 | haiku |
 | `rein:grader` | spec | `1-spec.md`만 읽고 모호도 채점 → `grade.md` | sonnet |
-| `rein:sketcher` | spec | `1-mockup.html` as-is / to-be 그림. to-be는 기획서 화면 그림을 보고 배치를 맞춤 | sonnet |
+| `rein:sketcher` | spec | `1-mockup.html` 그림. 화면마다 as-is와 to-be, to-be에 질문·미해결·규칙 핀. 답마다 다시 그리고, to-be는 기획서 화면 그림을 보고 배치를 맞춤 | sonnet |
 | `rein:layout-verifier` | spec, qa-integration | spec: 렌더링한 to-be와 기획서 그림을 화면마다 비교 → `layout-verify.md`(맞음/다름). 통합 qa: 배치 체크(`배치-<id>`)의 judge로 구현 화면 스크린샷과 to-be를 비교 → `judge.md` | sonnet |
 | `rein:collator` | spec | 기획서 원본과 `## 기획서 대조`를 맞춰 빠지거나 다른 요구사항을 답함. 파일을 쓰지 않음 | 상속 |
 | `rein:planner` | plan | 설계 → `2-plan.md` | 상속 |

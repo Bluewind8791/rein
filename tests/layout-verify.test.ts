@@ -110,7 +110,7 @@ describe("spec's layout check", () => {
     const questions: string[] = []
     world(on, { [SPEC]: SPEC_TEXT }, q => (questions.push(q), undefined), undefined, renders)
     await sketch($)
-    expect(context(await verify($, DIFFER))).toContain("The to-be differs from the planning-document picture (#dash0101: 도넛 차트: 그림은 오른쪽 위, 목업은 왼쪽 아래). Spawn rein:sketcher with to-be")
+    expect(context(await verify($, DIFFER))).toContain("The to-be differs from the planning-document picture (#dash0101: 도넛 차트: 그림은 오른쪽 위, 목업은 왼쪽 아래). Spawn rein:sketcher again, in the foreground")
     expect(record().sketchCheck).toEqual(expect.objectContaining({ state: "differ", fails: 1 }))
     await sketch($)
     const second = spawned.filter(s => s.type === "rein:sketcher").at(-1)!.prompt ?? ""
@@ -129,6 +129,50 @@ describe("spec's layout check", () => {
     await grade($)
     await relay($, ADVANCE)
     expect(questions[0]).toContain(`주의: 기획서 그림과 배치가 5번 연달아 달라 다시 그리기를 멈췄습니다. 다른 곳: ${VERDICT}`)
+  })
+
+  test("a drawing that got no closer stops the redrawing, as the verifier judges from the last differences", async ($, on) => {
+    const questions: string[] = []
+    world(on, { [SPEC]: SPEC_TEXT }, q => (questions.push(q), undefined), undefined, renders)
+    await sketch($)
+    const first = await spawnAs($, "rein:layout-verifier")
+    expect(spawned.at(-1)!.prompt ?? "").not.toContain("진전")
+    await $.tool.call({ tool: "Write", file_path: VERDICT, content: DIFFER, agentId: first.agentId } as never)
+    const redraw = await sketch($)
+    expect(spawned.filter(s => s.type === "rein:sketcher").at(-1)).toEqual(expect.objectContaining({ background: false }))
+    expect(context(redraw)).toContain("Spawn rein:layout-verifier")
+    await spawnAs($, "rein:layout-verifier")
+    const task = spawned.at(-1)!.prompt ?? ""
+    expect(task).toContain("This drawing was made to fix the differences found in the one before:\n- #dash0101: 도넛 차트: 그림은 오른쪽 위, 목업은 왼쪽 아래")
+    expect(task).toContain("진전: 있음 | 없음")
+    const agentId = record().sketchCheck?.agent
+    const r = await $.tool.call({ tool: "Write", file_path: VERDICT, content: `${DIFFER}진전: 없음\n`, agentId } as never)
+    expect(context(r)).toContain("The last drawing got no closer to the planning-document picture (#dash0101: 도넛 차트: 그림은 오른쪽 위, 목업은 왼쪽 아래). The hook stops redrawing")
+    expect(record().sketchCheck).toEqual(expect.objectContaining({ state: "given-up", fails: 2 }))
+    await grade($)
+    await relay($, ADVANCE)
+    expect(questions[0]).toContain("주의: 기획서 그림과 배치가 2번 연달아 달라 다시 그리기를 멈췄습니다.")
+  })
+
+  test("a drawing redone for an answer is not compared until advance, which compares it before the user is asked", async ($, on) => {
+    const questions: string[] = []
+    const files: Record<string, string> = { [SPEC]: SPEC_TEXT }
+    world(on, files, q => (questions.push(q), undefined), undefined, renders)
+    await sketch($)
+    await verify($, MATCH)
+    const renders0 = ran.filter(c => c.argv[1]?.endsWith("hooks/render-mockup.js")).length
+    files[SPEC] = `${SPEC_TEXT}답 하나\n`
+    const again = await sketch($, `${TO_BE()}<!-- 답 반영 -->`)
+    expect(context(again)).not.toContain("layout-verifier")
+    expect(ran.filter(c => c.argv[1]?.endsWith("hooks/render-mockup.js")).length).toBe(renders0)
+    await grade($)
+    expect(await relay($, ADVANCE)).toEqual(refused("The to-be of #dash0101 is drawn from a planning-document picture. Spawn rein:layout-verifier"))
+    expect(questions).toEqual([])
+    expect(record().sketchCheck).toEqual(expect.objectContaining({ state: "pending", fails: 0 }))
+    expect(await relay($, ADVANCE)).toEqual(refused("The to-be is being compared with its planning-document picture."))
+    await verify($, MATCH)
+    await relay($, ADVANCE)
+    expect(questions[0]).toContain("기획서 그림과 배치 비교: 맞음.")
   })
 
   test("a match after a difference starts the count again, and approval says it matches", async ($, on) => {

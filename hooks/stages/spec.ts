@@ -34,27 +34,16 @@ export const spec: StageSpec = {
   artifacts: ["agent/grade.md", "1-mockup.html", SPEC_VERDICT],
 }
 
-// what the sketcher draws: the current screen before the questions, or
-// the current and the target once the grading is over.
-export type SketchMode = "as-is" | "to-be"
-
-// the mode named in the Agent call's description, the one place it can
-// come from (the hook drops the prompt); undefined when it names none or both.
-export function sketchMode(description: string): SketchMode | undefined {
-  const named = (["as-is", "to-be"] as const).filter(m => new RegExp(`(^|[^a-z])${m}($|[^a-z])`, "i").test(description))
-  return named.length === 1 ? named[0] : undefined
-}
-
 // the sketcher's whole task, built by the hook at agent.spawn in place of
 // whatever the main session wrote, so nothing of the conversation reaches it.
-export function sketcherTask(dir: string, mode: SketchMode, redraw: string[] = []): string {
+// Every drawing is the same: the as-is and the to-be of each screen, the
+// to-be redrawn as answers come in.
+export function sketcherTask(dir: string, redraw: string[] = []): string {
   return [
-    `Draw ${dir}/1-mockup.html, mode ${mode}. You did not see the conversation that produced the spec: draw only what ${dir}/1-spec.md says, what the planning document's pictures it names show, and what the code shows.`,
+    `Draw ${dir}/1-mockup.html. You did not see the conversation that produced the spec: draw only what ${dir}/1-spec.md says, what the planning document's pictures it names show, and what the code shows.`,
     "",
     `Read ${dir}/1-spec.md first. Then read the code it cites, and the code you find, for the as-is.`,
-    mode === "as-is"
-      ? "Mode as-is: the screens as they are now, alone, with each [?] of 1-spec.md as a yellow note where it belongs. No to-be."
-      : "Mode to-be: rewrite the file whole, the as-is above and the to-be below for each screen that changes; each line of ## 미해결 질문 as one red note. No yellow note is left. Where `## 기획서 대조` names a picture of the screen (its `원본:` line, a file in the run folder), open it with Read and draw the to-be's layout as the picture lays it out, with `<!-- to-be source: <its path relative to the run folder> (<page>) -->` inside that screen's section.",
+    "Rewrite the file whole: the as-is above and the to-be below for each screen that changes. Each [?] of 1-spec.md is a yellow pin on the to-be where it belongs, and each line of ## 미해결 질문 a red pin. Where `## 기획서 대조` names a picture of the screen (its `원본:` line, a file in the run folder), open it with Read and draw the to-be's layout as the picture lays it out, with `<!-- to-be source: <its path relative to the run folder> (<page>) -->` inside that screen's section.",
     ...redraw,
     "",
     `Write ${dir}/1-mockup.html, whole, with Write; the hook refuses every other write and every tool but Read, Grep, Glob and Write. Then answer in the form your instructions give, and stop.`,

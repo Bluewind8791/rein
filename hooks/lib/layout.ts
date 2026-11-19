@@ -11,7 +11,9 @@ export const SPEC_VERDICT = "agent/layout-verify.md"
 // where the hook renders the mockup's to-be screens, relative to the run.
 export const MOCKUP_SHOTS = "agent/layout/mockup"
 // the drawings in a row that differ before the sketcher gets the
-// measurement of its last to-be, and before the hook stops drawing.
+// measurement of its last to-be, and, in spec, before the hook stops drawing
+// even while the drawings still get closer: a cap never shown before it is
+// reached (a drawing that got no closer stops it sooner).
 export const MEASURE_AT = 3
 export const GIVE_UP_AT = 5
 
@@ -31,10 +33,13 @@ export function toBeSources(html: string): Record<string, string> {
   return out
 }
 
-export type ScreenVerdict = { id: string; match: boolean; diffs: string[] }
+// stuck: under 다름, the verifier's `진전: 없음`, every difference it names
+// was named last time too.
+export type ScreenVerdict = { id: string; match: boolean; diffs: string[]; stuck?: true }
 
 // the verifier's file: one `## #<id>` section per screen asked, each with
-// `판정: 맞음` or `판정: 다름`, and under 다름 one `- ` line per difference.
+// `판정: 맞음` or `판정: 다름`, and under 다름 one `- ` line per difference and,
+// when it was given the differences of the last drawing, `진전: 있음` or `진전: 없음`.
 export function parseLayoutVerdict(text: string, ids: string[]): { verdicts: ScreenVerdict[] } | { problem: string } {
   const sections = new Map<string, string>()
   for (const part of text.split(/^##\s+/m).slice(1)) {
@@ -51,16 +56,17 @@ export function parseLayoutVerdict(text: string, ids: string[]): { verdicts: Scr
     if (said.length !== 1 || (said[0] !== "맞음" && said[0] !== "다름")) return { problem: `#${id} needs exactly one line \`판정: 맞음\` or \`판정: 다름\`` }
     const diffs = body.split(/\r?\n/).filter(l => /^\s*[-*]\s+\S/.test(l)).map(l => l.trim().replace(/^[-*]\s+/, ""))
     if (said[0] === "다름" && diffs.length === 0) return { problem: `#${id} is 다름 with no \`- \` line saying what differs` }
-    verdicts.push({ id, match: said[0] === "맞음", diffs: said[0] === "맞음" ? [] : diffs })
+    const stuck = said[0] === "다름" && /^진전:\s*없음\s*$/m.test(body)
+    verdicts.push({ id, match: said[0] === "맞음", diffs: said[0] === "맞음" ? [] : diffs, ...(stuck ? { stuck } : {}) })
   }
   return { verdicts }
 }
 
-const FORM = (file: string, ids: string[]) => [
+const FORM = (file: string, ids: string[], progress = false) => [
   `Write ${file} with Write, one section per screen, in this form, and nothing else:`,
   "",
   "```",
-  ...ids.flatMap(id => [`## #${id}`, "판정: 맞음 | 다름", "- <under 다름, one line per difference: where, what the picture shows, what the mockup shows>", ""]),
+  ...ids.flatMap(id => [`## #${id}`, "판정: 맞음 | 다름", "- <under 다름, one line per difference: where, what the picture shows, what the mockup shows>", ...(progress ? ["진전: 있음 | 없음 <under 다름 only>"] : []), ""]),
   "```",
   "",
   "Then answer with the verdict of each screen in one line, and stop.",
@@ -71,7 +77,9 @@ const FORM = (file: string, ids: string[]) => [
 // other to-be screens (the menu tabs above a tab's body, a popup) may draw
 // part of the same picture, so they come along. Paths of the pictures and
 // sources are relative to the run folder.
-export function specVerifierTask(dir: string, shots: Record<string, string>, sources: Record<string, string>, others: Record<string, string> = {}): string {
+// last: the differences the verifier named in the drawing before, by screen,
+// when this one is drawn again to fix them.
+export function specVerifierTask(dir: string, shots: Record<string, string>, sources: Record<string, string>, others: Record<string, string> = {}, last?: Record<string, string[]>): string {
   const ids = Object.keys(shots)
   const rest = Object.keys(others)
   return [
@@ -88,8 +96,16 @@ export function specVerifierTask(dir: string, shots: Record<string, string>, sou
       : []),
     "Judge the layout only: the regions of the screen and their order, the number and order of the columns of each table, the order of the fields of a form or a search bar, and the place and size of each chart, panel, tab and button relative to the others. A difference in colors, fonts, borders, exact pixel sizes or the sample data is not one: the mockup takes the look of the service's existing screens on purpose.",
     `The user changed or dropped some of the document's requirements: read the \`## 기획서 대조\` section of ${dir}/1-spec.md, and nothing else of it. Where the mockup follows a line marked 변경 or 제외 there and the document does not, that is not a difference.`,
+    ...(last
+      ? [
+          "",
+          "This drawing was made to fix the differences found in the one before:",
+          ...Object.entries(last).flatMap(([id, diffs]) => diffs.map(d => `- #${id}: ${d}`)),
+          "For each screen that still differs, add `진전: 없음` when every difference you name is one of those, still there; otherwise `진전: 있음`.",
+        ]
+      : []),
     "",
-    ...FORM(`${dir}/${SPEC_VERDICT}`, ids),
+    ...FORM(`${dir}/${SPEC_VERDICT}`, ids, last !== undefined),
   ].join("\n")
 }
 

@@ -6,8 +6,8 @@
 // and reads one JSON line from stdout:
 //   {"shots":[{"id","png","boxes"}],"missing":[<id>]}  exit 0
 //   {"error":"<why>"}                                  exit 2
-// For each id it shows only that `.screen`, hides its notes (the sketcher's
-// remarks, not the screen), clips the union of its `.after` blocks, and writes <out>/<id>.png and <out>/<id>.boxes.txt: one line per
+// For each id it shows only that `.screen`, hides its notes and pins (the
+// sketcher's remarks, not the screen), clips the union of its `.after` blocks, and writes <out>/<id>.png and <out>/<id>.boxes.txt: one line per
 // element of the to-be (tag.class "text" x,y w×h, relative to the to-be), the
 // measurement the sketcher reads when the picture keeps coming out different.
 const fs = require("fs")
@@ -87,7 +87,7 @@ const MEASURE = id => `(() => {
   const screen = document.getElementById(${JSON.stringify(id)})
   if (!screen) return null
   for (const s of document.querySelectorAll(".screen")) s.style.display = s === screen ? "" : "none"
-  for (const n of screen.querySelectorAll(".note")) n.style.display = "none"
+  for (const n of screen.querySelectorAll(".note, .pin")) n.style.display = "none"
   const afters = [...screen.querySelectorAll(".after")]
   if (afters.length === 0) return null
   const rects = afters.map(a => a.getBoundingClientRect())

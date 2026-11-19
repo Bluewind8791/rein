@@ -109,7 +109,7 @@ export type ReviewGroup = { title: string; files: string[]; reviewer?: string; v
 // rendered PNGs (relative to the run), the rein:layout-verifier on it, the
 // state, and the drawings in a row that came out different.
 // pending: the verifier is to compare; match: every screen matches; differ:
-// the sketcher draws again; given-up: GIVE_UP_AT in a row differed, the
+// the sketcher draws again; given-up: a drawing got no closer, or GIVE_UP_AT in a row differed, the
 // differences go to the approval; unrendered: no browser rendered it (why).
 export type SketchCheck = {
   html: string
@@ -118,6 +118,7 @@ export type SketchCheck = {
   agent?: string
   state: "pending" | "match" | "differ" | "given-up" | "unrendered"
   fails: number
+  last?: Record<string, string[]> // the differences of the last drawing that differed, by screen, given to the verifier of the next
   why?: string
 }
 

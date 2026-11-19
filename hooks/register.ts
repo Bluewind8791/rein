@@ -25,7 +25,7 @@ import { filesOf, landFiles, nameStatus, numstat, stagedPaths, stagingProblem, s
 import { backendsHint, commandReport, failedRun, failureOf, OUTPUT_FILE, outputLog, rerunQuestion, rewrote, type CommandResult } from "./stages/qa.ts"
 import { driverRow, egoSection, folderOf as checkFolder, judgeOf, judgeRow, settleEgo, asideSection, progressSection, allChecked, carriedPass, carriedTick, asideTick, egoTick, checklist, doubtful, IMPACT_DIFF, IMPACT_FILE, impactRow, impactTask, parseImpact, completionLine, completionTask, E2E_MANUAL, E2E_NONE, E2E_SKIPPED, e2eSection, entryOutcome, handChecked, judgeIntegration, keptPasses, openLayouts, parseResult, qaIntegration, remember, resultOf, runnerCheck, runnerRow, sameE2e, settleAside, tick, unchecked, UNSHOT, withHistory } from "./stages/qaIntegration.ts"
 import { GROUPS_FILE, groupFile, groupItems, groupRules, groupsCover, groupTask, joinedReview, parseGroups, pendingGroups, review, reviewEntry, reviewLists, reviewNext, reviewRules, reviewTask, splits, splitterTask } from "./stages/review.ts"
-import { DIMENSIONS, EVERY, gradeLine, graderTask, gradeSummary, openQuestions, passes, scoreGrade, sketcherTask, sketchMode, spec, specProblem, specType, TYPES } from "./stages/spec.ts"
+import { DIMENSIONS, EVERY, gradeLine, graderTask, gradeSummary, openQuestions, passes, scoreGrade, sketcherTask, spec, specProblem, specType, TYPES } from "./stages/spec.ts"
 import { unbuilt } from "./stages/unbuilt.ts"
 
 // Kickoff step 5, all six stages. The run opens through the open_run tool,
@@ -1625,7 +1625,14 @@ async function advanceRun($: EngineInterface, run: Run, answer: string | undefin
   const visual = `${path.slice(0, path.lastIndexOf("/"))}/1-mockup.html`
   const drawn = run.stage === "spec" && (await $.fs.exists(visual)) ? await $.fs.read(visual) : undefined
   const fresh = drawn !== undefined && run.sketched?.spec === (await sha256Text(shown)) && run.sketched.html === (await sha256Text(drawn))
-  const seen = drawn === undefined ? "" : ` 시각 자료: ${visual}${fresh ? "" : " — 주의: 1-mockup.html이 1-spec.md보다 오래됐습니다. 지금의 1-spec.md를 rein:sketcher가 그린 것이 아닙니다."}${fresh ? sketchLine(run.sketchCheck, visual) : ""}`
+  // the to-be is compared with its planning-document picture again before
+  // the person is asked, when this drawing was not compared yet.
+  const unchecked = answer === undefined && fresh ? await endCheck($, run, visual, drawn!) : undefined
+  if (unchecked !== undefined) {
+    await trace($, run, { ev: "tool", stage: run.stage, tool: ADVANCE, decision: "deny", reason: "layout check" })
+    return { deny: unchecked }
+  }
+  const seen =drawn === undefined ? "" : ` 시각 자료: ${visual}${fresh ? "" : " — 주의: 1-mockup.html이 1-spec.md보다 오래됐습니다. 지금의 1-spec.md를 rein:sketcher가 그린 것이 아닙니다."}${fresh ? sketchLine(run.sketchCheck, visual) : ""}`
   // a 1-spec.md approved before and changed since (the run came back to
   // spec) shows the person what changed, quoted (the file may be anyone's).
   const changed = run.stage === "spec" && run.frozen?.spec !== undefined ? lineDiff(run.frozen.spec, shown) : []
@@ -5009,22 +5016,42 @@ async function gradeExit($: EngineInterface, c: Ctx, result: ToolCallResult): Pr
 
 // right after the sketcher's 1-mockup.html went through: the hook records
 // which 1-spec.md it drew and what it wrote, so advance can tell when the
-// picture is older than the spec.
+// picture is older than the spec. The first drawing of the run, and each
+// drawing of a comparison under way, is compared with its planning-document
+// picture; a drawing redone for an answer is not, until advance.
 async function sketchExit($: EngineInterface, c: Ctx, result: ToolCallResult): Promise<ToolCallResult> {
   const html = await $.fs.read(`${c.dir}/1-mockup.html`)
   const sketched = { spec: await sha256Text(await $.fs.read(`${c.dir}/1-spec.md`)), html: await sha256Text(html) }
   const moved = await mutate($, r => (r?.stage === "spec" && r.sketcher === c.agentId ? { ...r, sketched } : undefined))
   if (!moved) return result
   await trace($, moved, { ev: "sketch", stage: "spec", agentId: c.agentId })
-  const line = await checkSketch($, c.dir, html, sketched.html)
+  const looping = c.run.sketchCheck?.state === "differ"
+  if (c.run.sketched !== undefined && !looping) return result
+  const line = await checkSketch($, c.dir, html, sketched.html, looping ? c.run.sketchCheck!.fails : 0)
   return line === undefined ? result : withContext(result, line)
+}
+
+// End's comparison: what the main session does before the person is asked,
+// or undefined when the drawing as it is was compared already, or names no
+// planning-document picture.
+async function endCheck($: EngineInterface, run: Run, visual: string, html: string): Promise<string | undefined> {
+  const hash = await sha256Text(html)
+  const check = run.sketchCheck
+  if (check?.html === hash) {
+    if (check.state === "pending") return `The to-be is being compared with its planning-document picture. Spawn ${LAYOUT_VERIFIER} if it is not running (a short prompt does), and call advance again once it has answered.`
+    if (check.state === "differ") return `The to-be differs from its planning-document picture (${visual.slice(0, visual.lastIndexOf("/"))}/${SPEC_VERDICT} says where). Spawn ${SKETCHER} in the foreground to draw it again; call advance again once the comparison is over.`
+    return undefined
+  }
+  const line = await checkSketch($, visual.slice(0, visual.lastIndexOf("/")), html, hash, 0)
+  return line === undefined ? undefined : `${line} Then call advance again.`
 }
 
 // a to-be drawn from a planning-document picture is rendered and compared
 // with it: the hook renders each such screen and has the main
 // session spawn rein:layout-verifier. What the main session is told, or
-// undefined when no to-be screen names a picture.
-async function checkSketch($: EngineInterface, dir: string, html: string, hash: string): Promise<string | undefined> {
+// undefined when no to-be screen names a picture. fails: the drawings in a
+// row that differed before this one, 0 when a comparison starts.
+async function checkSketch($: EngineInterface, dir: string, html: string, hash: string, fails: number): Promise<string | undefined> {
   const sources = toBeSources(html)
   const ids = Object.keys(sources)
   if (ids.length === 0) {
@@ -5035,7 +5062,7 @@ async function checkSketch($: EngineInterface, dir: string, html: string, hash: 
   const shots = "shots" in rendered ? Object.fromEntries(Object.keys(rendered.shots).map(id => [id, `${MOCKUP_SHOTS}/${id}.png`])) : {}
   const why = "error" in rendered ? rendered.error : rendered.missing.length > 0 ? `the to-be of ${rendered.missing.map(m => `#${m}`).join(", ")} rendered nothing` : undefined
   const state = why === undefined ? "pending" : "unrendered"
-  const moved = await mutate($, r => (r?.stage === "spec" ? { ...r, sketchCheck: { html: hash, sources, shots, state, fails: r.sketchCheck?.fails ?? 0, ...(why ? { why } : {}) } } : undefined))
+  const moved = await mutate($, r => (r?.stage === "spec" ? { ...r, sketchCheck: { html: hash, sources, shots, state, fails, ...(fails > 0 && r.sketchCheck?.last ? { last: r.sketchCheck.last } : {}), ...(why ? { why } : {}) } } : undefined))
   if (moved) await trace($, moved, { ev: "sketch-check", stage: "spec", state, screens: ids, ...(why ? { why } : {}) })
   if (why !== undefined) return `The to-be of ${ids.map(i => `#${i}`).join(", ")} is drawn from a planning-document picture, but the hook could not render it to compare (${why}), so the layout is not checked against the picture. Tell the user in one line, and go on.`
   return `The to-be of ${ids.map(i => `#${i}`).join(", ")} is drawn from a planning-document picture. Spawn ${LAYOUT_VERIFIER} (a short prompt does: the hook writes its task) to compare each with its picture, before you call mcp__rein__advance.`
@@ -5084,7 +5111,7 @@ async function spawnLayoutVerifier($: EngineInterface, run: Run, e: AgentSpawnIn
   // the mockup's other to-be screens, which may draw part of the same picture.
   const rest = toBeScreens(await $.fs.read(`${dir}/1-mockup.html`)).filter(id => check.shots[id] === undefined)
   const others = rest.length === 0 ? {} : await toBeShots($, dir, rest.map(anchor => ({ anchor, page: "", route: "", look: "" })))
-  const result = await next({ ...e, prompt: specVerifierTask(dir, check.shots, check.sources, others), background: false })
+  const result = await next({ ...e, prompt: specVerifierTask(dir, check.shots, check.sources, others, check.fails > 0 ? check.last : undefined), background: false })
   if (result.deny !== undefined || result.agentId === undefined) return result
   const agentId = result.agentId
   reinAgents.add(agentId)
@@ -5100,9 +5127,11 @@ async function spawnLayoutVerifier($: EngineInterface, run: Run, e: AgentSpawnIn
 }
 
 // right after the verifier's layout-verify.md went through: every screen
-// matches, or the sketcher draws again with what differs, or, the
-// GIVE_UP_AT-th drawing in a row differing, the hook stops and the
-// differences go to the approval.
+// matches, or the sketcher draws again with what differs, or the hook stops
+// and the differences go to the approval: when no screen that differs got
+// closer to its picture since the last drawing, as the verifier judges, or
+// at the GIVE_UP_AT-th drawing in a row that differs, a cap never shown
+// before it is reached.
 async function layoutVerifyExit($: EngineInterface, c: Ctx, result: ToolCallResult): Promise<ToolCallResult> {
   const check = c.run.sketchCheck
   if (check === undefined || check.agent !== c.agentId || check.state !== "pending") return result
@@ -5110,39 +5139,43 @@ async function layoutVerifyExit($: EngineInterface, c: Ctx, result: ToolCallResu
   if ("problem" in parsed) return withContext(result, `${SPEC_VERDICT} was not taken: ${parsed.problem}. Write it again.`)
   const differ = parsed.verdicts.filter(v => !v.match)
   const fails = differ.length === 0 ? 0 : check.fails + 1
-  const state = differ.length === 0 ? "match" : fails >= GIVE_UP_AT ? "given-up" : "differ"
-  const moved = await mutate($, r => (r?.stage === "spec" && r.sketchCheck !== undefined && r.sketchCheck.agent === c.agentId ? { ...r, sketchCheck: { ...r.sketchCheck, agent: undefined, state, fails } } : undefined))
+  const stuck = fails > 1 && differ.every(v => v.stuck)
+  const state = differ.length === 0 ? "match" : stuck || fails >= GIVE_UP_AT ? "given-up" : "differ"
+  const last = Object.fromEntries(differ.map(v => [v.id, v.diffs]))
+  const moved = await mutate($, r => (r?.stage === "spec" && r.sketchCheck !== undefined && r.sketchCheck.agent === c.agentId ? { ...r, sketchCheck: { ...r.sketchCheck, agent: undefined, state, fails, last } } : undefined))
   if (!moved) return withContext(result, "The run left spec, or the drawing changed, while this comparison was on its way; it was not recorded. Stop.")
-  await trace($, moved, { ev: "sketch-verdict", stage: "spec", agentId: c.agentId, state, fails, differ: differ.map(v => v.id) })
+  await trace($, moved, { ev: "sketch-verdict", stage: "spec", agentId: c.agentId, state, fails, differ: differ.map(v => v.id), ...(stuck ? { stuck } : {}) })
   if (state === "match") return withContext(result, "Every to-be drawn from a planning-document picture matches its picture. Go on.")
   const where = differ.map(v => `#${v.id}: ${v.diffs.join("; ")}`).join(" / ")
-  if (state === "given-up") return withContext(result, `${GIVE_UP_AT} drawings in a row differ from the planning-document picture (${where}). The hook stops redrawing: tell the user what still differs, in one line per screen; the approval names ${SPEC_VERDICT} too. Then go on.`)
-  return withContext(result, `The to-be differs from the planning-document picture (${where}). Spawn ${SKETCHER} with to-be in the description again: the hook gives it ${SPEC_VERDICT}. Its drawing is compared again.`)
+  if (state === "given-up") return withContext(result, `${stuck ? "The last drawing got no closer to the planning-document picture" : `${fails} drawings in a row differ from the planning-document picture`} (${where}). The hook stops redrawing: tell the user what still differs, in one line per screen; the approval names ${SPEC_VERDICT} too. Then go on.`)
+  return withContext(result, `The to-be differs from the planning-document picture (${where}). Spawn ${SKETCHER} again, in the foreground: the hook gives it ${SPEC_VERDICT}. Its drawing is compared again.`)
 }
 
-// the sketcher draws 1-mockup.html in spec, on the hook's task: the mode
-// from the Agent call's description, the main session's prompt dropped, so
-// nothing of the conversation reaches it. The last one spawned is recorded
-// and the only one that writes.
+// the sketcher draws 1-mockup.html in spec, on the hook's task, the main
+// session's prompt dropped, so nothing of the conversation reaches it. The
+// last one spawned is recorded and the only one that writes. The first
+// drawing and a drawing of a comparison under way run in the foreground,
+// since the comparison follows them; a drawing redone for an answer runs as
+// the main session spawned it, in the background while the questions go on.
 async function spawnSketcher($: EngineInterface, run: Run, e: AgentSpawnInput, next: (e: AgentSpawnInput) => Promise<AgentSpawnResult>): Promise<AgentSpawnResult> {
   if (run.stage !== "spec") return { deny: `${SKETCHER} draws 1-mockup.html in the spec stage only; the run is in ${run.stage}.` }
-  const mode = sketchMode(e.description)
-  if (mode === undefined) return { deny: `name the mode in the Agent call's description, as-is (before the questions) or to-be (once the grading is over), one of them: the hook drops the prompt, so the description is the only place it is read from.` }
   const dir = await folderOf($, "active", run.runId)
   if (!(await $.fs.exists(`${dir}/1-spec.md`))) return { deny: `${dir}/1-spec.md does not exist yet. Write it, then spawn ${SKETCHER}.` }
   // a to-be that came out different from its planning-document picture is
   // drawn again with what differs.
   const check = run.sketchCheck
-  const redraw = mode === "to-be" && check?.state === "differ" ? redrawLines(dir, check.fails, Object.keys(check.shots).map(id => `${MOCKUP_SHOTS}/${id}.boxes.txt`)) : []
-  const prompt = await withKnowledge($, sketcherTask(dir, mode, redraw), SKETCHER_USE, run)
-  const result = await next({ ...e, prompt, background: false })
+  const looping = check?.state === "differ"
+  const redraw = looping ? redrawLines(dir, check.fails, Object.keys(check.shots).map(id => `${MOCKUP_SHOTS}/${id}.boxes.txt`)) : []
+  const prompt = await withKnowledge($, sketcherTask(dir, redraw), SKETCHER_USE, run)
+  const background = run.sketched !== undefined && !looping && e.background
+  const result = await next({ ...e, prompt, background })
   if (result.deny !== undefined || result.agentId === undefined) return result
   const agentId = result.agentId
   reinAgents.add(agentId)
   sketchers.add(agentId)
   try {
     const moved = await mutate($, r => (r?.stage === "spec" ? { ...r, sketcher: agentId } : undefined))
-    if (moved) await trace($, moved, { ev: "spawn", stage: "spec", agent: SKETCHER, agentId, mode })
+    if (moved) await trace($, moved, { ev: "spawn", stage: "spec", agent: SKETCHER, agentId, background })
   } catch (err) {
     // The agent started; without its id recorded its 1-mockup.html is refused.
     await trace($, run, { ev: "error", stage: "spec", agent: SKETCHER, agentId, error: String(err) })
