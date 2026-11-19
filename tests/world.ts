@@ -281,7 +281,11 @@ export function world(
     value: spawned.map((s, i) => {
       const n = spawned.slice(0, i + 1).filter(x => x.type === s.type).length
       const id = n === 1 ? `agent-${s.type}` : `agent-${s.type}-${n}`
-      return { id, description: "d", type: s.type, status: host.agents?.[id] ?? "running" }
+      return {
+        id, description: "d", type: s.type, status: host.agents?.[id] ?? "running",
+        kind: "local_agent" as const, label: id, cwd: s.cwd ?? ROOT, taskStatus: "running" as const,
+        startTime: 0, tokenCount: 0, tokenSamples: [], hasRow: true,
+      }
     }),
   }))
   on("tool.call", async (_$, e) => {
