@@ -12,11 +12,11 @@ import { clock, DIR, gitSub, ran, relay, SPEC_TEXT, spawned, store, world, type 
 // from the evidence, part by part, citing files that exist.
 
 const QAI = `${DIR}/agent/e2e.md`
-const APPS = { admin: { url: "http://localhost:8090", login: "id/password form; test-pass for every account", profile: "Tester1", profiles: { staff01: "Tester2" } }, tablet: { url: "http://localhost:3000", profile: "Tester1" } }
+const APPS = { admin: { url: "http://localhost:8090", login: "id/password form; test-pass for every account", profile: "Tester1", profiles: { tester2: "Tester2" } }, mobile: { url: "http://localhost:3000", profile: "Tester1" } }
 const E2E = { apps: APPS, production: ["app.example.com"], backends: ["localhost:8080"] }
 const CHECKS: Check[] = [
   { name: "detail", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "회원 테스트회원A의 회원유형을 본다", expect: "우수회원만 체크되고 비활성", saves: false, evidence: [{ kind: "측정", text: "회원유형 체크박스의 disabled 수" }] },
-  { name: "staff", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "같은 회원을 staff01로 본다", expect: "우수회원", saves: false, account: "staff01" },
+  { name: "staff", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "같은 회원을 tester2로 본다", expect: "우수회원", saves: false, account: "tester2" },
 ]
 const RUN = { v: 2, stage: "qa", runId: "login-fix", rules: [], retries: 0, planFiles: ["E:/proj/src/login.ts"], repos: ["E:/proj"], writes: ["E:/proj/src/login.ts"], checks: CHECKS }
 const PROFILES = [{ id: "Default", name: "Your ego" }, { id: "Profile 1", name: "Tester1" }, { id: "Profile 2", name: "Tester2" }]
@@ -104,15 +104,15 @@ describe("the ego path's pieces", () => {
     expect(readConfig(JSON.stringify({ qa: ["t"], e2e: E2E })).e2e?.apps.admin).toEqual(APPS.admin)
     const bad = (app: object) => checkConfig(JSON.stringify({ qa: ["t"], e2e: { apps: { admin: { url: "http://x", ...app } }, production: [], backends: [] } }))
     expect(bad({ profile: "" })).toContain("`e2e.apps.admin.profile` must be an ego profile name")
-    expect(bad({ profiles: { staff01: 3 } })).toContain("`e2e.apps.admin.profiles` must map each account to an ego profile name")
-    expect(bad({ profile: "Tester1", profiles: { staff01: "Tester2" } })).toBeUndefined()
+    expect(bad({ profiles: { tester2: 3 } })).toContain("`e2e.apps.admin.profiles` must map each account to an ego profile name")
+    expect(bad({ profile: "Tester1", profiles: { tester2: "Tester2" } })).toBeUndefined()
   })
 
   test("each check maps to its account's profile, else the app's; what is missing is named", () => {
     const e2e = readConfig(JSON.stringify({ qa: ["t"], e2e: E2E })).e2e!
     expect(resolveProfiles(e2e, CHECKS, PROFILES)).toEqual({ ids: { detail: "Profile 1", staff: "Profile 2" } })
     const missing = resolveProfiles({ ...e2e, apps: { admin: { url: "http://x", profile: "Nobody" } } }, CHECKS, PROFILES)
-    expect(missing).toEqual({ missing: ["check detail: ego has no profile named Nobody", "check staff: account staff01 has no profile in e2e.apps.admin.profiles"] })
+    expect(missing).toEqual({ missing: ["check detail: ego has no profile named Nobody", "check staff: account tester2 has no profile in e2e.apps.admin.profiles"] })
   })
 
   test("drivers run side by side unless one saves; one profile only as one account", () => {
@@ -188,10 +188,10 @@ describe("the ego path's pieces", () => {
   })
 
   test("a check's account wins over an account the app's login names", () => {
-    const e2e = readConfig(JSON.stringify({ qa: ["t"], e2e: { ...E2E, apps: { ...APPS, admin: { ...APPS.admin, login: "tester / test-pass (master password)" } } } })).e2e!
-    const drive = driverTask(e2e, { ...CHECKS[0], account: "staff01" } as Check, { name: "detail", minutes: 30, spent: 0 }, "f", undefined, 1000)
-    expect(drive).toContain("- Log in: tester / test-pass (master password)\n")
-    expect(drive).toContain("- Account: staff01 (log in as this account, even where the login above names another; the rest of the login still applies)\n")
+    const e2e = readConfig(JSON.stringify({ qa: ["t"], e2e: { ...E2E, apps: { ...APPS, admin: { ...APPS.admin, login: "tester / test-pass (one password for every account)" } } } })).e2e!
+    const drive = driverTask(e2e, { ...CHECKS[0], account: "tester2" } as Check, { name: "detail", minutes: 30, spent: 0 }, "f", undefined, 1000)
+    expect(drive).toContain("- Log in: tester / test-pass (one password for every account)\n")
+    expect(drive).toContain("- Account: tester2 (log in as this account, even where the login above names another; the rest of the login still applies)\n")
   })
 
   test("a snapshot ref is not reused from an earlier round", () => {
@@ -308,7 +308,7 @@ describe("running checks in ego", () => {
   test("a check with no ego profile halts before anything runs (ego-profile-missing)", async ($, on) => {
     const files = filesWith({ ...E2E, apps: { ...APPS, admin: { ...APPS.admin, profiles: {} } } })
     world(on, files, () => undefined, RUN, host(files, []))
-    expect(context(await toEgo($))).toContain("ego-profile-missing: the user asked for e2e, but the ego profiles are not set up: check staff: account staff01 has no profile in e2e.apps.admin.profiles")
+    expect(context(await toEgo($))).toContain("ego-profile-missing: the user asked for e2e, but the ego profiles are not set up: check staff: account tester2 has no profile in e2e.apps.admin.profiles")
     expect(((await $.tool.call(ADVANCE)) as { result: string }).result).toContain('"rein:setup으로 채웠음, 다시 확인", "Aside로 실행", "e2e 없이 진행"')
     files["E:/proj/.rein/config.json"] = JSON.stringify({ qa: ["npm test"], e2e: E2E })
     await relay($, ADVANCE)

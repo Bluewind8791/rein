@@ -344,7 +344,7 @@ function base(p) { return p.split("/").pop(); }
 function dir(p) { return p.split("/").slice(0, -1).join("/"); }
 function lang(p) {
   var ext = p.split(".").pop();
-  return { jsp: "html", html: "html", java: "java", js: "javascript", mjs: "javascript", ts: "typescript", tsx: "typescript", xml: "xml", sql: "sql", css: "css", md: "markdown", json: "json", py: "python", sh: "shell", yml: "yaml", yaml: "yaml" }[ext] || "plaintext";
+  return { jsp: "html", html: "html", vue: "html", php: "php", java: "java", kt: "kotlin", cs: "csharp", go: "go", rb: "ruby", js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript", xml: "xml", sql: "sql", css: "css", scss: "scss", md: "markdown", json: "json", py: "python", sh: "shell", yml: "yaml", yaml: "yaml" }[ext] || "plaintext";
 }
 
 var state = { file: 0, hunk: -1, hide: true, side: true, overview: false };

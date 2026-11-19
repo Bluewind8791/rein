@@ -18,11 +18,11 @@ const SPEC_LINE = "로그인에 세 번 실패하면 잠긴다"
 const QAI = `${DIR}/agent/e2e.md`
 const S1 = "OKWcCe6bYhKXDkt8"
 const S2 = "dAIZX30NAZGDxNXV"
-const APPS = { admin: { url: "http://localhost:8090", login: "tester / test-pass, 아이디·비밀번호로 직접 로그인" }, tablet: { url: "http://localhost:3000" } }
+const APPS = { admin: { url: "http://localhost:8090", login: "tester / test-pass, 아이디·비밀번호로 직접 로그인" }, mobile: { url: "http://localhost:3000" } }
 const E2E = { apps: APPS, production: ["app.example.com"], backends: ["localhost:8080"] }
 const CHECKS = [
   { name: "detail", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "/member/detail에서 회원 테스트회원A를 검색해 회원유형을 본다", expect: "우수회원만 체크되고 비활성", saves: false },
-  { name: "tablet", app: "tablet", todo: "/member에서 같은 회원을 열고 회원유형을 저장한 뒤 되돌린다", expect: "우수회원으로 표시", saves: true, minutes: 25 },
+  { name: "mobile", app: "mobile", todo: "/member에서 같은 회원을 열고 회원유형을 저장한 뒤 되돌린다", expect: "우수회원으로 표시", saves: true, minutes: 25 },
 ]
 const RUN = {
   v: 2, stage: "qa", runId: "login-fix", rules: [], retries: 0,
@@ -102,7 +102,7 @@ function host(answers: Record<string, unknown>[], listed: () => string = () => "
 
 describe("2-plan.md's checks and cover (D168, D169)", () => {
   const PLAN = (extra: string) => `## 접근 방법\n\na\n\n## 상세 설계\n\n### src/login.ts\n- 고친다\n- 테스트: tests/login.test.ts\n\n### tests/login.test.ts\n- 본다\n- 테스트: tests/login.test.ts\n${extra}`
-  const CHECK_SECTION = "\n## e2e 확인\n\n### detail\n- 제목: t\n- 구분: 변경\n- 앱: admin\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: /member/detail에서 본다\n- 기대: 우수회원\n- 저장: 없음\n\n### stop-agency\n- 제목: t\n- 구분: 변경\n- 앱: admin\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: 조직을 정지했다 되돌린다\n- 기대: 일반, 우수회원\n- 저장: 있음\n- 시간: 40\n"
+  const CHECK_SECTION = "\n## e2e 확인\n\n### detail\n- 제목: t\n- 구분: 변경\n- 앱: admin\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: /member/detail에서 본다\n- 기대: 우수회원\n- 저장: 없음\n\n### stop-member\n- 제목: t\n- 구분: 변경\n- 앱: admin\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: 회원을 정지했다 되돌린다\n- 기대: 일반, 우수회원\n- 저장: 있음\n- 시간: 40\n"
   const REPO = (e2e?: object) => ({ "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": JSON.stringify({ qa: ["t"], ...(e2e ? { e2e } : {}) }), [`${DIR}/1-spec.md`]: SPEC_TEXT })
   const said = (r: unknown) => context(r)
 
@@ -110,7 +110,7 @@ describe("2-plan.md's checks and cover (D168, D169)", () => {
     expect(parseChecks(CHECK_SECTION)).toEqual({
       checks: [
         { name: "detail", title: "t", kind: "변경", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "/member/detail에서 본다", expect: "우수회원", saves: false },
-        { name: "stop-agency", title: "t", kind: "변경", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "조직을 정지했다 되돌린다", expect: "일반, 우수회원", saves: true, minutes: 40 },
+        { name: "stop-member", title: "t", kind: "변경", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "회원을 정지했다 되돌린다", expect: "일반, 우수회원", saves: true, minutes: 40 },
       ],
     })
     expect(parseChecks("## e2e 확인\n\n없음\n")).toEqual({ checks: [] })
@@ -126,9 +126,9 @@ describe("2-plan.md's checks and cover (D168, D169)", () => {
 
   test("a check may name the account it logs in as, on one non-empty line", () => {
     const one = "## e2e 확인\n\n### a\n- 제목: t\n- 구분: 변경\n- 앱: admin\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: x\n- 기대: y\n- 저장: 없음\n"
-    expect(parseChecks(`${one}- 계정: staff01\n`)).toEqual({ checks: [{ name: "a", title: "t", kind: "변경", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "x", expect: "y", saves: false, account: "staff01" }] })
+    expect(parseChecks(`${one}- 계정: tester2\n`)).toEqual({ checks: [{ name: "a", title: "t", kind: "변경", app: "admin", page: "회원상세", route: "회원 > 회원관리 > 회원상세", todo: "x", expect: "y", saves: false, account: "tester2" }] })
     const reason = (text: string) => (parseChecks(text) as { reason?: string }).reason ?? ""
-    expect(reason(`${one}- 계정: staff01\n- 계정: staff02\n`)).toContain("a needs at most one non-empty `- 계정:` line")
+    expect(reason(`${one}- 계정: tester2\n- 계정: tester3\n`)).toContain("a needs at most one non-empty `- 계정:` line")
     expect(reason(`${one}- 계정:\n`)).toContain("a needs at most one non-empty `- 계정:` line")
   })
 
@@ -149,21 +149,21 @@ describe("2-plan.md's checks and cover (D168, D169)", () => {
   })
 
   test("parseCover and judgeCover: parts of the line, checks of the section, test files that are items or exist", () => {
-    const text = `## 완료 판정 덮기\n\n- "세 번 실패하면" — e2e: detail, stop-agency\n- “잠긴다” — 테스트: \`tests/login.test.ts\`\n- "로그인에" - 확인 불가: 화면이 없음\n`
+    const text = `## 완료 판정 덮기\n\n- "세 번 실패하면" — e2e: detail, stop-member\n- “잠긴다” — 테스트: \`tests/login.test.ts\`\n- "로그인에" - 확인 불가: 화면이 없음\n`
     const cover = parseCover(text)
     expect(cover).toEqual({
       cover: [
-        { part: "세 번 실패하면", by: "e2e", checks: ["detail", "stop-agency"] },
+        { part: "세 번 실패하면", by: "e2e", checks: ["detail", "stop-member"] },
         { part: "잠긴다", by: "테스트", file: "tests/login.test.ts" },
         { part: "로그인에", by: "확인 불가", reason: "화면이 없음" },
       ],
     })
     const all = (cover as { cover: Parameters<typeof judgeCover>[0] }).cover
-    expect(judgeCover(all, SPEC_LINE, ["detail", "stop-agency"], ["E:/proj/tests/login.test.ts"], [], "E:/proj")).toBeUndefined()
-    expect(judgeCover(all, SPEC_LINE, ["detail", "stop-agency"], [], ["E:/proj/tests/login.test.ts"], "E:/proj")).toBeUndefined()
+    expect(judgeCover(all, SPEC_LINE, ["detail", "stop-member"], ["E:/proj/tests/login.test.ts"], [], "E:/proj")).toBeUndefined()
+    expect(judgeCover(all, SPEC_LINE, ["detail", "stop-member"], [], ["E:/proj/tests/login.test.ts"], "E:/proj")).toBeUndefined()
     const wrong = judgeCover(all, "로그인에 두 번 실패하면 잠긴다", ["detail"], [], [], "E:/proj") ?? ""
     expect(wrong).toContain('"세 번 실패하면" is not part of the completion line')
-    expect(wrong).toContain('"세 번 실패하면" names stop-agency, not a check of `## e2e 확인`')
+    expect(wrong).toContain('"세 번 실패하면" names stop-member, not a check of `## e2e 확인`')
     expect(wrong).toContain('"잠긴다" names the test tests/login.test.ts, which is neither')
     expect((parseCover("## 완료 판정 덮기\n\n- 잠긴다 — 확인함\n") as { reason: string }).reason).toContain("not in the form: 잠긴다 — 확인함")
     expect((parseCover("## 완료 판정 덮기\n\n없음\n") as { reason: string }).reason).toContain("has no line")
@@ -174,17 +174,17 @@ describe("2-plan.md's checks and cover (D168, D169)", () => {
     const files: Record<string, string> = REPO(E2E)
     world(on, files, undefined, { stage: "plan", runId: "login-fix" })
     expect(await planned($, PLAN(COVER))).toContain("D168: 2-plan.md does not pass yet, so the run stays in plan: a repository's config has e2e, so 2-plan.md needs `## e2e 확인`")
-    const stray = CHECK_SECTION.replace("- 앱: admin\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: 조직", "- 앱: pos\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: 조직")
-    expect(await planned($, PLAN(stray + COVER))).toContain("these checks name an app config e2e.apps does not have: stop-agency (pos). The apps are: admin, tablet.")
+    const stray = CHECK_SECTION.replace("- 앱: admin\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: 회원을 정지", "- 앱: shop\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: 회원을 정지")
+    expect(await planned($, PLAN(stray + COVER))).toContain("these checks name an app config e2e.apps does not have: stop-member (shop). The apps are: admin, mobile.")
     expect(await planned($, PLAN(CHECK_SECTION))).toContain("D169: 2-plan.md does not pass yet, so the run stays in plan: 2-plan.md has no `## 완료 판정 덮기`")
     const off = '\n## 완료 판정 덮기\n\n- "잠긴다" — e2e: detail, grid\n'
     expect(await planned($, PLAN(CHECK_SECTION + off))).toContain('"잠긴다" names grid, not a check of `## e2e 확인`')
-    const cover = '\n## 완료 판정 덮기\n\n- "세 번 실패하면 잠긴다" — e2e: detail, stop-agency\n- "로그인에" — 테스트: tests/old.test.ts\n'
+    const cover = '\n## 완료 판정 덮기\n\n- "세 번 실패하면 잠긴다" — e2e: detail, stop-member\n- "로그인에" — 테스트: tests/old.test.ts\n'
     expect(await planned($, PLAN(CHECK_SECTION + cover))).toContain("tests/old.test.ts, which is neither")
     files["E:/proj/tests/old.test.ts"] = "it()"
     expect(await planned($, PLAN(CHECK_SECTION + cover))).toContain("now in the dev stage")
     const run = store.get("runs:proj/login-fix") as { checks?: { name: string; minutes?: number }[] }
-    expect(run.checks?.map(k => [k.name, k.minutes])).toEqual([["detail", undefined], ["stop-agency", 40]])
+    expect(run.checks?.map(k => [k.name, k.minutes])).toEqual([["detail", undefined], ["stop-member", 40]])
   })
 
   test("a check's files are design items or handoff files, kept as the seal names them", async ($, on) => {
@@ -195,12 +195,12 @@ describe("2-plan.md's checks and cover (D168, D169)", () => {
     expect(await planned($, PLAN(filed("src/login.ts, src/nowhere.ts") + cover))).toContain("D168: 2-plan.md does not pass yet, so the run stays in plan: these checks name a file on `- 파일:` that is neither a `### <path>` item of `## 상세 설계` nor an item of `## 넘길 것`: detail (src/nowhere.ts).")
     expect(await planned($, PLAN(filed("src/login.ts, FIX.sql") + handoff + cover))).toContain("now in the dev stage")
     const run = store.get("runs:proj/login-fix") as { planFiles: string[]; checks: { name: string; files?: string[] }[] }
-    expect(run.checks.map(k => [k.name, k.files])).toEqual([["detail", [run.planFiles.find(f => f.endsWith("src/login.ts")), `${DIR}/handoff/fix.sql`]], ["stop-agency", undefined]])
+    expect(run.checks.map(k => [k.name, k.files])).toEqual([["detail", [run.planFiles.find(f => f.endsWith("src/login.ts")), `${DIR}/handoff/fix.sql`]], ["stop-member", undefined]])
   })
 
   test("without e2e in the config: no section, or 없음, passes; checks that would never run do not", async ($, on) => {
     world(on, REPO(), undefined, { stage: "plan", runId: "login-fix" })
-    expect(await planned($, PLAN(CHECK_SECTION + COVER))).toContain("no repository's config has e2e, so these checks would never run: detail, stop-agency")
+    expect(await planned($, PLAN(CHECK_SECTION + COVER))).toContain("no repository's config has e2e, so these checks would never run: detail, stop-member")
     expect(await planned($, PLAN("\n## e2e 확인\n\n없음\n" + COVER))).toContain("now in the dev stage")
     expect((store.get("runs:proj/login-fix") as { checks?: unknown[] }).checks).toEqual([])
   })
@@ -219,8 +219,8 @@ describe("one rein:e2e-runner per check, up to five at once", () => {
     expect(names(["a", "b", "c", "d", "e", "f"].map(n => check(n)))).toEqual(["a", "b", "c", "d", "e"])
     expect(names([check("a"), check("b", { saves: true }), check("c")])).toEqual(["a"])
     expect(names([check("a", { saves: true }), check("b")])).toEqual(["a"])
-    expect(names([check("a"), check("b", { account: "staff01" }), check("c")])).toEqual(["a"])
-    expect(names([check("a"), check("b", { app: "tablet" })])).toEqual(["a"])
+    expect(names([check("a"), check("b", { account: "tester2" }), check("c")])).toEqual(["a"])
+    expect(names([check("a"), check("b", { app: "mobile" })])).toEqual(["a"])
     // runners already on checks count toward the five and the fit.
     expect(names([check("a", { runner: "r1" }), check("b", { verdict: "통과" }), check("c"), check("d", { saves: true })])).toEqual(["c"])
     expect(names([check("a", { runner: "r1", saves: true }), check("b")])).toEqual([])
@@ -257,27 +257,27 @@ describe("one rein:e2e-runner per check, up to five at once", () => {
     expect(task).toContain(`- Expected: ${CHECKS[0]!.expect}\n- Saving: do not save, change or delete anything\n- Production hosts, never to be opened: app.example.com\n- Screenshot folder: ${folderOf("detail")}`)
     expect(task).toContain("timeout 10m aside exec --permission full-access '<prompt>'")
     expect(task).toContain(`write ${folderOf("detail")}/result.md with Write`)
-    // tablet saves, so it waits for detail.
-    expect(await spawnRunner($)).toEqual(refused("check tablet waits for the runners on detail"))
+    // mobile saves, so it waits for detail.
+    expect(await spawnRunner($)).toEqual(refused("check mobile waits for the runners on detail"))
     const ran1 = await $.tool.call(runAs(first.agentId!, asideExec(folderOf("detail"))))
     expect(context(ran1)).toContain(`The hook captured session ${S1}; aside ended with 관측: 우수회원만 체크, 모두 disabled and 판정: 통과. Write agent/evidence/detail/1/result.md`)
     expect(context(await $.tool.call(report(first.agentId!, folderOf("detail"), S1, "우수회원만 체크, 모두 disabled", "통과")))).toContain("check detail: 판정: 통과. Report this to the main session and stop")
     // a check closed, the others open: e2e.md holds each as it stands.
     expect(files[QAI]).toContain(`### detail\n\n- 할 일: ${CHECKS[0]!.todo}\n`)
     expect(files[QAI]).toContain(`- 본 것: 우수회원만 체크, 모두 disabled\n- 결과: 통과\n- aside 세션: ${S1}\n`)
-    expect(files[QAI]).toContain("### tablet\n")
+    expect(files[QAI]).toContain("### mobile\n")
     expect(files[QAI]).toContain("- 본 것: (없음)\n- 결과: 진행 중\n- aside 세션: 없음\n")
     expect(files[QAI]).toContain("판정: 미정\n")
     expect(await status($)).toContain(`e2e check detail: 판정: 통과, 세션 ${S1}`)
     const second = await spawnRunner($)
     expect(spawned[1]!.prompt).toContain("- Saving: save only what the task says to save, and change nothing else")
     expect(spawned[1]!.prompt).toContain("timeout 10m aside exec")
-    await $.tool.call(runAs(second.agentId!, asideExec(folderOf("tablet"))))
-    expect(context(await $.tool.call(report(second.agentId!, folderOf("tablet"), S2, "우수회원", "통과")))).toContain("Every aside check passed; the hook wrote ## e2e")
+    await $.tool.call(runAs(second.agentId!, asideExec(folderOf("mobile"))))
+    expect(context(await $.tool.call(report(second.agentId!, folderOf("mobile"), S2, "우수회원", "통과")))).toContain("Every aside check passed; the hook wrote ## e2e")
     expect(files[QAI]).toBe(
       "## e2e\n\n방법: aside가 화면을 직접 확인함\n\n" +
         `### detail\n\n- 할 일: ${CHECKS[0]!.todo}\n- 기대: ${CHECKS[0]!.expect}\n- 계정: 앱 login 설정대로\n- 본 것: 우수회원만 체크, 모두 disabled\n- 결과: 통과\n- aside 세션: ${S1}\n- 스크린샷: agent/evidence/detail/1/shot.png\n\n![](evidence/detail/1/shot.png)\n\n` +
-        `### tablet\n\n- 할 일: ${CHECKS[1]!.todo}\n- 기대: ${CHECKS[1]!.expect}\n- 계정: 앱 login 설정대로\n- 본 것: 우수회원\n- 결과: 통과\n- aside 세션: ${S2}\n- 스크린샷: agent/evidence/tablet/1/shot.png\n\n![](evidence/tablet/1/shot.png)\n\n` +
+        `### mobile\n\n- 할 일: ${CHECKS[1]!.todo}\n- 기대: ${CHECKS[1]!.expect}\n- 계정: 앱 login 설정대로\n- 본 것: 우수회원\n- 결과: 통과\n- aside 세션: ${S2}\n- 스크린샷: agent/evidence/mobile/1/shot.png\n\n![](evidence/mobile/1/shot.png)\n\n` +
         "판정: 통과\n",
     )
     expect(await status($)).not.toContain("e2e runners to spawn now")
@@ -364,13 +364,13 @@ describe("one rein:e2e-runner per check, up to five at once", () => {
     world(on, files, undefined, { ...RUN, checks: [CHECKS[1]] }, host([timedOut(S2), timedOut(S2, "continuing existing session"), ok(out(S2, "우수회원", "통과", "continuing existing session"))], running))
     await toAside($)
     const { agentId } = await spawnRunner($)
-    const r1 = await $.tool.call(runAs(agentId!, asideExec(folderOf("tablet"))))
-    expect(context(r1)).toContain(`aside is still running check tablet in session ${S2} (10 of 25 minutes spent). Wait on it: \`timeout 10m aside session resume ${S2} '<prompt>'\``)
-    expect(await status($)).toContain(`e2e check tablet: rein:e2e-runner ${agentId} on it, 세션 ${S2}, 10 of 25 minutes spent`)
+    const r1 = await $.tool.call(runAs(agentId!, asideExec(folderOf("mobile"))))
+    expect(context(r1)).toContain(`aside is still running check mobile in session ${S2} (10 of 25 minutes spent). Wait on it: \`timeout 10m aside session resume ${S2} '<prompt>'\``)
+    expect(await status($)).toContain(`e2e check mobile: rein:e2e-runner ${agentId} on it, 세션 ${S2}, 10 of 25 minutes spent`)
     await $.tool.call(runAs(agentId!, asideResume(S2, 10)))
     expect(await $.tool.call(runAs(agentId!, asideResume(S2, 10)))).toEqual(refused("the timeout must be 1 to 5 minutes"))
     expect(context(await $.tool.call(runAs(agentId!, asideResume(S2, 5))))).toContain("aside ended with 관측: 우수회원 and 판정: 통과")
-    expect(context(await $.tool.call(report(agentId!, folderOf("tablet"), S2, "우수회원", "통과")))).toContain("Every aside check passed")
+    expect(context(await $.tool.call(report(agentId!, folderOf("mobile"), S2, "우수회원", "통과")))).toContain("Every aside check passed")
     expect(files[QAI]).toContain(`- 결과: 통과\n- aside 세션: ${S2}\n`)
     expect(ran.some(x => x.argv.includes("stop"))).toBe(false)
   })
@@ -417,7 +417,7 @@ describe("one rein:e2e-runner per check, up to five at once", () => {
   })
 
   test("each app the checks use is checked against production and probed (D170)", async ($, on) => {
-    world(on, filesWith({ ...E2E, apps: { ...APPS, tablet: { url: "https://app.example.com" } } }), undefined, RUN, host([]))
+    world(on, filesWith({ ...E2E, apps: { ...APPS, mobile: { url: "https://app.example.com" } } }), undefined, RUN, host([]))
     expect(context(await toAside($))).toContain("D100: the run is in the qa-integration stage but halted: https://app.example.com")
     expect(await spawnRunner($)).toEqual(refused("D100: the run is halted"))
   })
@@ -485,7 +485,7 @@ describe("a failed check asks the user (D173)", () => {
   async function toHalt($: Engine) {
     await toAside($)
     await runCheck($, "detail", S1, "우수회원만 체크", "통과")
-    return runCheck($, "tablet", S2, "공란", "실패")
+    return runCheck($, "mobile", S2, "공란", "실패")
   }
 
   test("실패 항목만 다시 돌리기 keeps what passed and runs the failed check again, counting nothing", async ($, on) => {
@@ -493,41 +493,41 @@ describe("a failed check asks the user (D173)", () => {
     const questions: string[] = []
     world(on, files, q => (questions.push(q), "실패 항목만 다시 돌리기"), RUN, failing())
     const r = await toHalt($)
-    expect(context(r)).toContain("Every aside check has a verdict and these aside checks failed: tablet")
+    expect(context(r)).toContain("Every aside check has a verdict and these aside checks failed: mobile")
     expect(files[QAI]).toContain("판정: 실패\n")
     expect(await $.tool.call(write(QAI, "## e2e\n\n판정: 통과\n"))).toEqual(expect.objectContaining({ result: "ok" }))
     const again = await relay($, ADVANCE)
     expect(questions[0]).toContain("aside 확인 항목이 실패했습니다 (D173)")
-    expect(questions[0]).toContain(`> tablet — 세션 ${S2} — 판정: 실패`)
+    expect(questions[0]).toContain(`> mobile — 세션 ${S2} — 판정: 실패`)
     expect(questions[0]).toContain(">   관측: 공란")
     expect(context(again)).toContain("with 1 check to run")
     const s = await status($)
     expect(s).toContain(`e2e check detail: 판정: 통과, 세션 ${S1}`)
-    expect(s).toContain("e2e check tablet: waiting for a runner")
+    expect(s).toContain("e2e check mobile: waiting for a runner")
     expect(questions[0]).toContain("사용자가 실패한 항목을 직접 확인했다면 5-checklist.md에서 그 항목의 칸을 모두 체크한 뒤 이것을 고릅니다. 칸이 다 체크된 항목은 다시 돌지 않고 사용자 확인으로 통과합니다.")
     expect(store.get("runs:proj/login-fix")).toMatchObject({ retries: 0 })
     expect(files[QAI]).toBe("## 이전 진입\n\n### 1차 진입 — e2e\n\n판정: 통과\n")
     const { agentId } = await spawnRunner($)
-    expect(spawned.at(-1)!.prompt).toContain(`- Screenshot folder: ${folderOf("tablet", 2)}`)
-    await $.tool.call(runAs(agentId!, asideExec(folderOf("tablet", 2))))
-    expect(context(await $.tool.call(report(agentId!, folderOf("tablet", 2), S2, "우수회원", "통과")))).toContain("Every aside check passed")
+    expect(spawned.at(-1)!.prompt).toContain(`- Screenshot folder: ${folderOf("mobile", 2)}`)
+    await $.tool.call(runAs(agentId!, asideExec(folderOf("mobile", 2))))
+    expect(context(await $.tool.call(report(agentId!, folderOf("mobile", 2), S2, "우수회원", "통과")))).toContain("Every aside check passed")
     expect(files[QAI]).toContain(`- 결과: 통과\n- aside 세션: ${S1}\n`)
-    expect(files[QAI]).toContain("- 스크린샷: agent/evidence/tablet/2/shot.png\n\n![](evidence/tablet/2/shot.png)\n")
+    expect(files[QAI]).toContain("- 스크린샷: agent/evidence/mobile/2/shot.png\n\n![](evidence/mobile/2/shot.png)\n")
     expect(files[QAI]).toContain("판정: 통과\n\n## 이전 진입\n\n### 1차 진입 — e2e\n\n판정: 통과\n")
   })
 
   test("the question names the parts of the completion line only the failed checks cover", async ($, on) => {
-    const files = { ...filesWith(), [`${DIR}/2-plan.md`]: '## 완료 판정 덮기\n\n- "세 번 실패하면" — e2e: tablet\n- "잠긴다" — e2e: detail, tablet\n- "로그인에" — 테스트: tests/login.test.ts\n' }
+    const files = { ...filesWith(), [`${DIR}/2-plan.md`]: '## 완료 판정 덮기\n\n- "세 번 실패하면" — e2e: mobile\n- "잠긴다" — e2e: detail, mobile\n- "로그인에" — 테스트: tests/login.test.ts\n' }
     const questions: string[] = []
     world(on, files, q => (questions.push(q), "그대로 멈춤"), RUN, failing())
     await toHalt($)
     await relay($, ADVANCE)
-    expect(questions[0]).toContain('이 경우 확인되지 않는 조각: "세 번 실패하면" (tablet로만 확인)')
+    expect(questions[0]).toContain('이 경우 확인되지 않는 조각: "세 번 실패하면" (mobile로만 확인)')
     expect(questions[0]).not.toContain('"잠긴다" (')
   })
 
   test("with no part only the failed checks cover, the question says so", async ($, on) => {
-    const files = { ...filesWith(), [`${DIR}/2-plan.md`]: '## 완료 판정 덮기\n\n- "세 번 실패하면 잠긴다" — e2e: detail, tablet\n' }
+    const files = { ...filesWith(), [`${DIR}/2-plan.md`]: '## 완료 판정 덮기\n\n- "세 번 실패하면 잠긴다" — e2e: detail, mobile\n' }
     const questions: string[] = []
     world(on, files, q => (questions.push(q), "그대로 멈춤"), RUN, failing())
     await toHalt($)
@@ -540,7 +540,7 @@ describe("a failed check asks the user (D173)", () => {
     world(on, files, () => "기존 동작으로 진행", RUN, failing())
     await toHalt($)
     const r = await relay($, ADVANCE)
-    expect(context(r)).toContain("D173: the user judged tablet as what the code did before")
+    expect(context(r)).toContain("D173: the user judged mobile as what the code did before")
     expect(files[QAI]).toContain(`- 결과: 실패 → 사용자가 기존 동작으로 판단\n- aside 세션: ${S2}\n`)
     expect(files[QAI]).toContain("\n판정: 통과\n")
     expect(await status($)).not.toContain("halt:")
@@ -624,7 +624,7 @@ describe("2-plan.md changed after it passed: told once, and goto takes it", () =
   })
 
   test("goto qa-integration is refused while a check is open; goto elsewhere is not", async ($, on) => {
-    const running = { ...at("qa-integration"), e2e: { path: "aside", checks: [{ name: "detail", minutes: 30, spent: 0, app: "admin", runner: "agent-r1" }, { name: "tablet", minutes: 30, spent: 0, app: "admin", verdict: "통과" }] } }
+    const running = { ...at("qa-integration"), e2e: { path: "aside", checks: [{ name: "detail", minutes: 30, spent: 0, app: "admin", runner: "agent-r1" }, { name: "mobile", minutes: 30, spent: 0, app: "admin", verdict: "통과" }] } }
     world(on, { ...filesWith(), ...repo, [PLAN]: V1 }, undefined, running, host([]))
     expect(await $.tool.call(goto("qa-integration"))).toEqual(refused("integration checks are still open (detail)"))
     expect(record()).toMatchObject({ stage: "qa-integration", e2e: { path: "aside" } })
@@ -653,8 +653,8 @@ describe("evidence a person reads (D208)", () => {
     const base = { name: "detail", minutes: 30, spent: 0, exec: "", session: S1, observed: "우수회원", verdict: "통과" as const, shots: ["a.png"], todo: "회원을 연다\n회원유형을 본다", expect: "우수회원\n비활성" }
     expect(asideSection([base])).toContain("- 할 일:\n  1. 회원을 연다\n  2. 회원유형을 본다\n- 기대:\n  - 우수회원\n  - 비활성\n")
     const check = { ...CHECKS[0]!, todo: base.todo, expect: base.expect, reference: "휴면 회원" }
-    const task = runnerTask({ ...E2E, apps: { ...APPS, admin: { ...APPS.admin, note: "공지 확인창은 [닫기]" } } }, check, base, "F", "F/result.md")
-    expect(task).toContain("- Mind in this app: 공지 확인창은 [닫기]\n")
+    const task = runnerTask({ ...E2E, apps: { ...APPS, admin: { ...APPS.admin, note: "환영 안내는 [건너뛰기]" } } }, check, base, "F", "F/result.md")
+    expect(task).toContain("- Mind in this app: 환영 안내는 [건너뛰기]\n")
     expect(task).toContain("- Task: \n  1. 회원을 연다\n  2. 회원유형을 본다\n- Expected: \n  - 우수회원\n  - 비활성\n- Why this data (background, not to check): 휴면 회원\n")
     const config = (app: object) => checkConfig(JSON.stringify({ qa: ["t"], e2e: { apps: { admin: { url: "http://x", ...app } }, production: [], backends: [] } }))
     expect(config({ note: 3 })).toContain("`e2e.apps.admin.note` must be a string")
@@ -663,20 +663,20 @@ describe("evidence a person reads (D208)", () => {
 
   test("a check's account wins over an account the app's login names, in the runner's task", () => {
     const base = { name: "detail", minutes: 30, spent: 0, exec: "", session: S1, observed: "", verdict: "통과" as const, shots: [] }
-    const task = runnerTask(E2E, { ...CHECKS[0]!, account: "staff01" }, base, "F", "F/result.md")
+    const task = runnerTask(E2E, { ...CHECKS[0]!, account: "tester2" }, base, "F", "F/result.md")
     expect(task).toContain("- Log in: tester / test-pass, 아이디·비밀번호로 직접 로그인\n")
-    expect(task).toContain("- Account: staff01 (log in as this account, even where the login above names another; the rest of the login still applies)\n")
+    expect(task).toContain("- Account: tester2 (log in as this account, even where the login above names another; the rest of the login still applies)\n")
   })
 
   test("each check says what it was asked and the account it logged in as, never the app's login", () => {
     const base = { minutes: 30, spent: 0, exec: "", session: S1, observed: "우수회원", verdict: "통과" as const, shots: ["a.png"] }
     const section = asideSection([
-      { ...base, name: "detail", todo: "회원을 연다", expect: "우수회원", account: "staff01" },
-      { ...base, name: "tablet", todo: "회원을 저장한다", expect: "저장됨" },
+      { ...base, name: "detail", todo: "회원을 연다", expect: "우수회원", account: "tester2" },
+      { ...base, name: "mobile", todo: "회원을 저장한다", expect: "저장됨" },
       { ...base, name: "old" },
     ])
-    expect(section).toContain("### detail\n\n- 할 일: 회원을 연다\n- 기대: 우수회원\n- 계정: staff01\n")
-    expect(section).toContain("### tablet\n\n- 할 일: 회원을 저장한다\n- 기대: 저장됨\n- 계정: 앱 login 설정대로\n")
+    expect(section).toContain("### detail\n\n- 할 일: 회원을 연다\n- 기대: 우수회원\n- 계정: tester2\n")
+    expect(section).toContain("### mobile\n\n- 할 일: 회원을 저장한다\n- 기대: 저장됨\n- 계정: 앱 login 설정대로\n")
     expect(section).toContain("### old\n\n- 할 일: (기록 없음)\n- 기대: (기록 없음)\n- 계정: (기록 없음)\n")
     expect(section.match(/^판정:/gm)).toHaveLength(1)
   })
@@ -704,9 +704,9 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
   })
 
   test("with checks, passing work qa stops in qa-integration: the hook writes the checklist by page and runs nothing", async ($, on) => {
-    const files = filesWith({ ...E2E, apps: { ...APPS, admin: { ...APPS.admin, note: "로그인 뒤 공지 확인창은 [닫기]" } } })
+    const files = filesWith({ ...E2E, apps: { ...APPS, admin: { ...APPS.admin, note: "로그인 뒤 환영 안내는 [건너뛰기]" } } })
     const detail = { ...CHECKS[0]!, title: "휴면 회원의 회원유형", kind: "변경" as const, todo: "/member/detail를 연다\n회원 테스트회원A를 검색해 회원유형을 본다", expect: "우수회원만 체크\n네 라디오가 모두 비활성", reference: "테스트회원A는 휴면 회원" }
-    world(on, files, undefined, { ...RUN, checks: [detail, { ...detail, name: "detail-control", title: "정상 회원의 회원유형", kind: "대조" as const, account: "staff01" }, CHECKS[1]] }, host([]))
+    world(on, files, undefined, { ...RUN, checks: [detail, { ...detail, name: "detail-control", title: "정상 회원의 회원유형", kind: "대조" as const, account: "tester2" }, CHECKS[1]] }, host([]))
     const r = await relay($, ADVANCE)
     expect(context(r)).toContain(`the hook wrote the integration test checklist ${LIST}, and nothing ran. Tell the user, then stop.`)
     expect(files[LIST]).toBe(
@@ -715,19 +715,19 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
         "- 직접 확인했으면: 모든 칸을 체크한 뒤 `/rein:land`\n" +
         "- aside에 맡기려면: `/rein:e2e` — 기대 칸을 모두 체크한 항목은 건너뛰고, 통과한 항목은 훅이 체크합니다\n" +
         "- 문제가 있으면: 메인 세션에 말하세요. dev로 되돌릴 수 있습니다\n\n" +
-        "## 회원상세\n\n- 접근: 회원 > 회원관리 > 회원상세\n- 앱: admin (http://localhost:8090)\n- 주의: 로그인 뒤 공지 확인창은 [닫기]\n\n" +
+        "## 회원상세\n\n- 접근: 회원 > 회원관리 > 회원상세\n- 앱: admin (http://localhost:8090)\n- 주의: 로그인 뒤 환영 안내는 [건너뛰기]\n\n" +
         "- **휴면 회원의 회원유형** — 변경 확인 · `detail`\n  - 계정: 따로 없음 — admin 앱의 login 설정대로\n" +
         "  - 할 일:\n    1. /member/detail를 연다\n    2. 회원 테스트회원A를 검색해 회원유형을 본다\n" +
         "  - 기대:\n    - [ ] 우수회원만 체크\n    - [ ] 네 라디오가 모두 비활성\n  - 참고: 테스트회원A는 휴면 회원\n\n" +
-        "- **정상 회원의 회원유형** — 대조군 (바뀌면 안 됨) · `detail-control`\n  - 계정: staff01\n" +
+        "- **정상 회원의 회원유형** — 대조군 (바뀌면 안 됨) · `detail-control`\n  - 계정: tester2\n" +
         "  - 할 일:\n    1. /member/detail를 연다\n    2. 회원 테스트회원A를 검색해 회원유형을 본다\n" +
         "  - 기대:\n    - [ ] 우수회원만 체크\n    - [ ] 네 라디오가 모두 비활성\n  - 참고: 테스트회원A는 휴면 회원\n\n" +
-        "## (페이지 기록 없음)\n\n- 접근: (기록 없음)\n- 앱: tablet (http://localhost:3000)\n- 계정: 따로 없음 — tablet 앱의 login 설정대로\n\n" +
-        `- **tablet**\n  - 할 일: ${CHECKS[1]!.todo}\n  - 기대:\n    - [ ] ${CHECKS[1]!.expect}\n  - 저장: 할 일대로 저장하고, 원래 값으로 되돌립니다\n`,
+        "## (페이지 기록 없음)\n\n- 접근: (기록 없음)\n- 앱: mobile (http://localhost:3000)\n- 계정: 따로 없음 — mobile 앱의 login 설정대로\n\n" +
+        `- **mobile**\n  - 할 일: ${CHECKS[1]!.todo}\n  - 기대:\n    - [ ] ${CHECKS[1]!.expect}\n  - 저장: 할 일대로 저장하고, 원래 값으로 되돌립니다\n`,
     )
     expect(files[LIST]).not.toContain("test-pass")
     expect(tick(files[LIST]!, "detail-control", "aside 통과")).toContain(
-      "- **정상 회원의 회원유형** — 대조군 (바뀌면 안 됨) · `detail-control` (aside 통과)\n  - 계정: staff01\n" +
+      "- **정상 회원의 회원유형** — 대조군 (바뀌면 안 됨) · `detail-control` (aside 통과)\n  - 계정: tester2\n" +
         "  - 할 일:\n    1. /member/detail를 연다\n    2. 회원 테스트회원A를 검색해 회원유형을 본다\n" +
         "  - 기대:\n    - [x] 우수회원만 체크\n    - [x] 네 라디오가 모두 비활성\n  - 참고: 테스트회원A는 휴면 회원\n\n" +
         "## (페이지 기록 없음)",
@@ -736,7 +736,7 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
     expect(tick(files[LIST]!, "detail-control", "aside 통과")).toContain("    - [ ] 우수회원만 체크\n")
     const ticked = tick(files[LIST]!, "detail-control", "aside 통과")
     expect(tick(ticked, "detail-control", "aside 통과")).toBe(ticked)
-    expect(unchecked(ticked)).toEqual(["- [ ] **휴면 회원의 회원유형**: 우수회원만 체크", "- [ ] **휴면 회원의 회원유형**: 네 라디오가 모두 비활성", `- [ ] **tablet**: ${CHECKS[1]!.expect}`])
+    expect(unchecked(ticked)).toEqual(["- [ ] **휴면 회원의 회원유형**: 우수회원만 체크", "- [ ] **휴면 회원의 회원유형**: 네 라디오가 모두 비활성", `- [ ] **mobile**: ${CHECKS[1]!.expect}`])
     expect(files[QAI]).toBe("")
     expect(await status($)).toContain("stage: qa-integration\n")
     expect(await status($)).toContain("e2e: wait (5-checklist.md is out")
@@ -761,10 +761,10 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
     await relay($, ADVANCE)
     const open = await $.tool.call(answer("직접 확인 완료"))
     expect(open).toEqual(refused(`The run does not go to land: these boxes of ${LIST} are still empty:\n  - [ ] **detail**: ${CHECKS[0]!.expect}`))
-    expect(open).toEqual(refused(`- [ ] **tablet**: ${CHECKS[1]!.expect}`))
+    expect(open).toEqual(refused(`- [ ] **mobile**: ${CHECKS[1]!.expect}`))
     expect(await $.tool.call(write(LIST, files[LIST]!.replace(`- [ ] ${CHECKS[0]!.expect}`, `- [x] ${CHECKS[0]!.expect}`)))).toEqual(expect.objectContaining({ result: "ok" }))
     const left = await $.tool.call(answer("직접 확인 완료"))
-    expect(left).toEqual(refused(`- [ ] **tablet**: ${CHECKS[1]!.expect}`))
+    expect(left).toEqual(refused(`- [ ] **mobile**: ${CHECKS[1]!.expect}`))
     expect(left).not.toEqual(refused("**detail**"))
     files[LIST] = files[LIST]!.replace(`- [ ] ${CHECKS[1]!.expect}`, `- [x] ${CHECKS[1]!.expect}`)
     const r = await $.tool.call(answer("직접 확인 완료"))
@@ -802,8 +802,8 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
     expect(context(await $.tool.call(answer("e2e 실행 (Aside)")))).toContain("D56: the user asked for e2e. The run is now in the qa-integration stage, aside path, with 2 checks to run")
     await runCheck($, "detail", S1, "우수회원만 체크", "통과")
     expect(files[LIST]).toContain(`- **detail** ([aside 통과](agent/e2e.md#detail))\n  - 할 일: ${CHECKS[0]!.todo}\n  - 기대:\n    - [x] ${CHECKS[0]!.expect}\n`)
-    await runCheck($, "tablet", S2, "공란", "실패")
-    expect(files[LIST]).toContain(`- **tablet**\n  - 할 일: ${CHECKS[1]!.todo}\n  - 기대:\n    - [ ] ${CHECKS[1]!.expect}\n`)
+    await runCheck($, "mobile", S2, "공란", "실패")
+    expect(files[LIST]).toContain(`- **mobile**\n  - 할 일: ${CHECKS[1]!.todo}\n  - 기대:\n    - [ ] ${CHECKS[1]!.expect}\n`)
     expect(await status($)).toContain("halt: D173")
   })
 
@@ -813,7 +813,7 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
     await relay($, ADVANCE)
     await $.tool.call(answer("e2e 실행 (Aside)"))
     await runCheck($, "detail", S1, "우수회원만 체크", "통과")
-    await runCheck($, "tablet", S2, "공란", "실패")
+    await runCheck($, "mobile", S2, "공란", "실패")
     expect(await status($)).toContain("halt: D173")
     files[LIST] = files[LIST]!.replace(`    - [ ] ${CHECKS[1]!.expect}`, `    - [x] ${CHECKS[1]!.expect}`)
     expect(context(await $.tool.call(answer("실패 항목만 다시 돌리기")))).toContain("every aside check already passed")
@@ -827,10 +827,10 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
     await relay($, ADVANCE)
     files[LIST] = files[LIST]!.replace(`    - [ ] ${CHECKS[0]!.expect}`, `    - [x] ${CHECKS[0]!.expect}`)
     expect(context(await $.tool.call(answer("e2e 실행 (Aside)")))).toContain("with 1 check to run")
-    await runCheck($, "tablet", S2, "우수회원으로 표시", "통과")
+    await runCheck($, "mobile", S2, "우수회원으로 표시", "통과")
     expect(files[QAI]).toContain("### detail\n\n")
     expect(files[QAI]).toContain("- 결과: 통과 (사용자가 체크리스트로 확인)\n- aside 세션: 없음\n- 스크린샷: 없음\n")
-    expect(files[LIST]).toContain(`- **tablet** ([aside 통과](agent/e2e.md#tablet))\n`)
+    expect(files[LIST]).toContain(`- **mobile** ([aside 통과](agent/e2e.md#mobile))\n`)
   })
 
   test("e2e 실행 with every check checked by the user runs no aside and goes to the completion check", async ($, on) => {
@@ -839,7 +839,7 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
     await relay($, ADVANCE)
     files[LIST] = files[LIST]!.replaceAll("    - [ ] ", "    - [x] ")
     expect(context(await $.tool.call(answer("e2e 실행 (Aside)")))).toContain("every aside check already passed")
-    expect(files[QAI]).toContain("### tablet\n\n")
+    expect(files[QAI]).toContain("### mobile\n\n")
     expect(files[QAI]!.match(/사용자가 체크리스트로 확인/g)).toHaveLength(2)
   })
 
@@ -930,37 +930,37 @@ describe("a pass stands while the files its check names are unchanged", () => {
     world(on, filesNow(), undefined, { ...RUN, planFiles: [SRC, VIEW], checks: [FILED[0], CHECKS[1]], sealed }, host([ok(out(S1, "우수회원", "통과")), ok(out(S2, "우수회원", "통과"))]))
     await toAside($)
     await runCheck($, "detail", S1, "우수회원", "통과")
-    await runCheck($, "tablet", S2, "우수회원", "통과")
-    expect(record().passed?.map(p => [p.name, p.verdict, p.files])).toEqual([["detail", "통과", { [SRC]: sealed[SRC] }], ["tablet", "통과", sealed]])
+    await runCheck($, "mobile", S2, "우수회원", "통과")
+    expect(record().passed?.map(p => [p.name, p.verdict, p.files])).toEqual([["detail", "통과", { [SRC]: sealed[SRC] }], ["mobile", "통과", sealed]])
   })
 
   test("a check that fails drops its earlier pass", async ($, on) => {
     world(on, filesNow("w2"), undefined, await retried("w2"), host([ok(out(S3, "공란", "실패"))]))
     await relay($, ADVANCE)
-    await judgeImpact($, { tablet: "영향 있음" })
+    await judgeImpact($, { mobile: "영향 있음" })
     await $.tool.call(answer("e2e 실행 (Aside)"))
-    await runCheck($, "tablet", S3, "공란", "실패")
+    await runCheck($, "mobile", S3, "공란", "실패")
     expect(record().passed?.map(p => p.name)).toEqual(["detail"])
   })
 
   test("back from dev, a check whose file changed waits for rein:impact; touched, it runs again, and the other comes checked and says so in ## e2e", async ($, on) => {
     const files = filesNow("w2")
     world(on, files, undefined, await retried("w2"), host([ok(out(S3, "우수회원", "통과"))]))
-    expect(context(await relay($, ADVANCE))).toContain("files they rest on changed since: tablet. Before the checklist is written, spawn rein:impact")
+    expect(context(await relay($, ADVANCE))).toContain("files they rest on changed since: mobile. Before the checklist is written, spawn rein:impact")
     expect(files[LIST]).toBeUndefined()
-    expect(await status($)).toContain("e2e impact: spawn rein:impact (in the foreground) to judge whether the change since their pass touches tablet")
+    expect(await status($)).toContain("e2e impact: spawn rein:impact (in the foreground) to judge whether the change since their pass touches mobile")
     expect(await $.tool.call(ADVANCE)).toEqual(refused("wait for rein:impact's judgment. Spawn rein:impact"))
-    expect(context(await judgeImpact($, { tablet: "영향 있음" }))).toContain("rein:impact found the change touches every check in question")
+    expect(context(await judgeImpact($, { mobile: "영향 있음" }))).toContain("rein:impact found the change touches every check in question")
     expect(spawned.at(-1)).toMatchObject({ type: "rein:impact", background: false })
-    expect(spawned.at(-1)!.prompt).toContain(`### tablet\n- 할 일: ${CHECKS[1]!.todo}\n- 기대: ${CHECKS[1]!.expect}\n- 통과 뒤 바뀐 파일: ${VIEW}`)
+    expect(spawned.at(-1)!.prompt).toContain(`### mobile\n- 할 일: ${CHECKS[1]!.todo}\n- 기대: ${CHECKS[1]!.expect}\n- 통과 뒤 바뀐 파일: ${VIEW}`)
     expect(files[LIST]).toContain(`- **detail** ([이전 통과 유지 — 파일 변경 없음](agent/e2e.md#detail))\n  - 할 일: ${CHECKS[0]!.todo}\n  - 기대:\n    - [x] ${CHECKS[0]!.expect}\n`)
-    expect(files[LIST]).toContain(`- **tablet**\n  - 할 일: ${CHECKS[1]!.todo}\n`)
+    expect(files[LIST]).toContain(`- **mobile**\n  - 할 일: ${CHECKS[1]!.todo}\n`)
     expect(context(await $.tool.call(answer("e2e 실행 (Aside)")))).toContain("with 1 check to run")
     const { agentId } = await spawnRunner($)
     expect(spawned.at(-1)!.prompt).toContain("- App: http://localhost:3000")
-    expect(await spawnRunner($)).toEqual(refused("every open aside check already has its runner (tablet)"))
-    await $.tool.call(runAs(agentId!, asideExec(folderOf("tablet"))))
-    expect(context(await $.tool.call(report(agentId!, folderOf("tablet"), S3, "우수회원", "통과")))).toContain("Every aside check passed")
+    expect(await spawnRunner($)).toEqual(refused("every open aside check already has its runner (mobile)"))
+    await $.tool.call(runAs(agentId!, asideExec(folderOf("mobile"))))
+    expect(context(await $.tool.call(report(agentId!, folderOf("mobile"), S3, "우수회원", "통과")))).toContain("Every aside check passed")
     expect(files[QAI]).toContain(`- 결과: 통과 (이전 통과 유지 — 파일 변경 없음)\n- aside 세션: ${S1}\n- 스크린샷: agent/evidence/detail/1/shot.png\n`)
     expect(files[QAI]).toContain(`- 결과: 통과\n- aside 세션: ${S3}\n`)
   })
@@ -969,7 +969,7 @@ describe("a pass stands while the files its check names are unchanged", () => {
     const files = filesNow("w2")
     world(on, files, undefined, await retried("w2"), host([]))
     await relay($, ADVANCE)
-    expect(context(await judgeImpact($, { tablet: "영향 없음" }))).toContain("rein:impact found the change does not touch tablet")
+    expect(context(await judgeImpact($, { mobile: "영향 없음" }))).toContain("rein:impact found the change does not touch mobile")
     expect(files[LIST]).toBeUndefined()
     expect(ran.filter(x => x.argv[0] === "aside" || x.argv[0] === "ego-browser")).toHaveLength(0)
     expect(files[QAI]).toContain("(이전 통과 유지 — 코드가 바뀌었지만 영향 없다고 판정 (agent/impact.md))")
@@ -983,7 +983,7 @@ describe("a pass stands while the files its check names are unchanged", () => {
     world(on, files, undefined, await retried("w2"), host([]))
     await relay($, ADVANCE)
     expect(ran.some(x => x.argv.join(" ") === `git diff --no-index --no-color -U5 -- ${DIR}/agent/sealed/${w1}.txt ${VIEW}`)).toBe(true)
-    expect(files[`${DIR}/agent/impact-diff.md`]).toContain(`## ${VIEW}\n\n통과 당시 버전 ${w1.slice(0, 12)}에서 지금까지 — check: tablet\n\n\`\`\`diff\nabc123\n\`\`\``)
+    expect(files[`${DIR}/agent/impact-diff.md`]).toContain(`## ${VIEW}\n\n통과 당시 버전 ${w1.slice(0, 12)}에서 지금까지 — check: mobile\n\n\`\`\`diff\nabc123\n\`\`\``)
   })
 
   test("without the copy there is no diff, and rein:impact is told the check is touched", async ($, on) => {
@@ -1011,14 +1011,14 @@ describe("a pass stands while the files its check names are unchanged", () => {
     await relay($, ADVANCE)
     await $.agent.spawn({ tool_use_id: "i", prompt: "p", description: "impact", subagentType: "rein:impact" } as never)
     expect(context(await $.tool.call(ADVANCE))).toContain("rein:impact ended without writing impact.md, so every check in question runs again")
-    expect(files[LIST]).toContain(`- **tablet**\n  - 할 일: ${CHECKS[1]!.todo}\n`)
+    expect(files[LIST]).toContain(`- **mobile**\n  - 할 일: ${CHECKS[1]!.todo}\n`)
   })
 
   test("a carried check runs again when the user unchecks its box", async ($, on) => {
     const files = filesNow("w2")
     world(on, files, undefined, await retried("w2"), host([]))
     await relay($, ADVANCE)
-    await judgeImpact($, { tablet: "영향 있음" })
+    await judgeImpact($, { mobile: "영향 있음" })
     files[LIST] = files[LIST]!.replace(`    - [x] ${CHECKS[0]!.expect}`, `    - [ ] ${CHECKS[0]!.expect}`)
     expect(context(await $.tool.call(answer("e2e 실행 (Aside)")))).toContain("with 2 checks to run")
   })
@@ -1055,7 +1055,7 @@ describe("a pass stands while the files its check names are unchanged", () => {
     world(on, filesNow(), () => "dev로 보냄", { ...RUN, planFiles: [SRC, VIEW], checks: FILED, sealed }, host([ok(out(S1, "우수회원", "통과")), ok(out(S2, "공란", "실패"))]))
     await toAside($)
     await runCheck($, "detail", S1, "우수회원", "통과")
-    await runCheck($, "tablet", S2, "공란", "실패")
+    await runCheck($, "mobile", S2, "공란", "실패")
     await relay($, ADVANCE)
     expect(record()).toMatchObject({ stage: "dev", retries: 0 })
     expect(record().passed?.map(p => p.name)).toEqual(["detail"])
@@ -1131,6 +1131,6 @@ describe("a pass stands while the files its check names are unchanged", () => {
     world(on, files, () => "새 config 승인", { ...(await retried("w1")), configHashes: { "E:/proj": await sha256Text(config()) }, configSeen: seen }, host([]))
     files[CFG] = JSON.stringify({ qa: ["npm run lint"], e2e: E2E })
     expect(await relay($, ADVANCE)).toEqual({ result: "The user approved the current configs.", context: [expect.stringContaining("D50: the configs are frozen")] })
-    expect(record().passed?.map(p => p.name)).toEqual(["detail", "tablet"])
+    expect(record().passed?.map(p => p.name)).toEqual(["detail", "mobile"])
   })
 })

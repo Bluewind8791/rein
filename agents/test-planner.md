@@ -35,7 +35,7 @@ When the hook says nothing changed, or the change reaches none of these, change 
 For each file, answer exactly one of:
 
 - `테스트: <path>`: the test file in the repository that covers this change. Look at how the repository tests (Grep and Glob for existing test files and their naming). Name the existing test file that covers the module when there is one; otherwise name a new one that follows the repository's conventions.
-- `테스트 면제: <reason>`: only when the change has no logic to verify, such as a JSP layout, CSS, a configuration file or documentation.
+- `테스트 면제: <reason>`: only when the change has no logic to verify, such as a template's markup, CSS, a configuration file or documentation.
 
 For each affected path whose behaviour the change could break, name the test file that shows it still works, under `## 영향 범위` as below. Give each test file you name there its own entry too. Leave out an affected path the change cannot reach.
 
@@ -75,7 +75,7 @@ When the change shows on a screen, at least one check must show the change: its 
 
 Always. Cut the completion line into parts, each copied character for character, and give each part one line: the checks that show it, a test file that shows it (a batch, an external call, anything no screen shows; a test file of your answer or an existing one), or `확인 불가` with the reason nothing can show it (a value with nothing to compare against, say). The reviewer fails the run on a part that is not covered, so cover all of it.
 
-A line covers its part only when what it names asserts every condition in it. Hold each check's `기대` and each test's assertions against the part's clauses: a limit such as "only for their own branch" needs a check or a test of the other branch. Name an existing test that already asserts a clause too. A test shows only the files it reads or calls: a part about JSP and Java files needs a test that reaches each.
+A line covers its part only when what it names asserts every condition in it. Hold each check's `기대` and each test's assertions against the part's clauses: a limit such as "only for their own orders" needs a check or a test of another member's orders. Name an existing test that already asserts a clause too. A test shows only the files it reads or calls: a part about a page template and the server code behind it needs a test that reaches each.
 
 A part that says what a screen shows is covered by checks. Cover it with a test file only when no screen can show it, and then end its line with `— 화면 불가: <reason>`: `- "<조각>" — 테스트: <test file> — 화면 불가: <reason>`. A test that asserts the SQL text does not show what the screen shows.
 

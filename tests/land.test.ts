@@ -75,10 +75,10 @@ describe("land Bash", () => {
     const questions: string[] = []
     let answer = "취소"
     world(on, { [LAND]: MESSAGE }, q => (questions.push(q), answer), RUN, gitHost(fresh()))
-    const heredoc = "git commit -q -F - <<'EOF'\n[신정애 요청] LC 연결 수정\n\n본문 한 줄\nEOF\ngit log -1 --oneline"
+    const heredoc = "git commit -q -F - <<'EOF'\n[담당자 요청] 로그인 오류 수정\n\n본문 한 줄\nEOF\ngit log -1 --oneline"
     const notRun = expect.objectContaining({ result: expect.stringContaining("The user did not approve the commit; it does not run.") })
     expect(await relay($, bash(heredoc))).toEqual(notRun)
-    expect(questions[0]).toContain("커밋 메시지:\n```text\n> [신정애 요청] LC 연결 수정\n> \n> 본문 한 줄")
+    expect(questions[0]).toContain("커밋 메시지:\n```text\n> [담당자 요청] 로그인 오류 수정\n> \n> 본문 한 줄")
     expect(await relay($, { tool: "PowerShell", command: "git -C E:/proj commit -m '제목' -m '본문'" } as never)).toEqual(notRun)
     expect(questions[1]).toContain("> 제목\n> \n> 본문")
     // unanswered, the commit stays refused and advance takes its answer first.

@@ -109,7 +109,7 @@ export const AT_ONCE = 5
 export const isOpen = (k: CheckRun) => !k.verdict && !k.over && !k.ego?.human
 
 // the check's account line in a runner's or driver's task. The app's login
-// may name an account of its own (a master password that opens every
+// may name an account of its own (one password that opens every
 // account): the check's account wins over it.
 export const accountLine = (check: Check): string[] =>
   check.account ? [`- Account: ${check.account} (log in as this account, even where the login above names another; the rest of the login still applies)`] : []
