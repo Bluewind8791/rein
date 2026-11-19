@@ -616,3 +616,63 @@ test("kick ends a server of an older plugin version on the same protocol and sta
     }
   }
 })
+
+// a Rein server for root in its own process, on the first free one of the
+// frame's ports. It quits when asked, or with mute takes connections and
+// never answers. It writes server.json only with named; resolves with its
+// { port, pid, exited }.
+async function frameLike(t, root, { named = false, mute = false } = {}) {
+  const src = `
+    const http = require("http"), fs = require("fs"), path = require("path")
+    const root = ${JSON.stringify(root)}
+    const s = http.createServer((q, r) => {
+      if (${mute}) return
+      r.setHeader("content-type", "application/json")
+      if (q.method === "POST") { r.end('{"ok":true}'); return setTimeout(() => process.exit(0), 20) }
+      r.end(q.url === "/api/ping" ? JSON.stringify({ rein: true, root, v: 2 }) : "{}")
+    })
+    s.on("listening", () => {
+      const port = s.address().port
+      if (${named}) fs.writeFileSync(path.join(root, "frame", "server.json"), JSON.stringify({ port, pid: process.pid }))
+      console.log("port " + port)
+    })
+    const at = p => s.once("error", () => at(p + 1)).listen(p, "127.0.0.1")
+    at(7357)`
+  fs.mkdirSync(path.join(root, "frame"), { recursive: true })
+  const child = require("child_process").spawn(process.execPath, ["-e", src], { stdio: ["ignore", "pipe", "inherit"] })
+  let out = ""
+  child.stdout.on("data", c => (out += c))
+  const exited = new Promise(r => child.on("exit", r))
+  t.after(() => child.kill())
+  const port = Number((await until(() => /port (\d+)/.exec(out)))[1])
+  return { port, pid: child.pid, exited }
+}
+
+const kickIn = dir => new Promise(resolve => {
+  execFile(process.execPath, [SERVER, "kick"], { env: { ...process.env, REIN_HOME: dir } }, (err, stdout) => resolve(JSON.parse(stdout.trim().split(/\r?\n/).pop())))
+})
+
+test("kick asks a server server.json no longer names to quit", async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rein-frame-"))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const orphan = await frameLike(t, dir)
+  const info = () => readJsonFile(path.join(dir, "frame", "server.json"))
+  try {
+    assert.deepStrictEqual(await kickIn(dir), { started: true })
+    await orphan.exited
+  } finally {
+    const i = await until(info)
+    try { process.kill(i.pid) } catch {}
+    await until(() => getJson(i.port, "/api/ping").then(() => false, () => true))
+  }
+})
+
+test("kick leaves the server server.json names alone while it is too busy to answer, and starts none beside it", async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rein-frame-"))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const busy = await frameLike(t, dir, { named: true, mute: true })
+  const before = readJsonFile(path.join(dir, "frame", "server.json"))
+  assert.deepStrictEqual(await kickIn(dir), { started: false })
+  assert.deepStrictEqual(readJsonFile(path.join(dir, "frame", "server.json")), before)
+  assert.strictEqual(before.port, busy.port)
+})

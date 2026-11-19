@@ -15,6 +15,7 @@
 "use strict"
 
 const http = require("http")
+const net = require("net")
 const fs = require("fs")
 const path = require("path")
 const os = require("os")
@@ -178,14 +179,47 @@ function out(obj, code) {
   process.stdout.write(JSON.stringify(obj) + "\n", () => process.exit(code))
 }
 
-// the running server's port when it speaks the current protocol; an older
-// one is asked to quit (null). One that refuses (/api/quit came with
-// protocol 2) or still answers a second later is ended by its pid.
+// whether a process with this pid is alive
+function alive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return e.code === "EPERM"
+  }
+}
+
+// whether something takes a connection on port
+function listening(port) {
+  return new Promise(resolve => {
+    const sock = net.connect({ host: "127.0.0.1", port, timeout: 300 }, () => {
+      sock.destroy()
+      resolve(true)
+    })
+    sock.on("timeout", () => { sock.destroy(); resolve(false) })
+    sock.on("error", () => resolve(false))
+  })
+}
+
+// the port of the server server.json names when it speaks the current
+// protocol; an older one is asked to quit (null). One that refuses
+// (/api/quit came with protocol 2) or still answers a second later is ended
+// by its pid. One that takes a connection but is too busy to answer (it has
+// just started) counts as running, so a second one is not started beside it.
+// Every other Rein server for this root on the frame's ports, older or one
+// server.json no longer names, is asked to quit.
 async function running() {
   const info = readJson(INFO)
-  const j = info && info.port ? await ping(info.port) : null
-  if (j && current(j)) return info.port
-  if (!j) return null
+  const mine = info && Number.isInteger(info.port) ? info.port : null
+  const ports = Array.from({ length: PORT_TRIES }, (_, i) => BASE_PORT + i).filter(p => p !== mine)
+  const [j, others] = await Promise.all([
+    mine === null ? null : ping(mine),
+    Promise.all(ports.map(async p => ((await ping(p)) ? p : null))),
+  ])
+  await Promise.all(others.filter(p => p !== null).map(p => call(p, "POST", "/api/quit")))
+  if (j && current(j)) return mine
+  if (!j) return mine !== null && alive(info.pid) && (await listening(mine)) ? mine : null
   const said = await call(info.port, "POST", "/api/quit")
   for (let i = 0; i < 10 && said && said.ok === true && (await ping(info.port, 300)); i++) await new Promise(r => setTimeout(r, 100))
   const still = await ping(info.port, 300)
