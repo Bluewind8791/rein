@@ -114,7 +114,12 @@ function artifacts(r) {
     const slash = f.name.indexOf("/")
     if (slash > 0) {
       const sub = f.name.slice(0, slash)
-      map.set(f.name, { key: f.name, stage: SUB_STAGE[sub] || "other", sub, label: f.name.slice(slash + 1), file: f, ext, mtime: f.mtime })
+      const a = { key: f.name, stage: SUB_STAGE[sub] || "other", sub, label: f.name.slice(slash + 1), mtime: f.mtime }
+      // a markdown or HTML file is shown like one at the root, not downloaded
+      if (ext === "md") a.md = f
+      else if (ext === "html") a.html = f
+      else { a.file = f; a.ext = ext }
+      map.set(f.name, a)
       continue
     }
     const twin = ext === "md" || ext === "html"
