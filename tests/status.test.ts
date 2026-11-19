@@ -1,5 +1,5 @@
-import { describe, expect, test } from "claude-code/testing"
-import { DIR, grade, REIN, relay, SPEC_TEXT, store, toasts, world } from "./world.ts"
+import { describe, expect } from "claude-code/testing"
+import { DIR, grade, REIN, relay, SPEC_TEXT, store, toasts, world, test } from "./world.ts"
 
 // G2: the read-only status tool shows the run the agent cannot read itself.
 

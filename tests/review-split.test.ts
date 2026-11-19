@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { parseGroups, pendingGroups, planRanges, SPLIT_AT } from "../hooks/stages/review.ts"
 import type { Run } from "../hooks/lib/state.ts"
-import { COVER, DIR, REIN, reviewed, spawned, SPEC_TEXT, store, world } from "./world.ts"
+import { COVER, DIR, REIN, reviewed, spawned, SPEC_TEXT, store, world, test } from "./world.ts"
 
 // A change of SPLIT_AT or more files is reviewed in groups: a
 // rein:review-splitter writes review-groups.md, one rein:reviewer per group

@@ -1,6 +1,6 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { knowledgeDescription, knowledgeIndex } from "../hooks/lib/knowledge.ts"
-import { relay, DIR, grade, REIN, SPEC_TEXT, spawned, world } from "./world.ts"
+import { relay, DIR, grade, REIN, SPEC_TEXT, spawned, world, test } from "./world.ts"
 
 // Domain rules in a folder under rules/ and domain knowledge under
 // knowledge/<domain>/, listed for the agents that get it.

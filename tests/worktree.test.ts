@@ -1,10 +1,10 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { applicableRules } from "../hooks/lib/rules.ts"
 import type { Land } from "../hooks/lib/pane.ts"
 import type { Rule, Run } from "../hooks/lib/state.ts"
 import { fromPortable, toPortable } from "../hooks/lib/sync.ts"
 import { inTree, landMessage, treeTable } from "../hooks/lib/trees.ts"
-import { at, COVER, DIR, gitSub, planned, ran, REIN, relay, SPEC_TEXT, store, world, type Host } from "./world.ts"
+import { at, COVER, DIR, gitSub, planned, ran, REIN, relay, SPEC_TEXT, store, world, type Host, test } from "./world.ts"
 
 // Every run works in its own git worktree of each repository its plan
 // names, <repository>/.claude/worktrees/<runId> on branch rein/<runId>, made

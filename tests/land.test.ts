@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import type { Land } from "../hooks/lib/pane.ts"
 import { landFiles, nameStatus, numstat, stagingProblem } from "../hooks/stages/land.ts"
-import { relay, DIR, gitSub, ran, world, type Host } from "./world.ts"
+import { relay, DIR, gitSub, ran, world, type Host, test } from "./world.ts"
 
 // The land stage: the main session stages the planned files that changed and
 // writes 6-land.md; advance checks the staging and closes the run. The user

@@ -1,5 +1,5 @@
-import { describe, expect, test } from "claude-code/testing"
-import { relay, DIR, grade, SPEC_TEXT, world } from "./world.ts"
+import { describe, expect } from "claude-code/testing"
+import { relay, DIR, grade, SPEC_TEXT, world, test } from "./world.ts"
 
 // The spec approval with the person played by a tool.call hook beneath the plugin
 // (world.ts): $.ui.ask is a tool.call of AskUserQuestion, so the hook answers it.

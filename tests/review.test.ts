@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { parseCover, parseReview } from "../hooks/lib/parse.ts"
 import { reviewTask } from "../hooks/stages/review.ts"
-import { relay, COVER, DIR, REIN, SPEC_TEXT, spawned, store, world, reviewed } from "./world.ts"
+import { relay, COVER, DIR, REIN, SPEC_TEXT, spawned, store, world, reviewed, test } from "./world.ts"
 
 // The review stage: only the recorded reviewer's review.md is a verdict
 //, its form is checked before it lands, the verdict moves the

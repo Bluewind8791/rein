@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import type { HttpInit } from "claude-code"
 import type { HubInfo, HubRecord } from "../hooks/lib/sync.ts"
-import { clock, DIR, grade, ran, relay, REIN, SPEC_TEXT, store, toasts, world, type Host } from "./world.ts"
+import { clock, DIR, grade, ran, relay, REIN, SPEC_TEXT, store, toasts, world, type Host, test } from "./world.ts"
 
 // The hook no longer sends runs anywhere: it writes each run's
 // agent/record.json, which the local frame server sends to the hub with the

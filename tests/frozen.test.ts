@@ -1,5 +1,5 @@
-import { describe, expect, test } from "claude-code/testing"
-import { relay, DIR, grade, SPEC_TEXT, store, world } from "./world.ts"
+import { describe, expect } from "claude-code/testing"
+import { relay, DIR, grade, SPEC_TEXT, store, world, test } from "./world.ts"
 
 // 1-spec.md as the person approved it and 2-plan.md as it passed,
 // and the planned files as dev handed them on (the seal). The main session

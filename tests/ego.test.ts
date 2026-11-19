@@ -1,10 +1,10 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { readConfig } from "../hooks/lib/config.ts"
 import { closeScript, driverTask, egoStartable, judgeTask, MARK, parseJudge, PROBE_SCRIPT, resolveProfiles, roundCommand, roundOutcome, runSpaces, SHOT_PROBE_SCRIPT } from "../hooks/lib/ego.ts"
 import { harnessSource, importLine, REOPEN_MARK, TAKEOVER_MARK } from "../hooks/lib/egoHarness.ts"
 import { checkConfig, parseChecks, type Check } from "../hooks/lib/parse.ts"
 import type { CheckRun } from "../hooks/lib/state.ts"
-import { clock, DIR, gitSub, ran, relay, SPEC_TEXT, spawned, store, world, type Host } from "./world.ts"
+import { clock, DIR, gitSub, ran, relay, SPEC_TEXT, spawned, store, world, type Host, test } from "./world.ts"
 
 // The ego path of integration qa: the user picks Ego at /rein:e2e, each
 // check runs in its ego profile's TaskSpace, a rein:ego-driver drives it in

@@ -1,10 +1,10 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { importLine } from "../hooks/lib/egoHarness.ts"
 import { MARK, PROBE_SCRIPT, SHOT_PROBE_SCRIPT } from "../hooks/lib/ego.ts"
 import { layoutCheck, parseLayoutVerdict, tickLayout, toBeSources } from "../hooks/lib/layout.ts"
 import { devTask } from "../hooks/stages/dev.ts"
 import type { Run } from "../hooks/lib/state.ts"
-import { DIR, gitSub, grade, ran, relay, SPEC_TEXT, spawned, store, world, type Host } from "./world.ts"
+import { DIR, gitSub, grade, ran, relay, SPEC_TEXT, spawned, store, world, type Host, test } from "./world.ts"
 
 // spec's layout check: a to-be drawn from a planning-document
 // picture is rendered with a headless Chrome, rein:layout-verifier compares it

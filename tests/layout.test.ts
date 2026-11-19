@@ -1,7 +1,7 @@
-import { describe, expect, test, type Engine } from "claude-code/testing"
+import { describe, expect, type Engine } from "claude-code/testing"
 import { parseLayouts, toBeScreens } from "../hooks/lib/parse.ts"
 import { checklist, openLayouts } from "../hooks/stages/qaIntegration.ts"
-import { relay, DIR, gitSub, planned, SPEC_TEXT, spawned, store, world, type Host } from "./world.ts"
+import { relay, DIR, gitSub, planned, SPEC_TEXT, spawned, store, world, type Host, test } from "./world.ts"
 
 // The to-be screens of 1-mockup.html: 2-plan.md names each in `## 배치 대조`,
 // 5-checklist.md gives each a box, and integration qa waits for the person

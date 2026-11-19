@@ -1,5 +1,5 @@
-import { describe, expect, test } from "claude-code/testing"
-import { DIR, REIN, relay, SPEC_TEXT, world } from "./world.ts"
+import { describe, expect } from "claude-code/testing"
+import { DIR, REIN, relay, SPEC_TEXT, world, test } from "./world.ts"
 import { TRACE_LIMIT } from "../hooks/lib/trace.ts"
 
 // The trace keeps a written file's length and hash, not its text, and goes on

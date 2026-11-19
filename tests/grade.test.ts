@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { parseGrade } from "../hooks/lib/parse.ts"
 import { DIMENSIONS, frontValue, openQuestions, passes, referenced, scopeGaps, scoreGrade, specType, steady } from "../hooks/stages/spec.ts"
-import { relay, DIR, grade, gradeMd, SCOPE, SPEC_TEXT, spawned, store, world } from "./world.ts"
+import { relay, DIR, grade, gradeMd, SCOPE, SPEC_TEXT, spawned, store, world, test } from "./world.ts"
 
 // a grader that sees only 1-spec.md scores it; the hook works out the
 // ambiguity, paces the user's questions and shows what is left when it asks

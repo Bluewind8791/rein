@@ -1,10 +1,10 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { checkChain, commitMessage, gitCommits, gitRewrite } from "../hooks/lib/bash.ts"
 import { dev } from "../hooks/stages/dev.ts"
 import { planReviewer } from "../hooks/stages/plan.ts"
 import { qaIntegration } from "../hooks/stages/qaIntegration.ts"
 import { review } from "../hooks/stages/review.ts"
-import { store, world } from "./world.ts"
+import { store, world, test } from "./world.ts"
 
 // the Bash policy of review, as a pure function.
 

@@ -1,6 +1,6 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { unsure } from "../hooks/lib/paths.ts"
-import { DIR, REIN, world } from "./world.ts"
+import { DIR, REIN, world, test } from "./world.ts"
 
 // Spellings that land somewhere other than they read: refused by their
 // spelling, or caught where they really land. Rein's agents are held to a

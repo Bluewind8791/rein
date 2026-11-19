@@ -1,8 +1,8 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { globToRegExp } from "../hooks/lib/glob.ts"
 import { applicableRules } from "../hooks/lib/rules.ts"
 import { holdRoute, routeJudged, toDev } from "../hooks/stages/dev.ts"
-import { COVER, DIR, REIN, SPEC_TEXT, gates, gitSub, planned, ran, spawned, store, world } from "./world.ts"
+import { COVER, DIR, REIN, SPEC_TEXT, gates, gitSub, planned, ran, spawned, store, world, test } from "./world.ts"
 
 // The dev stage: its write allowlist, the writes it records and the
 // exit on dev-items.md, the hand-off to review, and the way back to

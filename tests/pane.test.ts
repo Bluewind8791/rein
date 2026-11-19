@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { chip, fmtDur, frameState, frameStatus, progressView, type FrameStatus } from "../hooks/lib/pane.ts"
 import type { Run } from "../hooks/lib/state.ts"
-import { relay, DIR, gates, ran, REIN, SPEC_TEXT, world, type Host } from "./world.ts"
+import { relay, DIR, gates, ran, REIN, SPEC_TEXT, world, type Host, test } from "./world.ts"
 
 // the frame. From when a run opens or is picked back up until it leaves
 // active, the hook writes the run's status to agent/frame.json in the run

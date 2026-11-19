@@ -1,6 +1,6 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { pastedImages, pasteName } from "../hooks/lib/brief.ts"
-import { clock, DIR, grade, ran, relay, SPEC_TEXT, world } from "./world.ts"
+import { clock, DIR, grade, ran, relay, SPEC_TEXT, world, test } from "./world.ts"
 
 // The images the user pastes into the run's main session are kept in the
 // run folder's brief/ as paste-1.png, paste-2.png, … in paste order. They

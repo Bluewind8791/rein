@@ -1,6 +1,6 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { worktreeMain } from "../hooks/lib/paths.ts"
-import { store, world } from "./world.ts"
+import { store, world, test } from "./world.ts"
 
 const QA = JSON.stringify({ qa: ["npm test"] })
 

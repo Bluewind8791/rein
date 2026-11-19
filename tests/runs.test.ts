@@ -1,6 +1,6 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { sha256Text } from "../hooks/lib/hash.ts"
-import { relay, DIR, REIN, SESSION, SPEC_TEXT, clock, moves, renames, store, world, type Host } from "./world.ts"
+import { relay, DIR, REIN, SESSION, SPEC_TEXT, clock, moves, renames, store, world, type Host, test } from "./world.ts"
 
 // Run states and their folders, the slug-keyed record a session
 // points to, park, resume and the v0.2.0 keys.

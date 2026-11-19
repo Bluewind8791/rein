@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { applicableRules } from "../hooks/lib/rules.ts"
 import type { Rule } from "../hooks/lib/state.ts"
-import { COVER, DIR, planned, SPEC_TEXT, store, world } from "./world.ts"
+import { COVER, DIR, planned, SPEC_TEXT, store, world, test } from "./world.ts"
 
 // a repository outside the session root (E:/proj) is a repository of
 // the run like any other. The first 2-plan.md that names it brings its

@@ -1,10 +1,10 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { E2E_SKIPPED } from "../hooks/stages/qaIntegration.ts"
 import { productionTargets } from "../hooks/lib/aside.ts"
 import { changeLines, readConfig, viewOf } from "../hooks/lib/config.ts"
 import { quoted } from "../hooks/lib/quote.ts"
 import { sha256Text } from "../hooks/lib/hash.ts"
-import { relay, DIR, gitSub, ran, store, world, type Host } from "./world.ts"
+import { relay, DIR, gitSub, ran, store, world, type Host, test } from "./world.ts"
 
 // The e2e gates against the cases their review found (R1-R9, turned
 // into the fixed behaviour) and the paths it listed as untested.

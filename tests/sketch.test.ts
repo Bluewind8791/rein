@@ -1,6 +1,6 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { sketchMode } from "../hooks/stages/spec.ts"
-import { relay, DIR, grade, REIN, SPEC_TEXT, spawned, store, world } from "./world.ts"
+import { relay, DIR, grade, REIN, SPEC_TEXT, spawned, store, world, test } from "./world.ts"
 
 // a sketcher that sees only 1-spec.md and the code draws 1-mockup.html; the
 // hook writes its task and tells the approval question when the picture is

@@ -1,8 +1,8 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { captureAside, isProduction } from "../hooks/lib/aside.ts"
 import { checkConfig } from "../hooks/lib/parse.ts"
 import { completionLine } from "../hooks/stages/qaIntegration.ts"
-import { relay, DIR, gitSub, ran, spawned, world, type Host } from "./world.ts"
+import { relay, DIR, gitSub, ran, spawned, world, type Host, test } from "./world.ts"
 
 // The qa guards the chunk 4 review asked for: frozen configs, one judgment
 // at a time, one aside run per entry, the production host match, the land set.

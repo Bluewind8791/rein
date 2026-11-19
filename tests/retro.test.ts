@@ -1,5 +1,5 @@
-import { describe, expect, test } from "claude-code/testing"
-import { relay, DIR, REIN, SPEC_TEXT, world } from "./world.ts"
+import { describe, expect } from "claude-code/testing"
+import { relay, DIR, REIN, SPEC_TEXT, world, test } from "./world.ts"
 
 // The retrospective after a run closes: the close names the rein:retro
 // skill with the run folder and the main session's transcripts, and until

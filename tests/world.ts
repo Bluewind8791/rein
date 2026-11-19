@@ -1,6 +1,14 @@
-import { mock, type MockClock } from "claude-code/testing"
+import { mock, test as kitTest, type MockClock, type TestBody, type TestOptions } from "claude-code/testing"
 import type { AgentStatus, HttpInit, On, ProcessRunResult } from "claude-code"
 import { DIMENSIONS, SCOPE_ROWS } from "../hooks/stages/spec.ts"
+
+// the kit's test with 15 s to run, not 5: with every file running at once a
+// test that takes 3 s alone outran 5 s now and then, a different one each time.
+const TIMEOUT_MS = 15_000
+export function test(name: string, ...rest: readonly [TestBody] | readonly [TestOptions, TestBody]): void {
+  if (rest.length === 1) kitTest(name, { timeoutMs: TIMEOUT_MS }, rest[0])
+  else kitTest(name, { timeoutMs: TIMEOUT_MS, ...rest[0] }, rest[1])
+}
 
 export const SESSION = "s1"
 export const ROOT = "E:/proj"

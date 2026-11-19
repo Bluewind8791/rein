@@ -1,4 +1,4 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import type { AgentStatus } from "claude-code"
 import { captureAside, runnerCommand, runnerTask, sessionStatus, startable } from "../hooks/lib/aside.ts"
 import { readConfig, viewOf } from "../hooks/lib/config.ts"
@@ -6,7 +6,7 @@ import { sha256Text } from "../hooks/lib/hash.ts"
 import { checkConfig, judgeCover, parseChecks, parseCover } from "../hooks/lib/parse.ts"
 import type { CheckRun } from "../hooks/lib/state.ts"
 import { allChecked, asideSection, asideTick, carriedTick, egoTick, handChecked, parseImpact, tick, unchecked, UNSHOT } from "../hooks/stages/qaIntegration.ts"
-import { relay, COVER, DIR, gitSub, planned, ran, SPEC_TEXT, spawned, store, world, type Host } from "./world.ts"
+import { relay, COVER, DIR, gitSub, planned, ran, SPEC_TEXT, spawned, store, world, type Host, test } from "./world.ts"
 
 // 2-plan.md's aside checks and how they cover the
 // completion line, config e2e.apps, one rein:e2e-runner agent per check, up

@@ -1,6 +1,6 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { E2E_SKIPPED, e2eSection, integrationGuard, withHistory } from "../hooks/stages/qaIntegration.ts"
-import { relay, DIR, clock, gitSub, ran, spawned, store, world, type Host } from "./world.ts"
+import { relay, DIR, clock, gitSub, ran, spawned, store, world, type Host, test } from "./world.ts"
 
 // Work qa and integration qa, with the aside
 // path as impl-plan §6 measured it. process.run, http.fetch

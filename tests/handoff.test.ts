@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { parsePlan } from "../hooks/lib/parse.ts"
 import { reviewTask } from "../hooks/stages/review.ts"
-import { COVER, DIR, planned, SPEC_TEXT, store, world } from "./world.ts"
+import { COVER, DIR, planned, SPEC_TEXT, store, world, test } from "./world.ts"
 
 // what dev writes for the person to apply outside the repositories
 // (a DB script): 2-plan.md's `## 넘길 것` names the files, dev writes them in

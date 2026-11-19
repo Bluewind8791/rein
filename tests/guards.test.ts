@@ -1,7 +1,7 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { itemPath } from "../hooks/lib/parse.ts"
 import { same, under } from "../hooks/lib/paths.ts"
-import { DIR, REIN, world } from "./world.ts"
+import { DIR, REIN, world, test } from "./world.ts"
 
 // Guards that hold in every stage: the main session in a stage not built
 // yet, the reads tool.check allows, and path spelling.

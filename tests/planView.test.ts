@@ -1,5 +1,6 @@
-import { describe, expect, test } from "claude-code/testing"
+import { describe, expect } from "claude-code/testing"
 import { applyHunks, parsePlanView, planViewData, planViewHtml } from "../hooks/lib/planView.ts"
+import { test } from "./world.ts"
 
 // 2-plan.html: the design's hunks placed in the files as they are. A hunk is
 // an excerpt, so it may skip lines, go on under a bare `@@` and note what it

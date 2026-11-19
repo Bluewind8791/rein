@@ -1,5 +1,5 @@
-import { describe, expect, test } from "claude-code/testing"
-import { relay, COVER, DIR, grade, planned, REIN, reviewed, spawned, SPEC_TEXT, store, world } from "./world.ts"
+import { describe, expect } from "claude-code/testing"
+import { relay, COVER, DIR, grade, planned, REIN, reviewed, spawned, SPEC_TEXT, store, world, test } from "./world.ts"
 
 // The plan stage: its write allowlist, the approval at advance once
 // 2-plan.md has the form, and the rules open_run freezes for it.
