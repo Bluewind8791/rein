@@ -1,6 +1,6 @@
 {
   "name": "rein",
-  "version": "0.65.2",
+  "version": "0.65.3",
   "description": "Workflow harness that enforces the spec, plan, dev, review, qa and land stages with function hooks: per-stage write and command allowlists, hook-judged exits, and human gates for the spec and the commit.",
   "repository": "https://github.com/Bluewind8791/rein",
   "license": "MIT"
