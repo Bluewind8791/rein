@@ -16,6 +16,12 @@ slug: <runId>
 
 - <a claim of the request> — <what was checked> → <what the code says, path:line>
 
+## 화면
+
+| id | 이름 | URL | 진입 파일 | 종류 |
+|---|---|---|---|---|
+| <screen code> | <screen name> | <URL, or -> | <entry file, or -> | <변경, 새 화면, or 새 화면, 따를 화면 <id>> |
+
 ## 현행 동작
 
 <how it works now, relevant files as path:line; the edge cases found, handled or not, as path:line>

@@ -14,8 +14,8 @@ export function knowledgeDescription(text: string): string | null {
 export const PLAN_USE = "Use it for the design, and give this list to rein:test-planner with its task."
 export const WORKER_USE = "Use it for how to write what the design asks for; it never widens the design."
 export const ARBITER_USE = "Use it to weigh a claim about what the domain (a framework, a library) allows."
-export const SKETCHER_USE = "Look in it first for the screen's files and for how to read its current layout."
-export const STATUS_USE = "The main session, rein:sketcher, rein:worker, rein:arbiter and rein:test-planner use it."
+export const AS_IS_USE = "Look in it first for the screen's files and for how to read its current layout."
+export const STATUS_USE = "The main session, rein:as-is, rein:worker, rein:arbiter and rein:test-planner use it."
 
 // where status keeps the index, in the run directory: status names the
 // file instead of repeating the index on every call.

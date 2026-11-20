@@ -14,8 +14,9 @@ import { TRACE_LIMIT, traceFile, traceInput, utf8Bytes } from "./lib/trace.ts"
 import { parsePlanView, planViewData, planViewHtml } from "./lib/planView.ts"
 import { afterPlan, clearSession, fromPortable, pastPlan, toPortable, type HubInfo, type HubRecord, type HubRun, type HubStatus } from "./lib/sync.ts"
 import { quoted } from "./lib/quote.ts"
+import { AS_IS, ASIS_FILE, asIsBlocks, joinMockup, TOBE_FILE } from "./lib/mockup.ts"
 import { COMMENTS_FILE, commentsJson, handOverText, markOne, parseComments, sendDrafts, unmarked, type Comment } from "./lib/comments.ts"
-import { ARBITER_USE, KNOWLEDGE_FILE, knowledgeDescription, knowledgeIndex, knowledgePointer, PLAN_USE, SKETCHER_USE, STATUS_USE, WORKER_USE, type Knowledge } from "./lib/knowledge.ts"
+import { ARBITER_USE, KNOWLEDGE_FILE, knowledgeDescription, knowledgeIndex, knowledgePointer, AS_IS_USE, PLAN_USE, STATUS_USE, WORKER_USE, type Knowledge } from "./lib/knowledge.ts"
 import { applicableRules, freezeRule, ruleFile, sharedRulesOf } from "./lib/rules.ts"
 import { frameStatus, MAIN, type Activity, type End, type Land, type LandFile, type LandRepo, type LandResult } from "./lib/pane.ts"
 import { normalizeRun, projectOf, renderRun, withContext, type CheckRun, type Ctx, type E2eState, type EgoCheck, type Rule, type Run, type Seal, type Stage, type StageSpec, type Tree } from "./lib/state.ts"
@@ -26,7 +27,7 @@ import { filesOf, landFiles, nameStatus, numstat, stagedPaths, stagingProblem, s
 import { backendsHint, commandReport, failedRun, failureOf, OUTPUT_FILE, outputLog, rerunQuestion, rewrote, type CommandResult } from "./stages/qa.ts"
 import { driverRow, egoSection, folderOf as checkFolder, judgeOf, judgeRow, settleEgo, asideSection, progressSection, allChecked, carriedPass, carriedTick, asideTick, egoTick, checklist, doubtful, IMPACT_DIFF, IMPACT_FILE, impactRow, impactTask, parseImpact, completionLine, completionTask, E2E_MANUAL, E2E_NONE, E2E_SKIPPED, e2eSection, entryOutcome, handChecked, judgeIntegration, keptPasses, openLayouts, parseResult, qaIntegration, remember, resultOf, runnerCheck, runnerRow, sameE2e, settleAside, tick, unchecked, UNSHOT, withHistory } from "./stages/qaIntegration.ts"
 import { GROUPS_FILE, groupFile, groupItems, groupRules, groupsCover, groupTask, joinedReview, parseGroups, pendingGroups, review, reviewEntry, reviewLists, reviewNext, reviewRules, reviewTask, splits, splitterTask } from "./stages/review.ts"
-import { DIMENSIONS, EVERY, gradeLine, graderTask, gradeSummary, openQuestions, passes, scoreGrade, sketcherTask, spec, specProblem, specType, TYPES } from "./stages/spec.ts"
+import { asIsTask, asIsWanted, DIMENSIONS, EVERY, gradeLine, graderTask, gradeSummary, openQuestions, passes, scoreGrade, screenRows, sketcherTask, spec, specProblem, specType, TYPES } from "./stages/spec.ts"
 import { unbuilt } from "./stages/unbuilt.ts"
 
 // Kickoff step 5, all six stages. The run opens through the open_run tool,
@@ -197,10 +198,13 @@ let closed: { dir: string; transcripts: string[] } | undefined
 // every grader this module spawned. It reads 1-spec.md and writes
 // grade.md, nothing else, even once it is spent.
 const graders = new Set<string>()
-// every sketcher this module spawned. It reads and writes 1-mockup.html,
+// every sketcher this module spawned. It reads and writes agent/tobe.html,
 // nothing else; only the last one spawned in spec writes at all.
 const sketchers = new Set<string>()
 const SKETCHER = "rein:sketcher"
+// every rein:as-is this module spawned. It reads the code and writes
+// agent/asis.html, nothing else; only the last one spawned in spec writes.
+const asIsAgents = new Set<string>()
 // every layout verifier this module spawned. It reads the pictures and
 // writes its verdict, nothing else.
 const layoutVerifiers = new Set<string>()
@@ -443,14 +447,14 @@ async function scopeOf($: EngineInterface, run: Run, agentId: string | undefined
   const check = run.stage === "qa-integration" && run.e2e?.path !== "ego" ? runnerCheck(run, agentId) : undefined
   if (check) return { c, spec: runnerRow(check), main: false }
   if (counts(run, agentId)) return { c, spec: run.stage === "plan" ? planReviewer : run.stage === "qa" ? impactRow() : stageOf(run), main: false }
-  const recorded = [run.worker, run.arbiter, run.reviewer, run.splitter, run.verifier, run.grader, run.sketcher, run.sketchCheck?.agent, run.planReviewer, run.impact?.agent].includes(agentId)
-  if (reinAgents.has(agentId) || graders.has(agentId) || sketchers.has(agentId) || layoutVerifiers.has(agentId) || recorded) return { c, spec: retired(`its part in the run is over (the run is in ${run.stage})`), main: false }
+  const recorded = [run.worker, run.arbiter, run.reviewer, run.splitter, run.verifier, run.grader, run.sketcher, run.asIs, run.sketchCheck?.agent, run.planReviewer, run.impact?.agent].includes(agentId)
+  if (reinAgents.has(agentId) || graders.has(agentId) || sketchers.has(agentId) || asIsAgents.has(agentId) || layoutVerifiers.has(agentId) || recorded) return { c, spec: retired(`its part in the run is over (the run is in ${run.stage})`), main: false }
   return { c, spec: master(run.stage), main: true }
 }
 
 // whether the run counts on this Rein agent in its stage now.
 function counts(run: Run, agentId: string): boolean {
-  if (run.stage === "spec") return run.grader === agentId || graders.has(agentId) || run.sketcher === agentId || run.sketchCheck?.agent === agentId
+  if (run.stage === "spec") return run.grader === agentId || graders.has(agentId) || run.sketcher === agentId || run.asIs === agentId || run.sketchCheck?.agent === agentId
   if (run.stage === "plan") return run.planReviewer === agentId && run.planReview !== undefined
   if (run.stage === "dev") return run.worker === agentId || run.arbiter === agentId
   if (run.stage === "review") return run.reviewer === agentId || run.splitter === agentId || (run.reviewGroups ?? []).some(g => g.reviewer === agentId)
@@ -1514,7 +1518,7 @@ async function openRun($: EngineInterface, input: Record<string, unknown>): Prom
   // the images pasted with the request the run opened on.
   await savePastes($, run)
   const pilot = run.autopilot ? " This is an autopilot run: the spec's questions are asked as usual, but where the user would type /rein:plan or /rein:dev, run /rein:e2e or approve the commit, the hook's result tells you to pass the answer yourself." : ""
-  const opened = `Run opened. runId: ${runId}.${pilot} Write the spec to ${dir}/1-spec.md, the only file this stage may write; rein:sketcher draws ${dir}/1-mockup.html beside it when a picture helps (D158).`
+  const opened = `Run opened. runId: ${runId}.${pilot} Write the spec to ${dir}/1-spec.md, the only file this stage may write; rein:as-is and rein:sketcher draw ${dir}/1-mockup.html beside it when a picture helps (D158).`
   // the deferred runs, so the spec agent can notice the request is one.
   const deferred = (await resumable($)).filter(r => r.state === "defer")
   const context: string[] = []
@@ -2832,7 +2836,7 @@ async function resume($: EngineInterface, input: Record<string, unknown>): Promi
     gone.delete(target.runId)
     const next: Run = {
       ...r, status: "active", owner: session,
-      grader: undefined, sketcher: undefined, worker: undefined, arbiter: undefined, reviewer: undefined, verifier: undefined, busy: undefined, commit: undefined,
+      grader: undefined, sketcher: undefined, asIs: undefined, worker: undefined, arbiter: undefined, reviewer: undefined, verifier: undefined, busy: undefined, commit: undefined,
       splitter: undefined, reviewGroups: r.reviewGroups?.map(g => ({ ...g, reviewer: undefined })),
       e2e: r.e2e && { ...r.e2e, checks: r.e2e.checks?.map(k => ({ ...k, runner: undefined, running: undefined })) },
     }
@@ -4967,7 +4971,8 @@ async function judgeFile($: EngineInterface, c: Ctx, file: string, result: ToolC
   const check = c.run.stage === "qa-integration" && c.run.e2e?.path !== "ego" ? runnerCheck(c.run, c.agentId) : undefined
   if (check && file === resultOf(check)) return runnerResult($, c, check, result)
   if (c.run.stage === "spec" && file === "agent/grade.md") return gradeExit($, c, result)
-  if (c.run.stage === "spec" && file === "1-mockup.html") return sketchExit($, c, result)
+  if (c.run.stage === "spec" && file === TOBE_FILE) return tobeExit($, c, result)
+  if (c.run.stage === "spec" && file === ASIS_FILE) return asIsExit($, c, result)
   if (c.run.stage === "spec" && file === SPEC_VERDICT) return layoutVerifyExit($, c, result)
   if (c.run.stage === "dev" && file === "agent/dev-items.md") return devExit($, c, result)
   if (c.run.stage === "dev" && file === "agent/deviation.md") return deviationExit($, c, result)
@@ -5028,9 +5033,45 @@ async function gradeExit($: EngineInterface, c: Ctx, result: ToolCallResult): Pr
   return withContext(result, gradeSummary(grades, text))
 }
 
-// right after the sketcher's 1-mockup.html went through: the hook records
-// which 1-spec.md it drew and what it wrote, so advance can tell when the
-// picture is older than the spec. The first drawing of the run, and each
+// 1-mockup.html made from the to-be and the as-is (lib/mockup.ts), or why not.
+async function joinFiles($: EngineInterface, dir: string): Promise<{ html: string } | { problem: string }> {
+  const asis = (await $.fs.exists(`${dir}/${ASIS_FILE}`)) ? await $.fs.read(`${dir}/${ASIS_FILE}`) : ""
+  const joined = joinMockup(await $.fs.read(`${dir}/${TOBE_FILE}`), asis)
+  if ("html" in joined) await $.fs.write(`${dir}/1-mockup.html`, joined.html)
+  return joined
+}
+
+// right after the sketcher's agent/tobe.html went through: the hook joins
+// it with the as-is into 1-mockup.html, or tells the sketcher why not.
+async function tobeExit($: EngineInterface, c: Ctx, result: ToolCallResult): Promise<ToolCallResult> {
+  if (c.agentId === undefined || c.agentId !== c.run.sketcher) return result
+  const joined = await joinFiles($, c.dir)
+  if ("problem" in joined) {
+    await trace($, c.run, { ev: "sketch-join", stage: "spec", agentId: c.agentId, problem: joined.problem })
+    return withContext(result, `1-mockup.html was not made from it: ${joined.problem}. Write ${c.dir}/${TOBE_FILE} again, whole.`)
+  }
+  return sketchExit($, c, result)
+}
+
+// right after rein:as-is's agent/asis.html went through: once the to-be is
+// drawn, 1-mockup.html is made again with the new as-is, and it stays the
+// sketcher's drawing of 1-spec.md.
+async function asIsExit($: EngineInterface, c: Ctx, result: ToolCallResult): Promise<ToolCallResult> {
+  if (c.agentId === undefined || c.agentId !== c.run.asIs) return result
+  await trace($, c.run, { ev: "as-is", stage: "spec", agentId: c.agentId, screens: await asIsDrawn($, c.dir) })
+  if (!(await $.fs.exists(`${c.dir}/${TOBE_FILE}`))) return result
+  const mockup = `${c.dir}/1-mockup.html`
+  const was = (await $.fs.exists(mockup)) ? await sha256Text(await $.fs.read(mockup)) : undefined
+  const joined = await joinFiles($, c.dir)
+  if ("problem" in joined) return withContext(result, `1-mockup.html was not made again with it: ${joined.problem}. Keep the section of every screen you were not asked to draw.`)
+  const html = await sha256Text(joined.html)
+  await mutate($, r => (r?.stage === "spec" && r.sketched !== undefined && r.sketched.html === was ? { ...r, sketched: { ...r.sketched, html } } : undefined))
+  return result
+}
+
+// once the to-be is joined into 1-mockup.html, the hook records which
+// 1-spec.md the sketcher drew and what 1-mockup.html became, so advance can
+// tell when the picture is older than the spec. The first drawing of the run, and each
 // drawing of a comparison under way, is compared with its planning-document
 // picture; a drawing redone for an answer is not, until advance.
 async function sketchExit($: EngineInterface, c: Ctx, result: ToolCallResult): Promise<ToolCallResult> {
@@ -5165,9 +5206,10 @@ async function layoutVerifyExit($: EngineInterface, c: Ctx, result: ToolCallResu
   return withContext(result, `The to-be differs from the planning-document picture (${where}). Spawn ${SKETCHER} again, in the foreground: the hook gives it ${SPEC_VERDICT}. Its drawing is compared again.`)
 }
 
-// the sketcher draws 1-mockup.html in spec, on the hook's task, the main
-// session's prompt dropped, so nothing of the conversation reaches it. The
-// last one spawned is recorded and the only one that writes. The first
+// the sketcher draws the to-be of 1-mockup.html in spec, on the hook's
+// task, the main session's prompt dropped, so nothing of the conversation
+// reaches it; never before rein:as-is drew every screen of `## 화면` it
+// draws on. The last one spawned is recorded and the only one that writes. The first
 // drawing and a drawing of a comparison under way run in the foreground,
 // since the comparison follows them; a drawing redone for an answer runs as
 // the main session spawned it, in the background while the questions go on.
@@ -5175,12 +5217,15 @@ async function spawnSketcher($: EngineInterface, run: Run, e: AgentSpawnInput, n
   if (run.stage !== "spec") return { deny: `${SKETCHER} draws 1-mockup.html in the spec stage only; the run is in ${run.stage}.` }
   const dir = await folderOf($, "active", run.runId)
   if (!(await $.fs.exists(`${dir}/1-spec.md`))) return { deny: `${dir}/1-spec.md does not exist yet. Write it, then spawn ${SKETCHER}.` }
+  const drawn = await asIsDrawn($, dir)
+  const missing = asIsWanted(screenRows(await $.fs.read(`${dir}/1-spec.md`))).filter(id => !drawn.includes(id))
+  if (missing.length > 0) return { deny: `${dir}/${ASIS_FILE} has no as-is of ${missing.map(id => `#${id}`).join(", ")}, which \`## 화면\` of 1-spec.md lists. Spawn ${AS_IS} first (a short prompt does: the hook writes its task), then ${SKETCHER}.` }
   // a to-be that came out different from its planning-document picture is
   // drawn again with what differs.
   const check = run.sketchCheck
   const looping = check?.state === "differ"
   const redraw = looping ? redrawLines(dir, check.fails, Object.keys(check.shots).map(id => `${MOCKUP_SHOTS}/${id}.boxes.txt`)) : []
-  const prompt = await withKnowledge($, sketcherTask(dir, redraw), SKETCHER_USE, run)
+  const prompt = sketcherTask(dir, redraw)
   const background = run.sketched !== undefined && !looping && e.background
   const result = await next({ ...e, prompt, background })
   if (result.deny !== undefined || result.agentId === undefined) return result
@@ -5193,6 +5238,43 @@ async function spawnSketcher($: EngineInterface, run: Run, e: AgentSpawnInput, n
   } catch (err) {
     // The agent started; without its id recorded its 1-mockup.html is refused.
     await trace($, run, { ev: "error", stage: "spec", agent: SKETCHER, agentId, error: String(err) })
+  }
+  return result
+}
+
+// the screens agent/asis.html draws the as-is of.
+async function asIsDrawn($: EngineInterface, dir: string): Promise<string[]> {
+  return (await $.fs.exists(`${dir}/${ASIS_FILE}`)) ? Object.keys(asIsBlocks(await $.fs.read(`${dir}/${ASIS_FILE}`))) : []
+}
+
+// rein:as-is draws the as-is of the screens of `## 화면` in spec, on the
+// hook's task: that section, never the rest of 1-spec.md or the
+// conversation. It draws the screens agent/asis.html lacks; with none
+// lacking, the user said a drawn one differs from the real screen, and the
+// main session's prompt, which names it, goes into the task. It runs in the
+// foreground: the sketcher draws on it. The last one spawned is recorded
+// and the only one that writes.
+async function spawnAsIs($: EngineInterface, run: Run, e: AgentSpawnInput, next: (e: AgentSpawnInput) => Promise<AgentSpawnResult>): Promise<AgentSpawnResult> {
+  if (run.stage !== "spec") return { deny: `${AS_IS} draws the as-is of 1-mockup.html in the spec stage only; the run is in ${run.stage}.` }
+  const dir = await folderOf($, "active", run.runId)
+  if (!(await $.fs.exists(`${dir}/1-spec.md`))) return { deny: `${dir}/1-spec.md does not exist yet. Write it with its \`## 화면\`, then spawn ${AS_IS}.` }
+  const text = await $.fs.read(`${dir}/1-spec.md`)
+  const wanted = asIsWanted(screenRows(text))
+  if (wanted.length === 0) return { deny: `\`## 화면\` of 1-spec.md lists no screen with an as-is: a row whose 종류 is \`변경\`, or \`새 화면, 따를 화면 <id>\`. Fill it, then spawn ${AS_IS}.` }
+  const drawn = await asIsDrawn($, dir)
+  const draw = wanted.filter(id => !drawn.includes(id))
+  const prompt = await withKnowledge($, asIsTask(dir, text, draw, drawn, e.prompt ?? ""), AS_IS_USE, run)
+  const result = await next({ ...e, prompt, background: false })
+  if (result.deny !== undefined || result.agentId === undefined) return result
+  const agentId = result.agentId
+  reinAgents.add(agentId)
+  asIsAgents.add(agentId)
+  try {
+    const moved = await mutate($, r => (r?.stage === "spec" ? { ...r, asIs: agentId } : undefined))
+    if (moved) await trace($, moved, { ev: "spawn", stage: "spec", agent: AS_IS, agentId, screens: draw })
+  } catch (err) {
+    // The agent started; without its id recorded its agent/asis.html is refused.
+    await trace($, run, { ev: "error", stage: "spec", agent: AS_IS, agentId, error: String(err) })
   }
   return result
 }
@@ -5708,6 +5790,7 @@ export const register: Register = (on) => {
     if (run?.stage === "qa-integration" && e.subagentType === LAYOUT_VERIFIER) return spawnLayoutJudge($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
     if (run && e.subagentType === LAYOUT_VERIFIER) return spawnLayoutVerifier($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
     if (run && e.subagentType === SKETCHER) return spawnSketcher($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
+    if (run && e.subagentType === AS_IS) return spawnAsIs($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
     if (run && e.subagentType === IMPACT) return spawnImpact($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
     // the collator reads the images pasted since the run opened, so they are
     // saved to brief/ before it starts.
@@ -5851,7 +5934,7 @@ export const register: Register = (on) => {
 
     const as = typeof agentId === "string" ? agentId : undefined
     // a hand-back carries the agent's report to the session and is never
-    // refused by the grader's, sketcher's or layout verifier's list below.
+    // refused by the grader's, sketcher's, as-is's or layout verifier's list below.
     const handback = (tool as string) === "SubagentHandback"
     // a grader reads 1-spec.md and writes grade.md (the stage rule judges
     // the write), nothing else; it sees the file, not the conversation.
@@ -5869,10 +5952,18 @@ export const register: Register = (on) => {
         return failClosed($, run, tool, err)
       }
     }
-    // a sketcher reads the spec and the code and writes 1-mockup.html (the
-    // stage rule judges the write); every other tool is refused.
-    if (as !== undefined && sketchers.has(as) && !handback && !["Read", "Grep", "Glob", "Write"].includes(tool as string)) {
-      const deny = `the sketcher reads with Read, Grep and Glob and writes 1-mockup.html with Write; ${tool as string} is refused.`
+    // a sketcher reads the spec, the as-is and the pictures and writes
+    // agent/tobe.html (the stage rule judges the write); it searches no
+    // code, and every other tool is refused.
+    if (as !== undefined && sketchers.has(as) && !handback && !["Read", "Write"].includes(tool as string)) {
+      const deny = `the sketcher reads with Read and writes agent/tobe.html with Write; ${tool as string} is refused.`
+      await trace($, run, { ev: "tool", stage: run.stage, tool, agentId, decision: "deny", deny })
+      return { deny }
+    }
+    // rein:as-is reads the code and writes agent/asis.html (the stage rule
+    // judges the write); every other tool is refused.
+    if (as !== undefined && asIsAgents.has(as) && !handback && !["Read", "Grep", "Glob", "Write", "Edit"].includes(tool as string)) {
+      const deny = `rein:as-is reads with Read, Grep and Glob and writes agent/asis.html with Write or Edit; ${tool as string} is refused.`
       await trace($, run, { ev: "tool", stage: run.stage, tool, agentId, decision: "deny", deny })
       return { deny }
     }

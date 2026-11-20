@@ -108,7 +108,7 @@ describe("domain knowledge (D211)", () => {
     expect(shown).not.toContain(INDEX)
     expect(shown).toContain(`Domain knowledge (D211): 4 files and folders, each with its description, listed in ${DIR}/agent/knowledge.md.`)
     expect(files[`${DIR}/agent/knowledge.md`]).toContain(INDEX)
-    expect(files[`${DIR}/agent/knowledge.md`]).toContain("The main session, rein:sketcher, rein:worker, rein:arbiter and rein:test-planner use it.")
+    expect(files[`${DIR}/agent/knowledge.md`]).toContain("The main session, rein:as-is, rein:worker, rein:arbiter and rein:test-planner use it.")
     // a knowledge file added later reaches the index at the next status.
     files[`${KNOW}/spring/new.md`] = "---\ndescription: 새 지식\n---\n"
     expect(await status($)).toContain("5 files and folders")

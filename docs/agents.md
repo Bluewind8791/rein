@@ -19,7 +19,8 @@
 |---|---|---|---|
 | `rein:slug` | spec | 요청을 보고 runId 슬러그 생성 | haiku |
 | `rein:grader` | spec | `1-spec.md`만 읽고 모호도 채점 → `grade.md` | sonnet |
-| `rein:sketcher` | spec | `1-mockup.html` 그림. 화면마다 as-is와 to-be(늘 화면 전체), to-be 요소마다 `data-id`와 질문·미해결·규칙 핀. 답과 사용자 코멘트마다 다시 그리고, to-be는 기획서 화면 그림을 보고 배치를 맞춤 | sonnet |
+| `rein:as-is` | spec | `## 화면` 표, 도메인 지식, 코드만 보고 화면마다 현행(as-is) 전체와 서비스 스타일 → `agent/asis.html`. 첫 그림 때 한 번, 더한 화면과 사용자가 다르다고 한 화면만 다시 | sonnet |
+| `rein:sketcher` | spec | `1-spec.md`, 기획서 그림, as-is만 보고(코드 안 봄) to-be(늘 화면 전체) → `agent/tobe.html`, 훅이 as-is와 합쳐 `1-mockup.html`. to-be 요소마다 `data-id`와 질문·미해결·규칙 핀. spec에 없는 것은 지어내지 않고 답에 적음. 답과 사용자 코멘트마다 다시 그리고, 기획서 화면 그림을 보고 배치를 맞춤 | sonnet |
 | `rein:layout-verifier` | spec, qa-integration | spec: 렌더링한 to-be와 기획서 그림을 화면마다 비교 → `layout-verify.md`(맞음/다름). 통합 qa: 배치 체크(`배치-<id>`)의 judge로 구현 화면 스크린샷과 to-be를 비교 → `judge.md` | sonnet |
 | `rein:collator` | spec | 기획서 원본과 `## 기획서 대조`를 맞춰 빠지거나 다른 요구사항을 답함. 파일을 쓰지 않음 | 상속 |
 | `rein:planner` | plan | 설계 → `2-plan.md` | 상속 |

@@ -13,6 +13,9 @@ import { DIR, gitSub, grade, ran, relay, SPEC_TEXT, spawned, store, world, type 
 const SPEC = `${DIR}/1-spec.md`
 const HTML = `${DIR}/1-mockup.html`
 const VERDICT = `${DIR}/agent/layout-verify.md`
+const TOBE = `${DIR}/agent/tobe.html`
+const ASIS = `${DIR}/agent/asis.html`
+const AS_IS_HTML = '<section class="screen" id="dash0101"><div class="before">지금</div></section>'
 const SHOTS = `${DIR}/agent/layout/mockup`
 const ADVANCE = { tool: "mcp__rein__advance" } as never
 const TO_BE = (source = "<!-- to-be source: brief/기획서.pdf (3쪽) -->") =>
@@ -23,10 +26,11 @@ const refused = (text: string) => expect.objectContaining({ deny: expect.stringC
 const spawnAs = async ($: { agent: { spawn: (e: never) => Promise<unknown> } }, type: string, description = "go") =>
   ((await $.agent.spawn({ tool_use_id: "s", prompt: "the user said a lot", description, subagentType: type } as never)) as { agentId?: string; deny?: string })
 type Engine = { agent: { spawn: (e: never) => Promise<unknown> }; tool: { call: (e: never) => Promise<unknown> } }
-// a sketcher spawned with to-be writes the drawing; what its Write returned.
+// a sketcher spawned with to-be writes the drawing, its as-is left to the
+// hook, which makes 1-mockup.html of it; what its Write returned.
 const sketch = async ($: Engine, html = TO_BE()) => {
   const { agentId } = await spawnAs($, "rein:sketcher", "to-be")
-  return $.tool.call({ tool: "Write", file_path: HTML, content: html, agentId } as never)
+  return $.tool.call({ tool: "Write", file_path: TOBE, content: html.replace('<div class="before">지금</div>', "<!-- rein:as-is dash0101 -->"), agentId } as never)
 }
 // a verifier spawned on the hook's ask writes its verdict; what its Write returned.
 const verify = async ($: Engine, body: string) => {
@@ -70,7 +74,7 @@ describe("the layout check's pieces", () => {
 
 describe("spec's layout check", () => {
   test("a to-be drawn from a picture is rendered and the main session is told to have it compared", async ($, on) => {
-    world(on, { [SPEC]: SPEC_TEXT }, undefined, undefined, renders)
+    world(on, { [SPEC]: SPEC_TEXT, [ASIS]: AS_IS_HTML }, undefined, undefined, renders)
     const r = await sketch($)
     expect(ran.find(c => c.argv[1]?.endsWith("hooks/render-mockup.js"))?.argv.slice(2)).toEqual([HTML, SHOTS, "dash0101"])
     expect(context(r)).toContain("The to-be of #dash0101 is drawn from a planning-document picture. Spawn rein:layout-verifier")
@@ -78,14 +82,14 @@ describe("spec's layout check", () => {
   })
 
   test("a drawing that names no picture is not checked", async ($, on) => {
-    world(on, { [SPEC]: SPEC_TEXT }, undefined, undefined, renders)
+    world(on, { [SPEC]: SPEC_TEXT, [ASIS]: AS_IS_HTML }, undefined, undefined, renders)
     const r = await sketch($, TO_BE(""))
     expect(context(r)).not.toContain("layout-verifier")
     expect(record().sketchCheck).toBeUndefined()
   })
 
   test("the verifier is spawned only when asked, on the hook's task, reads and writes its verdict alone", async ($, on) => {
-    world(on, { [SPEC]: SPEC_TEXT }, undefined, undefined, renders)
+    world(on, { [SPEC]: SPEC_TEXT, [ASIS]: AS_IS_HTML }, undefined, undefined, renders)
     expect(await spawnAs($, "rein:layout-verifier")).toEqual(refused("only when the hook asks for it in spec"))
     await sketch($)
     const { agentId } = await spawnAs($, "rein:layout-verifier")
@@ -111,7 +115,7 @@ describe("spec's layout check", () => {
 
   test("a drawing that differs goes back to the sketcher with what differs, measured from the third, and stops at the fifth", async ($, on) => {
     const questions: string[] = []
-    world(on, { [SPEC]: SPEC_TEXT }, q => (questions.push(q), undefined), undefined, renders)
+    world(on, { [SPEC]: SPEC_TEXT, [ASIS]: AS_IS_HTML }, q => (questions.push(q), undefined), undefined, renders)
     await sketch($)
     expect(context(await verify($, DIFFER))).toContain("The to-be differs from the planning-document picture (#dash0101: 도넛 차트: 그림은 오른쪽 위, 목업은 왼쪽 아래). Spawn rein:sketcher again, in the foreground")
     expect(record().sketchCheck).toEqual(expect.objectContaining({ state: "differ", fails: 1 }))
@@ -136,7 +140,7 @@ describe("spec's layout check", () => {
 
   test("a drawing that got no closer stops the redrawing, as the verifier judges from the last differences", async ($, on) => {
     const questions: string[] = []
-    world(on, { [SPEC]: SPEC_TEXT }, q => (questions.push(q), undefined), undefined, renders)
+    world(on, { [SPEC]: SPEC_TEXT, [ASIS]: AS_IS_HTML }, q => (questions.push(q), undefined), undefined, renders)
     await sketch($)
     const first = await spawnAs($, "rein:layout-verifier")
     expect(spawned.at(-1)!.prompt ?? "").not.toContain("진전")
@@ -159,7 +163,7 @@ describe("spec's layout check", () => {
 
   test("a drawing redone for an answer is not compared until advance, which compares it before the user is asked", async ($, on) => {
     const questions: string[] = []
-    const files: Record<string, string> = { [SPEC]: SPEC_TEXT }
+    const files: Record<string, string> = { [SPEC]: SPEC_TEXT, [ASIS]: AS_IS_HTML }
     world(on, files, q => (questions.push(q), undefined), undefined, renders)
     await sketch($)
     await verify($, MATCH)
@@ -180,7 +184,7 @@ describe("spec's layout check", () => {
 
   test("a match after a difference starts the count again, and approval says it matches", async ($, on) => {
     const questions: string[] = []
-    world(on, { [SPEC]: SPEC_TEXT }, q => (questions.push(q), undefined), undefined, renders)
+    world(on, { [SPEC]: SPEC_TEXT, [ASIS]: AS_IS_HTML }, q => (questions.push(q), undefined), undefined, renders)
     await sketch($)
     await verify($, DIFFER)
     await sketch($)
@@ -194,7 +198,7 @@ describe("spec's layout check", () => {
   test("without a browser the check is skipped, and the user is told", async ($, on) => {
     const questions: string[] = []
     const none: Host = { run: argv => (argv[1]?.endsWith("hooks/render-mockup.js") ? { exitCode: 2, stdout: JSON.stringify({ error: "no Chrome or Edge found" }) + "\n" } : { exitCode: 0 }) }
-    world(on, { [SPEC]: SPEC_TEXT }, q => (questions.push(q), undefined), undefined, none)
+    world(on, { [SPEC]: SPEC_TEXT, [ASIS]: AS_IS_HTML }, q => (questions.push(q), undefined), undefined, none)
     const r = await sketch($)
     expect(context(r)).toContain("the hook could not render it to compare (no Chrome or Edge found)")
     expect(record().sketchCheck).toEqual(expect.objectContaining({ state: "unrendered", why: "no Chrome or Edge found" }))

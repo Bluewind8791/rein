@@ -80,7 +80,8 @@ export type Run = {
   planVerdicts?: PlanVerdict[] // this visit's design reviews of 2-plan.md, oldest first; gone when plan passes or goto moves the run
   grader?: string // agentId of the rein:grader spawned in spec
   sketcher?: string // agentId of the rein:sketcher spawned last in spec
-  sketched?: { spec: string; html: string } // sha256 of 1-spec.md and of 1-mockup.html when the sketcher last wrote it; either one changed since means the picture is not of 1-spec.md as it is
+  asIs?: string // agentId of the rein:as-is spawned last in spec
+  sketched?: { spec: string; html: string } // sha256 of 1-spec.md and of 1-mockup.html when the hook last made it from the sketcher's agent/tobe.html; either one changed since means the picture is not of 1-spec.md as it is
   layoutChecks?: Check[] // the ego checks of integration qa made from `## 배치 대조`, one per to-be screen whose box was empty at the entry
   layoutFails?: Record<string, number> // per to-be screen, the layout checks in a row that found the screen as built different from the to-be
   sketchCheck?: SketchCheck // the to-be screens drawn from a planning-document picture, and rein:layout-verifier's comparison of the last drawing with it
@@ -248,7 +249,8 @@ export function renderRun(run: Run): string {
   if (run.planReviewer && run.planReview) lines.push(`plan reviewer: ${run.planReviewer} (gives its verdict through mcp__rein__plan_review)`)
   for (const [i, v] of (run.planVerdicts ?? []).entries()) lines.push(`design review ${i + 1}: ${v.pass ? "통과" : "실패"}`)
   if (run.grader) lines.push(`grader: ${run.grader} (may write grade.md)`)
-  if (run.sketcher) lines.push(`sketcher: ${run.sketcher} (may write 1-mockup.html)`)
+  if (run.asIs) lines.push(`as-is: ${run.asIs} (may write agent/asis.html)`)
+  if (run.sketcher) lines.push(`sketcher: ${run.sketcher} (may write agent/tobe.html)`)
   if (run.sketchCheck) lines.push(`layout check of 1-mockup.html: ${run.sketchCheck.state}${run.sketchCheck.agent ? `, rein:layout-verifier ${run.sketchCheck.agent} on it` : ""}${run.sketchCheck.fails > 0 ? `, ${run.sketchCheck.fails} drawings in a row differed` : ""}`)
   if (run.verifier) lines.push(`verifier: ${run.verifier}`)
   if (run.deviation) lines.push(`deviation: ${run.deviation.verdict} (${run.deviation.file})`)

@@ -315,7 +315,7 @@ describe("open_run", () => {
   test("the result lists this project's deferred runs", async ($, on) => {
     world(on, oldFiles("defer"), undefined, null, { store: { "runs:proj/old-run": { ...OLD, status: "defer" } } })
     const r = await $.tool.call(OPEN("new-one"))
-    expect(r).toEqual(expect.objectContaining({ result: `Run opened. runId: new-one. Write the spec to ${REIN}/active/new-one/1-spec.md, the only file this stage may write; rein:sketcher draws ${REIN}/active/new-one/1-mockup.html beside it when a picture helps (D158).` }))
+    expect(r).toEqual(expect.objectContaining({ result: `Run opened. runId: new-one. Write the spec to ${REIN}/active/new-one/1-spec.md, the only file this stage may write; rein:as-is and rein:sketcher draw ${REIN}/active/new-one/1-mockup.html beside it when a picture helps (D158).` }))
     expect(context(r)).toContain("D147: this project has deferred runs:\n- old-run: 리뷰 상세 블록 삭제 (stage land, deferred)")
   })
 })

@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  1-mockup.html scaffold. rein:sketcher copies this file and fills it from 1-spec.md and the code.
-  - Replace every FILL marker (FILL comments, FILL in an id, a data-id or the title) and delete every
-    EXAMPLE section that does not apply. No FILL marker or EXAMPLE comment may be left in 1-mockup.html.
+  1-mockup.html scaffold. rein:sketcher copies this file to agent/tobe.html and fills the to-be
+  from 1-spec.md and the as-is (agent/asis.html, drawn by rein:as-is); the hook joins the two.
+  - Replace every FILL marker (FILL comments, FILL in an id, a data-id, an as-is marker or the
+    title) and delete every EXAMPLE section that does not apply. No FILL marker or EXAMPLE comment
+    may be left.
+  - The as-is is never drawn here: a screen's .compare holds the marker of its as-is (see EXAMPLE
+    A), which the hook replaces with that screen's .before from agent/asis.html.
   - The shell (header, legend, pins, .screen, .compare, .phone) keeps the variables below and
     follows light and dark. A screen itself is drawn inside .canvas, in the service's own look.
   - In the to-be, each element a comment could be about (a region, a table, a column header, a
@@ -143,6 +147,7 @@
   .rein-frame.rein-show-both .frame-label { display: block; }
   .frame-label { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 8px; }
   .frame-label::before { content: "현재 화면 (as-is) · "; color: var(--muted); }
+  .frame-label.follows::before { content: "참고 화면 (as-is) · "; }
   /* the as-is alone: its label, and no to-be pins */
   .rein-frame.rein-show-before .screen:has(.after) > h2::before { content: "현재 화면 (as-is) · "; color: var(--muted); }
   .rein-frame.rein-show-before .screen > p.muted { display: block; }
@@ -162,8 +167,9 @@
   .rein-commenting .screen { cursor: crosshair; }
   .rein-pick { outline: 2px solid var(--accent) !important; outline-offset: 2px !important; }
 
-  /* FILL: the service's look, read from its stylesheets (the source as a comment above each
-     group). Every selector starts with .canvas, so the shell keeps its own look. */
+  /* FILL: only the parts the as-is does not have. The hook puts the as-is's <style> (the
+     service's look, read from its stylesheets) right before this block. Every selector starts
+     with .canvas, so the shell keeps its own look. */
 </style>
 </head>
 <body>
@@ -199,11 +205,7 @@
         <span class="pin ask" tabindex="0"><span class="pin-note"><b>질문 예정</b><!-- FILL: a [?] about the screen as a whole --></span></span>
       </span></h2>
     <div class="compare">
-      <div class="before">
-        <span class="tag">AS-IS (현행)</span>
-        <!-- as-is source: FILL path:line, path:line -->
-        <div class="canvas"><!-- FILL: the screen as it is now, or only the regions that change --></div>
-      </div>
+      <!-- rein:as-is FILL-screen-code -->
       <div class="compare-arrow">▼</div>
       <div class="after">
         <span class="tag">TO-BE</span>
@@ -231,7 +233,24 @@
   </section>
 
   <!-- ================================================================== -->
-  <!-- EXAMPLE B: a new mobile screen, nothing before it.                 -->
+  <!-- EXAMPLE B: a new screen that follows another (## 화면: 새 화면,     -->
+  <!-- 따를 화면 <id>): the as-is of the screen it follows, for reference.  -->
+  <!-- ================================================================== -->
+  <section class="screen" id="FILL-screen-code">
+    <h2><!-- FILL: 화면 이름 --><span class="anchor">#FILL-screen-code</span></h2>
+    <p class="muted">현행 없음 — 새 화면, <!-- FILL: 따를 화면 이름 -->을 따름</p>
+    <div class="compare">
+      <!-- rein:as-is FILL-followed-screen-code -->
+      <div class="compare-arrow">▼</div>
+      <div class="after">
+        <span class="tag">TO-BE</span>
+        <div class="canvas"><!-- FILL: the screen as 1-spec.md describes it, with data-id as in EXAMPLE A --></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <!-- EXAMPLE C: a new mobile screen that follows none, nothing before it. -->
   <!-- A desktop screen leaves out the .phone frame.                       -->
   <!-- ================================================================== -->
   <section class="screen" id="FILL-screen-code">
@@ -244,7 +263,7 @@
   </section>
 
   <!-- ================================================================== -->
-  <!-- EXAMPLE C: a flow, states or how data moves, in inline SVG.          -->
+  <!-- EXAMPLE D: a flow, states or how data moves, in inline SVG.          -->
   <!-- ================================================================== -->
   <section class="screen" id="FILL-flow-name">
     <h2><!-- FILL: 흐름 이름 --><span class="anchor">#FILL-flow-name</span></h2>
@@ -260,7 +279,7 @@
   </section>
 
   <!-- ================================================================== -->
-  <!-- EXAMPLE D: open questions that belong to no screen or flow above.    -->
+  <!-- EXAMPLE E: open questions that belong to no screen or flow above.    -->
   <!-- ================================================================== -->
   <section class="screen" id="open-questions">
     <h2>화면 밖의 미해결 질문<span class="anchor">#open-questions</span></h2>
@@ -347,9 +366,10 @@
       return s.trim()
     }
     ;[].forEach.call(document.querySelectorAll(".screen > .compare > .before"), function (b) {
-      var sec = b.closest(".screen"), label = document.createElement("div")
-      label.className = "frame-label"
-      label.textContent = nameOf(sec) + " #" + sec.id
+      var sec = b.closest(".screen"), label = document.createElement("div"), follows = sec.querySelector(":scope > p.muted")
+      // a new screen shows the as-is of the screen it follows, under that line
+      label.className = follows ? "frame-label follows" : "frame-label"
+      label.textContent = follows ? follows.textContent : nameOf(sec) + " #" + sec.id
       b.insertBefore(label, b.firstChild)
     })
     // a screen wider than the column is scaled down to it

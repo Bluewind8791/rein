@@ -1,17 +1,25 @@
 import { parseGrade, parseImpacts, type GradeDim } from "../lib/parse.ts"
 import { SPEC_VERDICT } from "../lib/layout.ts"
+import { ASIS_FILE, TOBE_FILE } from "../lib/mockup.ts"
 import { same } from "../lib/paths.ts"
+import { quoted } from "../lib/quote.ts"
 import type { Grade, StageSpec } from "../lib/state.ts"
 import { completionLine, sectionText } from "./qaIntegration.ts"
 
 // the Rein agents' row in spec: grade.md only, by the rein:grader the hook
-// recorded for the current 1-spec.md; 1-mockup.html only, by the rein:sketcher
-// it recorded last (register.ts refuses their every other tool). The main
-// session writes 1-spec.md as it likes; the run leaves spec through advance.
+// recorded for the current 1-spec.md; agent/tobe.html only, by the
+// rein:sketcher it recorded last, and agent/asis.html only, by the rein:as-is
+// it recorded last (register.ts refuses their every other tool, and joins
+// the two into 1-mockup.html). The main session writes 1-spec.md as it
+// likes; the run leaves spec through advance.
 export const spec: StageSpec = {
   write(path, c) {
-    if (path !== undefined && same(path, `${c.dir}/1-mockup.html`) && c.agentId !== undefined && c.agentId === c.run.sketcher) return { allow: true }
-    if (c.agentId !== undefined && c.agentId === c.run.sketcher) return { deny: `the sketcher writes ${c.dir}/1-mockup.html and nothing else.` }
+    if (c.agentId !== undefined && c.agentId === c.run.sketcher) {
+      return path !== undefined && same(path, `${c.dir}/${TOBE_FILE}`) ? { allow: true } : { deny: `the sketcher writes ${c.dir}/${TOBE_FILE} and nothing else; the hook makes 1-mockup.html from it.` }
+    }
+    if (c.agentId !== undefined && c.agentId === c.run.asIs) {
+      return path !== undefined && same(path, `${c.dir}/${ASIS_FILE}`) ? { allow: true } : { deny: `rein:as-is writes ${c.dir}/${ASIS_FILE} and nothing else.` }
+    }
     if (c.agentId !== undefined && c.agentId === c.run.sketchCheck?.agent) {
       return path !== undefined && same(path, `${c.dir}/${SPEC_VERDICT}`) ? { allow: true } : { deny: `the layout verifier writes ${c.dir}/${SPEC_VERDICT} and nothing else.` }
     }
@@ -31,22 +39,70 @@ export const spec: StageSpec = {
     return parsed.ok ? undefined : `D175: ${parsed.reason}`
   },
 
-  artifacts: ["agent/grade.md", "1-mockup.html", SPEC_VERDICT],
+  artifacts: ["agent/grade.md", TOBE_FILE, ASIS_FILE, SPEC_VERDICT],
 }
 
 // the sketcher's whole task, built by the hook at agent.spawn in place of
 // whatever the main session wrote, so nothing of the conversation reaches it.
-// Every drawing is the same: the as-is and the to-be of each screen, the
-// to-be redrawn as answers come in.
+// Every drawing is the same: the to-be of each screen, redrawn as answers
+// come in, on the as-is rein:as-is drew once.
 export function sketcherTask(dir: string, redraw: string[] = []): string {
   return [
-    `Draw ${dir}/1-mockup.html. You did not see the conversation that produced the spec: draw only what ${dir}/1-spec.md says, what the planning document's pictures it names show, and what the code shows.`,
+    `Draw the to-be of ${dir}/1-mockup.html. You did not see the conversation that produced the spec: draw only what ${dir}/1-spec.md says, what the planning document's pictures it names show, and the as-is in ${dir}/${ASIS_FILE}. You read no code.`,
     "",
-    `Read ${dir}/1-spec.md first. Then read the code it cites, and the code you find, for the as-is.`,
-    "Rewrite the file whole: the as-is above and the to-be below for each screen that changes. Each [?] of 1-spec.md is a yellow pin on the to-be where it belongs, and each line of ## 미해결 질문 a red pin. Where `## 기획서 대조` names a picture of the screen (its `원본:` line, a file in the run folder), open it with Read and draw the to-be's layout as the picture lays it out, with `<!-- to-be source: <its path relative to the run folder> (<page>) -->` inside that screen's section.",
+    `Read ${dir}/1-spec.md first, then ${dir}/${ASIS_FILE} when it exists: the as-is of each screen of \`## 화면\`, drawn already, with the service's look in its <style>.`,
+    "Write the page whole: the to-be of each screen of `## 화면`, with `<!-- rein:as-is <id> -->` where its as-is goes (for a new screen, the id of the screen it follows); the hook puts the as-is there. Each [?] of 1-spec.md is a yellow pin on the to-be where it belongs, and each line of ## 미해결 질문 a red pin. Where `## 기획서 대조` names a picture of the screen (its `원본:` line, a file in the run folder), open it with Read and draw the to-be's layout as the picture lays it out, with `<!-- to-be source: <its path relative to the run folder> (<page>) -->` inside that screen's section.",
+    "What the to-be needs and none of these says (a label, a value, a rule), leave as it is in the as-is and name it on the `spec에 없음:` line of your answer; never make it up.",
     ...redraw,
     "",
-    `Write ${dir}/1-mockup.html, whole, with Write; the hook refuses every other write and every tool but Read, Grep, Glob and Write. Then answer in the form your instructions give, and stop.`,
+    `Write ${dir}/${TOBE_FILE}, whole, with Write; the hook refuses every other write and every tool but Read and Write, and makes ${dir}/1-mockup.html from it and the as-is. Then answer in the form your instructions give, and stop.`,
+  ].join("\n")
+}
+
+// one row of 1-spec.md's `## 화면`: `| id | 이름 | URL | 진입 파일 | 종류 |`.
+// follows: the screen a new screen follows (`새 화면, 따를 화면 <id>`).
+export type ScreenRow = { id: string; kind: string; follows?: string }
+
+// the rows of `## 화면`, its header and separator left out.
+export function screenRows(text: string): ScreenRow[] {
+  return (sectionText(text, "화면")?.split(/\r?\n/) ?? [])
+    .filter(l => l.trim().startsWith("|"))
+    .map(l => l.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim()))
+    .filter(cells => !cells.every(c => /^:?-+:?$/.test(c)))
+    .slice(1)
+    .filter(cells => (cells[0] ?? "") !== "")
+    .map(cells => {
+      const kind = cells[4] ?? ""
+      const follows = /따를\s*화면\s*`?#?([^\s`,)]+)/.exec(kind)?.[1]
+      return { id: cells[0]!.replace(/^`?#?|`$/g, ""), kind, ...(follows ? { follows } : {}) }
+    })
+}
+
+// the screens whose as-is the mockup shows: each changed screen, and the
+// screen each new screen follows. A new screen that follows none has no as-is.
+export function asIsWanted(rows: ScreenRow[]): string[] {
+  return [...new Set(rows.flatMap(r => (r.follows ? [r.follows] : r.kind.startsWith("변경") ? [r.id] : [])))]
+}
+
+// rein:as-is's whole task, built by the hook at agent.spawn: `## 화면` cut
+// out of 1-spec.md, never the rest of it. draw: the screens agent/asis.html
+// lacks; none means the user said a drawn one differs from the real screen,
+// and the main session's words (note) name it.
+export function asIsTask(dir: string, specText: string, draw: string[], drawn: string[], note: string): string {
+  const what = draw.length > 0
+    ? [`Draw the as-is of ${draw.map(id => `#${id}`).join(", ")}: each screen as the code shows it now, whole.`]
+    : ["The user says the as-is of a screen differs from the real one. The main session's words, which name the screen and what differs:", quoted(note), "Draw again the screens they name, and only those, from the code."]
+  return [
+    `Draw the as-is screens of ${dir}/1-mockup.html into ${dir}/${ASIS_FILE}. You see neither 1-spec.md nor the conversation, only the screens of the run below; never read 1-spec.md.`,
+    "",
+    ...what,
+    "",
+    "The screens of the run, as the main session listed them (`## 화면` of 1-spec.md):",
+    "",
+    sectionText(specText, "화면") ?? "",
+    "",
+    ...(drawn.length > 0 ? [`${dir}/${ASIS_FILE} has the as-is of ${drawn.map(id => `#${id}`).join(", ")} already. Keep every section you are not asked to draw as it is: change the file with Edit, one section at a time.`, ""] : []),
+    `Write ${dir}/${ASIS_FILE} with Write, or change it with Edit; the hook refuses every other write and every tool but Read, Grep, Glob, Write and Edit. Then answer in the form your instructions give, and stop.`,
   ].join("\n")
 }
 
