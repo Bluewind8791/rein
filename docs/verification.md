@@ -58,6 +58,8 @@ sequenceDiagram
 | `groups` | splitter의 `review-groups.md`가 들어올 때 | 묶음마다 제목과 파일 수 |
 | `deviation` | 중재 판정이 들어올 때 | `합당`·`부당`, `agentId` (`D123`) |
 | `grade` | 채점이 들어올 때 | 훅이 낸 모호도, 그때까지의 질문 수, 차원마다 점수·깎임·빈칸, `agentId` (`D175`) |
+| `as-is` | `rein:as-is`의 `agent/asis.html`이 들어올 때 | `agentId`, 그 파일이 그린 화면 `id` 목록. 띄울 때의 `spawn` 줄에는 이번에 그릴 화면(`screens`) |
+| `sketch` | sketcher의 `agent/tobe.html`을 as-is와 합쳐 `1-mockup.html`을 쓸 때 | `agentId`. 합치지 못하면 대신 `sketch-join`과 이유(`problem`: 표식 없는 `.compare`, as-is에 없는 `id`) |
 | `ask` | `spec`에서 메인 세션의 질문이 답을 받을 때 | 지금까지의 질문 수 (`D175`). 거부된 질문은 `tool` `deny` 줄에 `rule: D175` |
 | `rerun` | 훅이 `advance`에서 `qa` 명령을 돌린 뒤 — 첫 실행 포함 | 저장소·명령·exit code (`D56`, `D153`). 묻지 않고 돌렸으면 `rule: D153`, 실패 뒤 사람에게 물어 돌렸으면 `rule: D143`과 답. 명령이 config를 고쳤으면 `configRewritten` (`D120`) |
 | `release` | 멈춘 run을 사람이 풀 때 | 단계, 멈춘 이유, 답 (`D132`, `D141`) |
