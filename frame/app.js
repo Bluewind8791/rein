@@ -148,6 +148,9 @@ function artifacts(r) {
   if (r.state === "active") {
     for (const [key, stage] of Object.entries(EXPECTED)) if (!map.has(key)) map.set(key, { key, stage, label: key, none: true, mtime: 0 })
   }
+  // the comments on 1-mockup.html not yet reflected
+  const mock = map.get("1-mockup")
+  if (mock) mock.cn = (r.comments || []).filter((c) => c && (c.status === "draft" || c.status === "sent")).length
   return [...map.values()].sort((a, b) => (a.key < b.key ? -1 : 1))
 }
 
@@ -228,12 +231,24 @@ function render() {
   renderHub()
   const mock = isMock(run)
   if (!mock) railOpen = false
+  const key = mock ? `${run.project}/${run.slug}` : null
+  if (cm.key !== key) {
+    clearTimeout(cm.timer)
+    cm = freshCm(key)
+  }
   document.querySelector(".body").classList.toggle("railed", mock && !railOpen)
   $("work").classList.toggle("left", mock)
   renderLeft(run, mock && !railOpen)
   if (mock) autoSide(run)
   renderMain(run)
   renderSide(run)
+  renderPanel(run, mock)
+  if (mock) {
+    const a = run.arts.find((x) => x.key === "1-mockup" && x.html)
+    if (a) mockScreens(run, a.html)
+    sendComments(run)
+    drawToggle(run)
+  }
   writeHash()
   tick()
 }
@@ -305,7 +320,7 @@ function extLabel(a) {
 function artRow(a) {
   if (a.none) return `<div class="art none"><span class="nm">${esc(a.label)}</span><span class="ext">아직 없음</span></div>`
   const on = (a.key === sel.key ? " on" : "") + (a.sub ? " sub" : "")
-  return `<button class="art${on}" type="button" data-key="${esc(a.key)}" title="${esc(a.key)}"><span class="nm">${esc(a.label)}</span><span class="ext">${extLabel(a)}</span></button>`
+  return `<button class="art${on}" type="button" data-key="${esc(a.key)}" title="${esc(a.key)}"><span class="nm">${esc(a.label)}</span>${a.cn ? `<span class="cn" title="반영되지 않은 코멘트 ${a.cn}개">${a.cn}</span>` : ""}<span class="ext">${extLabel(a)}</span></button>`
 }
 
 function statusCard(run) {
@@ -436,7 +451,7 @@ function crumb(run, a, view) {
     for (const v of views) if (v !== view) right += `<button type="button" data-view="${v === views[0] ? "" : v}">${VIEW_LABEL[v]}</button><span>·</span>`
     const f = view === "html" ? a.html : view === "md" || view === "draw" ? a.md : a.file
     right += `<a href="${fileUrl(run, f.name)}" target="_blank" rel="noopener">새 탭 ↗</a>`
-    if (isMock(run)) right = `${showSeg()}<span>·</span>${right}`
+    if (isMock(run)) right = `${showSeg()}<span class="ctogw" id="ctog"></span><span>·</span>${right}`
   }
   return `<div class="mhd"><div class="crumb">${path}<span class="sp"></span>${right}</div></div>`
 }
@@ -448,20 +463,74 @@ const showSeg = () => `<span class="seg">${Object.entries(SHOW).map(([k, l]) => 
 
 // The server sandboxes a run's page, so the frame and the mockup talk by
 // message (skills/spec/template.html's script): the frame says which part
-// of each screen to show; the mockup says which screen was clicked, with
-// its `to-be source`, and the planning document opens at that page.
-function dressMock(iframe) {
-  try { iframe.contentWindow.postMessage({ rein: "show", show: mockShow }, "*") } catch {}
+// of each screen to show, whether a click picks an element to comment on,
+// and the comments to pin; the mockup says which screen was clicked, with
+// its `to-be source` (the planning document scrolls to that page), which
+// element was picked, which comments found no element and which pin was
+// clicked. A mockup from an older template answers none of it.
+const mockFrame = () => $("main").querySelector(".pane iframe")
+
+function toMock(msg) {
+  const f = mockFrame()
+  try { if (f) f.contentWindow.postMessage(msg, "*") } catch {}
+}
+
+function dressMock() {
+  const run = findRun(sel.project, sel.slug)
+  toMock({ rein: "show", show: mockShow })
+  toMock({ rein: "comment-mode", on: cm.mode && canComment(run) })
+  sendComments(run, true)
+  // a mockup that answers the comments is one of this template
+  clearTimeout(cm.timer)
+  if (cm.old !== false) {
+    const key = cm.key
+    cm.timer = setTimeout(() => {
+      if (cm.key !== key || cm.old !== null) return
+      cm.old = true
+      cm.mode = false
+      renderPanel(findRun(sel.project, sel.slug))
+      drawToggle(findRun(sel.project, sel.slug))
+    }, 2000)
+  }
 }
 
 addEventListener("message", (e) => {
-  const f = $("main").querySelector(".pane iframe")
+  const f = mockFrame()
   const run = findRun(sel.project, sel.slug)
-  if (!f || e.source !== f.contentWindow || !isMock(run) || !e.data || e.data.rein !== "screen") return
-  const src = sourceOf(String(e.data.source || ""))
+  const m = e.data
+  if (!f || e.source !== f.contentWindow || !isMock(run) || !m) return
+  if (m.rein === "screen") jumpBrief(run, String(m.source || ""))
+  else if (m.rein === "anchors") {
+    cm.old = false
+    cm.missing = new Set(Array.isArray(m.missing) ? m.missing : [])
+    renderPanel(run)
+    drawToggle(run)
+  } else if (m.rein === "pick" && canComment(run) && typeof m.screen === "string" && m.screen) {
+    cm.pick = { screen: m.screen, el: typeof m.el === "string" && m.el ? m.el : null }
+    cm.edit = null
+    cm.text = ""
+    cm.err = null
+    renderPanel(run)
+    const t = $("cpanel").querySelector("[data-cin]")
+    if (t) {
+      t.scrollIntoView({ block: "nearest" })
+      t.focus()
+    }
+  } else if (m.rein === "pin" && Number.isInteger(m.n)) {
+    cm.on = m.n
+    renderPanel(run)
+    const c = $("cpanel").querySelector(`.ccard[data-cn="${m.n}"]`)
+    if (c) c.scrollIntoView({ block: "nearest" })
+  }
+})
+
+// the planning document a `to-be source` names, opened at its page
+function jumpBrief(run, source) {
+  const src = sourceOf(source)
   const doc = src && briefDocs(run).find((x) => x.id === src.file || x.show.name === src.file)
   if (doc) openSide(doc.id, doc.ext === "pdf" ? src.page : null)
-})
+  return !!doc
+}
 
 // a `to-be source:` value, `brief/<file> (<page>)`: the file, relative to the
 // run folder, and the page (its number before 쪽, else its first number)
@@ -470,6 +539,165 @@ function sourceOf(text) {
   if (!m || !m[1]) return null
   const p = m[2] ? /(\d+)\s*쪽/.exec(m[2]) || /(\d+)/.exec(m[2]) : null
   return { file: m[1], page: p ? Number(p[1]) : null }
+}
+
+// ---------- 1-mockup.html: the person's comments (agent/comments.json) ----------
+
+// The panel right of the mockup. Comments are added only while the run is
+// active in spec, and never on the hub's page; the hook hands the drafts to
+// the agent at the next prompt, and the agent marks them done or declined.
+const CST = { draft: "보내기 전", sent: "보냄", done: "반영됨", declined: "반영 안 함" }
+const canComment = (run) => !!run && run.state === "active" && run.stageShort === "spec" && !ro
+
+// key: the run shown; mode: a click on the mockup picks an element; pick:
+// { screen, el } being written; edit: the n of the draft being changed; text:
+// what the input holds; on: the selected card; missing: the n of comments
+// whose element the mockup lacks; old: null until the mockup answers, true
+// when it never does; sent: what the mockup was last given; srcs: the
+// mockup's screens, id -> { name, source }
+const freshCm = (key) => ({ key, mode: false, pick: null, edit: null, text: "", on: null, missing: new Set(), old: null, err: null, busy: false, sent: null, srcs: null, timer: null })
+let cm = freshCm(null)
+
+const commentsOfRun = (run) => (run.comments || []).filter((c) => c && Number.isInteger(c.n) && typeof c.screen === "string").sort((a, b) => a.n - b.n)
+
+// the 코멘트 toggle beside 현재|목표|둘 다, once the mockup answered
+function drawToggle(run) {
+  const w = $("ctog")
+  if (!w) return
+  const show = canComment(run) && cm.old === false
+  setHTML(w, show ? `<span class="seg"><button type="button" class="${cm.mode ? "on" : ""}" data-cmode title="켜면 목업의 요소를 눌러 코멘트를 답니다 (C)">코멘트</button></span>` : "")
+}
+
+function setMode(run, on) {
+  cm.mode = on
+  toMock({ rein: "comment-mode", on })
+  drawToggle(run)
+}
+
+function sendComments(run, force = false) {
+  const items = commentsOfRun(run).map((c) => ({ n: c.n, screen: c.screen, el: c.el ?? null, status: c.status }))
+  const sig = JSON.stringify(items)
+  if (!force && sig === cm.sent) return
+  cm.sent = sig
+  toMock({ rein: "comments", items })
+}
+
+// the screens of 1-mockup.html, read from the file: each one's name and
+// `to-be source`, which the cards show
+async function mockScreens(run, file) {
+  const sig = `${run.project}/${run.slug}/${file.mtime}:${file.size}`
+  if (cm.srcs && cm.srcs.sig === sig) return
+  const mine = (cm.srcs = { sig, map: {} })
+  let text
+  try {
+    text = await (await fetch(fileUrl(run, file.name), { cache: "no-store" })).text()
+  } catch {
+    return
+  }
+  if (cm.srcs !== mine) return
+  const d = new DOMParser().parseFromString(text, "text/html")
+  for (const sec of d.querySelectorAll("section.screen[id]")) {
+    // the name is the h2's own text: its #id and pins are in elements
+    const h = sec.querySelector(":scope > h2")
+    const name = h ? [...h.childNodes].filter((x) => x.nodeType === 3).map((x) => x.textContent).join("").trim() : ""
+    const walk = d.createTreeWalker(sec, NodeFilter.SHOW_COMMENT)
+    let n, source = ""
+    while ((n = walk.nextNode())) {
+      const m = /^\s*to-be source:\s*([\s\S]*?)\s*$/.exec(n.nodeValue)
+      if (m) { source = m[1]; break }
+    }
+    mine.map[sec.id] = { name, source }
+  }
+  renderPanel(findRun(sel.project, sel.slug))
+}
+
+function renderPanel(run, mock = isMock(run)) {
+  const p = $("cpanel")
+  p.hidden = !mock
+  if (!mock) return setHTML(p, "")
+  const can = canComment(run)
+  const list = commentsOfRun(run)
+  const drafts = list.filter((c) => c.status === "draft").length
+  const open = list.filter((c) => c.status === "draft" || c.status === "sent").length
+  const where = (screen, el) => {
+    const s = cm.srcs && cm.srcs.map[screen]
+    return `<span class="cwh" title="#${esc(screen)}${el ? ` · ${esc(el)}` : ""}"><span class="sc">${esc((s && s.name) || "#" + screen)}</span><span class="el">${el ? esc(el) : "화면 전체"}</span></span>`
+  }
+  const input = (save) => `<textarea class="cin" rows="3" placeholder="코멘트" data-cin>${esc(cm.text)}</textarea>` +
+    `<div class="cbt"><button type="button" class="pri" data-cact="${save}"${cm.busy ? " disabled" : ""}>저장</button><button type="button" data-cact="cancel">취소</button><span class="hint">Ctrl+Enter</span></div>`
+  const cards = list.map((c) => {
+    const st = CST[c.status] ? c.status : "other"
+    const s = cm.srcs && cm.srcs.map[c.screen]
+    const src = s && s.source ? sourceOf(s.source) : null
+    const doc = src && briefDocs(run).find((x) => x.id === src.file || x.show.name === src.file)
+    const srcHtml = !src ? ""
+      : doc ? `<button type="button" class="csrc" data-csrc="${esc(s.source)}" title="기획서 열에서 보기">${esc(baseOf(doc.id))}${doc.ext === "pdf" && src.page ? ` · p.${src.page}` : ""}</button>`
+      : `<span class="csrc">${esc(s.source)}</span>`
+    const editing = can && cm.edit === c.n && c.status === "draft"
+    let acts = ""
+    if (can && !editing && c.status === "draft") acts = `<button type="button" data-cact="edit">고치기</button><button type="button" data-cact="del">지우기</button>`
+    else if (can && (c.status === "done" || c.status === "declined")) acts = `<button type="button" data-cact="reopen">다시 열기</button>`
+    // a reflected comment whose element went away is shown as it is
+    const miss = cm.missing.has(c.n) && c.status !== "done"
+    return `<div class="ccard ${st}${cm.on === c.n ? " on" : ""}" data-cn="${c.n}">` +
+      `<div class="cct"><span class="cno ${st}">${c.n}</span>${where(c.screen, c.el)}<span class="cst ${st}">${esc(CST[c.status] || String(c.status))}</span></div>` +
+      (miss ? `<div class="cmiss">요소 없음</div>` : "") +
+      (editing ? input("save-edit") : `<div class="ctx">${esc(c.text || "")}</div>`) +
+      (c.note ? `<div class="cnote"><b>Rein</b>${esc(c.note)}</div>` : "") +
+      (srcHtml || acts ? `<div class="cact">${srcHtml}<span class="sp"></span>${acts}</div>` : "") + `</div>`
+  }).join("")
+  const pick = can && cm.pick
+    ? `<div class="ccard new"><div class="cct"><span class="cno draft">+</span>${where(cm.pick.screen, cm.pick.el)}<span class="cst draft">새 코멘트</span></div>${input("save-new")}</div>`
+    : ""
+  let note = ""
+  if (cm.old) note = `<div class="cline">이 목업은 코멘트 기능 이전 템플릿으로 그려져 핀과 코멘트 달기가 동작하지 않습니다.</div>`
+  else if (!can && !ro) note = `<div class="cline">코멘트는 spec 단계에서만 답니다. 지금은 읽기 전용입니다.</div>`
+  const empty = !list.length && !pick
+    ? `<div class="cempty">${can && cm.old === false ? "「코멘트」를 켜고 목업의 요소를 누르면 코멘트를 답니다." : "코멘트가 없습니다."}</div>`
+    : ""
+  const html = `<div class="chd"><b>코멘트</b><span class="cnt">${list.length}${open ? ` · 반영 전 ${open}` : ""}</span></div>${note}` +
+    `<div class="clist">${cards}${pick}${empty}</div>` +
+    (cm.err ? `<div class="cerr">${esc(cm.err)}</div>` : "") +
+    (can ? `<div class="cfoot">다음 입력 때 보낼 코멘트 <b>${drafts}</b>개</div>` : "")
+  // the input keeps its focus and caret when the panel is drawn again
+  const f = document.activeElement
+  const at = f && f.matches && f.matches("#cpanel [data-cin]") ? [f.selectionStart, f.selectionEnd] : null
+  const top = p.querySelector(".clist") ? p.querySelector(".clist").scrollTop : 0
+  setHTML(p, html)
+  if (p.querySelector(".clist")) p.querySelector(".clist").scrollTop = top
+  const t = at && p.querySelector("[data-cin]")
+  if (t && document.activeElement !== t) {
+    t.focus()
+    t.setSelectionRange(at[0], at[1])
+  }
+}
+
+// one change to agent/comments.json; the run list brings the result back
+async function postComment(run, body) {
+  cm.busy = true
+  cm.err = null
+  renderPanel(run)
+  let ok = false
+  try {
+    const res = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: run.project, runId: run.slug, ...body }),
+    })
+    if (res.status === 409) cm.err = "지금은 바꿀 수 없습니다. 코멘트는 spec 단계의 진행 중인 run에서만 달고 고칩니다."
+    else if (!res.ok) cm.err = `저장하지 못했습니다 (${res.status})`
+    ok = res.ok
+  } catch {
+    cm.err = "저장하지 못했습니다. 프레임 서버에 닿지 않습니다."
+  }
+  cm.busy = false
+  if (ok) {
+    cm.pick = null
+    cm.edit = null
+    cm.text = ""
+  }
+  renderPanel(findRun(sel.project, sel.slug))
+  if (ok) load()
 }
 
 function renderMain(run) {
@@ -867,34 +1095,51 @@ function renderSide(run) {
   aside.hidden = $("grip").hidden = !a
   if (!a) {
     aside._sig = null
+    closePdf(aside)
     aside.innerHTML = ""
     return
   }
   const d = sideDoc(run, a)
   const page = d.ext === "pdf" ? sideAt.page : null
   const url = fileUrl(run, d.file.name)
-  const sig = [run.project, run.state, run.slug, a.key, page].join("/")
+  // beside 1-mockup.html a PDF is drawn by pdf.js, every page in one column,
+  // and a page asked for is scrolled to; elsewhere the browser's viewer opens it
+  const own = d.ext === "pdf" && $("work").classList.contains("left")
+  const sig = [run.project, run.state, run.slug, a.key, own ? "pdf.js" : page].join("/")
   const ver = `${d.file.mtime}:${d.file.size}`
   // the viewer is rebuilt only when it shows something else, so a PDF keeps
   // its place; a changed file is reloaded where it is scrolled to
   if (aside._sig !== sig) {
     aside._sig = sig
     aside._ver = ver
+    aside._at = null
+    closePdf(aside)
     let view
-    if (d.how === "frame") view = `<iframe src="${url}${page ? `#page=${page}` : ""}" title="${esc(d.file.name)}"></iframe>`
+    if (own) view = `<div class="pdfv"></div>`
+    else if (d.how === "frame") view = `<iframe src="${url}${page ? `#page=${page}` : ""}" title="${esc(d.file.name)}"></iframe>`
     else if (d.how === "img") view = `<div class="bimg"><img src="${url}" alt="${esc(d.file.name)}"></div>`
     else if (d.how === "md") view = `<div class="doc"></div>`
     else {
       const [act, label] = fileAct(d.file.name)
       view = `<div class="dl"><span class="fn">${esc(d.file.name)}</span><span class="meta">${fmtSize(d.file.size)}</span><a class="btn" href="${url}" ${act}>${label}</a></div>`
     }
-    aside.innerHTML = `<div class="bhead"></div><div class="bview">${view}</div><div class="bft"></div>`
+    aside.innerHTML = `<div class="bhead"></div><div class="bview${own ? " own" : ""}">${view}</div><div class="bft"></div>`
+    if (own) openPdf(aside, url)
     if (d.how === "md") sideMd(run, d.file, aside, sig, false)
   } else if (aside._ver !== ver) {
     aside._ver = ver
-    if (d.how === "md") sideMd(run, d.file, aside, sig, true)
+    if (own) {
+      const at = aside._pdf.cur
+      closePdf(aside)
+      aside.querySelector(".pdfv").innerHTML = ""
+      openPdf(aside, url).go(at)
+    } else if (d.how === "md") sideMd(run, d.file, aside, sig, true)
     else if (d.how === "frame") reloadFrame(aside.querySelector("iframe"))
     else if (d.how === "img") aside.querySelector("img").src = `${url}?v=${enc(ver)}`
+  }
+  if (own && aside._at !== sideAt) {
+    aside._at = sideAt
+    if (page) aside._pdf.go(page)
   }
   // a planning document among several shows them all as tabs
   const docs = briefDocs(run)
@@ -902,7 +1147,8 @@ function renderSide(run) {
     ? `<span class="btabs">${docs.map((x) => `<button type="button" class="btab${x.id === a.key ? " on" : ""}" data-btab="${esc(x.id)}" title="${esc(x.id)}">${esc(baseOf(x.id))}</button>`).join("")}</span>`
     : `<span class="fn" title="${esc(d.file.name)}">${esc(d.file.name)}</span>`
   const head = `<div class="bhd">${name}` +
-    `${page ? `<span class="pg">${page}쪽</span>` : ""}<a href="${url}" target="_blank" rel="noopener">새 탭 ↗</a>` +
+    (own ? `<span class="pg" data-pdfpg>${aside._pdf.label()}</span>` : page ? `<span class="pg">${page}쪽</span>` : "") +
+    `<a href="${url}" target="_blank" rel="noopener">새 탭 ↗</a>` +
     `<button type="button" class="bx" data-sidex title="${$("work").classList.contains("left") ? "기획서 닫기" : "우측 탭 닫기"}">×</button></div>`
   const [dlAct, dlLabel] = d.dl ? fileAct(d.dl.name) : []
   const foot = [
@@ -912,6 +1158,143 @@ function renderSide(run) {
   setHTML(aside.querySelector(".bhead"), head)
   setHTML(aside.querySelector(".bft"), foot)
   aside.querySelector(".bft").hidden = !foot
+}
+
+// ----- planning documents drawn by pdf.js (vendor/pdfjs, loaded on first use) -----
+
+let pdfjs = null
+
+function pdfLib() {
+  return pdfjs || (pdfjs = new Promise((resolve, reject) => {
+    const s = document.createElement("script")
+    s.src = "vendor/pdfjs/pdf.min.js"
+    s.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js"
+      resolve(window.pdfjsLib)
+    }
+    s.onerror = () => {
+      pdfjs = null
+      reject(new Error("pdf.js"))
+    }
+    document.head.appendChild(s)
+  }))
+}
+
+// the PDF at url drawn into the side tab's .pdfv: each page under a 「기획서 ·
+// p.N / 전체」 label, painted as it nears the view; the column head follows
+// the page at the top. aside._pdf: { cur, label(), go(n), close() }
+function openPdf(aside, url) {
+  const box = aside.querySelector(".pdfv")
+  const st = { cur: 1, total: 0, want: null, closed: false, task: null, io: null, pages: [] }
+  const head = () => {
+    const pg = aside.querySelector("[data-pdfpg]")
+    if (pg) pg.textContent = st.label()
+  }
+  st.label = () => (st.total ? `p.${st.cur} / ${st.total}` : "")
+  st.go = (n) => {
+    const sec = st.pages[n - 1]
+    if (!sec) return void (st.want = n)
+    st.want = null
+    // the head names the page asked for, even when the last pages cannot
+    // scroll up to the top
+    const was = box.scrollTop
+    box.scrollTop = sec.offsetTop - 12
+    st.skip = box.scrollTop !== was
+    st.cur = n
+    head()
+  }
+  st.close = () => {
+    st.closed = true
+    if (st.io) st.io.disconnect()
+    if (st.task) st.task.destroy()
+  }
+  const paint = (sec) => {
+    if (sec._painted) return
+    sec._painted = true
+    const vp = sec._page.getViewport({ scale: 1 })
+    const scale = Math.min(4, ((box.clientWidth - 28) * devicePixelRatio) / vp.width)
+    const v = sec._page.getViewport({ scale })
+    const c = sec.querySelector("canvas")
+    c.width = Math.floor(v.width)
+    c.height = Math.floor(v.height)
+    sec._page.render({ canvasContext: c.getContext("2d"), viewport: v })
+  }
+  box.addEventListener("scroll", () => {
+    if (st.closed) return
+    if (st.skip) {
+      st.skip = false
+      return
+    }
+    let cur = 1
+    for (const [i, sec] of st.pages.entries()) if (sec.offsetTop - box.scrollTop < 80) cur = i + 1
+    if (cur !== st.cur) {
+      st.cur = cur
+      head()
+    }
+  })
+  box.addEventListener("click", (e) => {
+    const sec = e.target.closest(".pg")
+    if (!st.closed && sec && sec._page) openZoom(sec._page, st.pages.indexOf(sec) + 1, st.total)
+  })
+  aside._pdf = st
+  ;(async () => {
+    try {
+      const lib = await pdfLib()
+      if (st.closed) return
+      st.task = lib.getDocument({ url })
+      const doc = await st.task.promise
+      st.total = doc.numPages
+      st.io = new IntersectionObserver((es) => { for (const x of es) if (x.isIntersecting) paint(x.target) }, { root: box, rootMargin: "100% 0px" })
+      for (let n = 1; n <= doc.numPages; n++) {
+        const page = await doc.getPage(n)
+        if (st.closed) return
+        const vp = page.getViewport({ scale: 1 })
+        const sec = document.createElement("div")
+        sec.className = "pg"
+        sec.title = "크게 보기"
+        sec.innerHTML = `<div class="lab"><b>기획서</b> · p.${n} / ${doc.numPages}</div><canvas style="aspect-ratio: ${vp.width} / ${vp.height}"></canvas>`
+        sec._page = page
+        box.appendChild(sec)
+        st.pages.push(sec)
+        st.io.observe(sec)
+        if (st.want === n) st.go(n)
+      }
+      head()
+    } catch {
+      if (!st.closed) box.innerHTML = `<div class="empty">기획서를 그리지 못했습니다.</div>`
+    }
+  })()
+  return st
+}
+
+function closePdf(aside) {
+  closeZoom()
+  if (aside._pdf) aside._pdf.close()
+  aside._pdf = null
+}
+
+// one page large over the planning documents and the mockup; Esc or a click
+// outside the page closes it
+function openZoom(page, n, total) {
+  closeZoom()
+  const z = document.createElement("div")
+  z.id = "pzoom"
+  z.className = "pzoom"
+  z.style.right = `${$("cpanel").hidden ? 0 : $("cpanel").offsetWidth}px`
+  z.innerHTML = `<div class="pzbox"><div class="lab"><b>기획서</b> · p.${n} / ${total}<button type="button" class="evx" title="닫기 (Esc)">×</button></div><canvas></canvas></div>`
+  $("work").appendChild(z)
+  const vp = page.getViewport({ scale: 1 })
+  const v = page.getViewport({ scale: Math.min(6, ((z.clientWidth - 64) * devicePixelRatio) / vp.width) })
+  const c = z.querySelector("canvas")
+  c.width = Math.floor(v.width)
+  c.height = Math.floor(v.height)
+  page.render({ canvasContext: c.getContext("2d"), viewport: v })
+}
+
+function closeZoom() {
+  const z = $("pzoom")
+  if (z) z.remove()
+  return !!z
 }
 
 async function sideMd(run, file, aside, sig, keep) {
@@ -1284,11 +1667,90 @@ $("menu").addEventListener("click", (e) => {
   if (r) pick(r.dataset.p, r.dataset.s)
 })
 
-document.addEventListener("click", () => { $("menu").hidden = $("cmenu").hidden = true })
+document.addEventListener("click", (e) => {
+  $("menu").hidden = $("cmenu").hidden = true
+  // a page shown large closes on a click anywhere but on it
+  if (!e.target.closest("#pzoom canvas, .pdfv .pg")) closeZoom()
+})
 document.addEventListener("keydown", (e) => {
   if (ev && evKey(e)) return
+  if (e.key === "Escape" && closeZoom()) return
   if (e.key === "Escape") $("menu").hidden = $("cmenu").hidden = true
+  // C: the comment mode, when focus is not in a text field
+  const t = e.target
+  if ((e.key === "c" || e.key === "C") && !e.ctrlKey && !e.metaKey && !e.altKey && !(t.closest && t.closest("input, textarea, select, [contenteditable]"))) {
+    const run = findRun(sel.project, sel.slug)
+    if (isMock(run) && canComment(run) && cm.old === false) setMode(run, !cm.mode)
+  }
 })
+
+// the comment panel: pick a card, write, change, delete or reopen a comment
+$("cpanel").addEventListener("click", (e) => {
+  const run = findRun(sel.project, sel.slug)
+  if (!run) return
+  const s = e.target.closest("[data-csrc]")
+  if (s) return jumpBrief(run, s.dataset.csrc)
+  const card = e.target.closest(".ccard[data-cn]")
+  const n = card ? Number(card.dataset.cn) : null
+  const c = n !== null ? commentsOfRun(run).find((x) => x.n === n) : null
+  const b = e.target.closest("[data-cact]")
+  if (b) {
+    const act = b.dataset.cact
+    if (act === "cancel") {
+      cm.pick = cm.edit = null
+      cm.text = ""
+      return renderPanel(run)
+    }
+    if (act === "save-new" || act === "save-edit") return saveInput(run)
+    if (!c) return
+    if (act === "edit") {
+      cm.edit = c.n
+      cm.pick = null
+      cm.text = c.text || ""
+      renderPanel(run)
+      const t = $("cpanel").querySelector("[data-cin]")
+      if (t) t.focus()
+      return
+    }
+    if (act === "del") {
+      if (confirm(`코멘트 ${c.n}을 지울까요?`)) postComment(run, { op: "delete", id: c.id })
+      return
+    }
+    if (act === "reopen") return postComment(run, { op: "reopen", id: c.id })
+    return
+  }
+  if (!c || e.target.closest("textarea")) return
+  cm.on = c.n
+  renderPanel(run)
+  toMock({ rein: "focus", n: c.n })
+})
+
+$("cpanel").addEventListener("input", (e) => {
+  if (e.target.matches("[data-cin]")) cm.text = e.target.value
+})
+
+$("cpanel").addEventListener("keydown", (e) => {
+  if (!e.target.matches("[data-cin]")) return
+  const run = findRun(sel.project, sel.slug)
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault()
+    saveInput(run)
+  } else if (e.key === "Escape") {
+    e.stopPropagation()
+    cm.pick = cm.edit = null
+    cm.text = ""
+    renderPanel(run)
+  }
+})
+
+function saveInput(run) {
+  if (!run || cm.busy || !cm.text.trim()) return
+  if (cm.pick) postComment(run, { op: "add", screen: cm.pick.screen, el: cm.pick.el, text: cm.text })
+  else if (cm.edit !== null) {
+    const c = commentsOfRun(run).find((x) => x.n === cm.edit)
+    if (c) postComment(run, { op: "edit", id: c.id, text: cm.text })
+  }
+}
 
 // right-click on an artifact of the timeline: open it in the right tab
 document.addEventListener("contextmenu", (e) => {
@@ -1322,7 +1784,7 @@ dragWidth($("grip"))
 
 // the mockup's page, each time it loads (a load does not bubble: caught on its way down)
 $("main").addEventListener("load", (e) => {
-  if (e.target.tagName === "IFRAME" && isMock(findRun(sel.project, sel.slug))) dressMock(e.target)
+  if (e.target.tagName === "IFRAME" && isMock(findRun(sel.project, sel.slug))) dressMock()
 }, true)
 
 $("left").addEventListener("click", (e) => {
@@ -1354,9 +1816,12 @@ $("main").addEventListener("click", (e) => {
   if (s) {
     mockShow = s.dataset.show
     for (const b of $("main").querySelectorAll("[data-show]")) b.classList.toggle("on", b === s)
-    const f = $("main").querySelector(".pane iframe")
-    if (f) dressMock(f)
+    toMock({ rein: "show", show: mockShow })
     return
+  }
+  if (e.target.closest("[data-cmode]")) {
+    const run = findRun(sel.project, sel.slug)
+    return setMode(run, !cm.mode)
   }
   const b = e.target.closest(".bdg[data-ev]")
   if (b && doc) return openEvidence(doc.run, b.dataset.ev, b.dataset.title, b.dataset.name)

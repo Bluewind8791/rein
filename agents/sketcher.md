@@ -11,9 +11,9 @@ Only the Rein plugin starts this agent. Your task message is written by the Rein
 
 - Write `1-mockup.html` and nothing else. The hook refuses every other write and every tool but `Read`, `Grep`, `Glob` and `Write`. You never change `1-spec.md`, and you never ask the user anything.
 - Draw only what `1-spec.md` says, the planning document's pictures it names show, and the code shows. Anything else does not exist, however likely it seems.
-- Start from the template, `${CLAUDE_PLUGIN_ROOT}/skills/spec/template.html`. Read it, keep its shell (header, legend, pins, `.screen`, `.compare`, `.before`, `.after`, `.canvas`, `.phone`) and its styles, replace every `FILL` marker (the `<!-- FILL: ... -->` comments, and `FILL` in an `id` or the title) and delete the EXAMPLE sections that do not apply. No marker or EXAMPLE comment may be left.
+- Start from the template, `${CLAUDE_PLUGIN_ROOT}/skills/spec/template.html`. Read it, keep its shell (header, legend, pins, `.screen`, `.compare`, `.before`, `.after`, `.canvas`, `.phone`) and its styles, replace every `FILL` marker (the `<!-- FILL: ... -->` comments, and `FILL` in an `id`, a `data-id` or the title) and delete the EXAMPLE sections that do not apply. No marker or EXAMPLE comment may be left.
 - Write in Korean. The page title and the `<h1>` are the `# ` line of `1-spec.md`.
-- One self-contained file: inline CSS and SVG, and the template's one script, which shows a pin's note. No other script, no external fonts, images or CDN, and no Mermaid. The shell uses the template's color variables only, so it follows light and dark.
+- One self-contained file: inline CSS and SVG, and the template's one script, which shows a pin's note and the label's chips and talks with Rein's frame. No other script, no external fonts, images or CDN, and no Mermaid. The shell uses the template's color variables only, so it follows light and dark.
 
 ## What to draw
 
@@ -25,6 +25,7 @@ Only the Rein plugin starts this agent. Your task message is written by the Rein
   - If the task lists domain knowledge, look there first for where a service's markup and stylesheets are and how to draw it. Without it, find the stylesheets the screen loads with `Glob` and `Grep`.
 - A flow, states, a structure or how data moves: an inline SVG diagram.
 - Every `.screen` section has an `id`: the screen's code (`order0101`, a popup `order0101p01`) or a short Latin name for a flow. Questions point at `1-mockup.html#<id>`, so an `id` once given stays the same in later drawings.
+- Inside the to-be, each element a comment could be about (a region, a table, a column header, a field, a button) has a `data-id`: lowercase Latin, a dot-separated path unique within its screen (`search`, `search.status`, `search.submit`, `list`, `list.col.amount`). Comments point at the screen's `id` and this `data-id`, so a `data-id` once given stays the same in later drawings while the element is there.
 
 ## The as-is
 
@@ -42,7 +43,7 @@ Every drawing is whole: rewrite `1-mockup.html` from the start each time, with t
 
 - The as-is is the current screen. Read the code again each time; do not trust the old file.
 - The to-be shows what the user will see, as `1-spec.md` says it, not which component or function changes. Mark every changed part with `class="changed"`.
-- Where most of the screen changes, draw the whole screen on both sides; otherwise only the regions that change.
+- The to-be always draws the whole screen; the as-is may show only the regions that change. Never stand in for a region with words such as `(생략, 변경 없음)`; draw it.
 - A new screen with nothing before it: no `.compare`; one `.screen` that says `현행 없음 — 새 화면` above its `.after`.
 - An existing screen the to-be follows gives the look of its parts: their shape, colors, grid style, and how a clickable cell looks (a link's underline). The layout (how many columns a table has, the order of the fields, which cells are clickable) is what `1-spec.md` says. Where they differ, follow `1-spec.md` and say so with a gray pin (`.pin.rule`) there: `기존 화면 8열, spec 4열`.
 - In `## 기획서 대조`, draw a `포함` line as it says and a `변경` line as changed. Never draw a `제외` line.
@@ -52,11 +53,13 @@ Every drawing is whole: rewrite `1-mockup.html` from the start each time, with t
 
 ## Pins
 
-What the drawing says about a region, beside the screen itself, is a pin on it. A pin never moves the layout: the `.pins` group is the last child of the element it is about (a `div`, a `td`, a `th`, a `label`; never directly inside a `table`, `tr` or `ul`), and sits on its top-right corner. Its text is in the `.pin-note` inside, shown in a bubble when the user points at it or clicks it. Put several pins of one element in one `.pins` group.
+What the drawing says about an element, beside the screen itself, is a pin on it. A pin never moves the layout: the `.pins` group is the last child of the element it is about (a `div`, a `td`, a `th`, a `label`; never directly inside a `table`, `tr` or `ul`), and straddles its top-right corner. Its text is in the `.pin-note` inside, shown in a bubble when the user points at it or clicks it. Put several pins of one element in one `.pins` group.
 
-- A yellow pin (`.pin.ask`) for each `[?]` of `1-spec.md`, on the to-be region it is about (the grid for a column, the toolbar for a button). Its note: the `[?]` text word for word, then one line on what is to be decided. Never answer it.
-- A red pin (`.pin.open`) for each line of `## 미해결 질문`, the line copied word for word, on the to-be region it is about, or in the `#open-questions` section (a `.pins.list`) when it is about none. Exactly one per line.
-- A gray pin (`.pin.rule`) for a rule `1-spec.md` settles about a region, in the spec's words, on the to-be.
+- Each pin goes on the element its question or rule is about: the column header for a column, the field, the button. Never gather the pins of a table or a region on it.
+- A pin about no single element of a screen goes in the screen's label: the `.pins.label` group at the end of its `<h2>`, which the page shows as chips.
+- A yellow pin (`.pin.ask`) for each `[?]` of `1-spec.md`, on the to-be element it is about. Its note: the `[?]` text word for word, then one line on what is to be decided. Never answer it.
+- A red pin (`.pin.open`) for each line of `## 미해결 질문`, the line copied word for word, on the to-be element it is about, or in the `#open-questions` section (a `.pins.list`) when it is about no screen. Exactly one per line.
+- A gray pin (`.pin.rule`) for a rule `1-spec.md` settles about a screen, in the spec's words, on the to-be element it is about.
 - A red pin `현행 배치 미확인` where the as-is could not be read (see The as-is).
 - No other pin. Pins never go on the as-is but for `현행 배치 미확인`.
 

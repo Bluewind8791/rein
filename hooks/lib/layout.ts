@@ -90,7 +90,7 @@ export function specVerifierTask(dir: string, shots: Record<string, string>, sou
     "",
     ...(ids.length + rest.length > 1
       ? [
-          `The mockup may split one page of the document into several screens, such as the menu tabs and title above in one and a tab's body in another. All its to-be screens: ${[...ids.map(i => `#${i} ${dir}/${shots[i]}`), ...rest.map(i => `#${i} ${dir}/${others[i]}`)].join(", ")}. Open them too. A region of the picture that another of them draws is not missing from the screen you judge: compare each screen only with the part of the picture it covers.`,
+          `The mockup may split one page of the document into several screens, such as the menu tabs and title above in one and a tab's body in another. All its to-be screens: ${[...ids.map(i => `#${i} ${dir}/${shots[i]}`), ...rest.map(i => `#${i} ${dir}/${others[i]}`)].join(", ")}. Open them too. A region of the picture that another of them draws as a screen of its own (a popup, a tab's body) is not missing from the screen you judge: compare each screen only with the part of the picture it covers. That holds only for a region another screen really draws; a region left as words instead of drawn (such as \`(생략, 변경 없음)\`) is missing.`,
           "",
         ]
       : []),

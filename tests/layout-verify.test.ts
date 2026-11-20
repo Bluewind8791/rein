@@ -95,6 +95,9 @@ describe("spec's layout check", () => {
     // the mockup's other to-be screen comes along: it may draw part of the picture.
     expect(task).toContain(`All its to-be screens: #dash0101 ${DIR}/agent/layout/mockup/dash0101.png, #flow ${DIR}/agent/layout/mockup/flow.png.`)
     expect(task).toContain("compare each screen only with the part of the picture it covers")
+    // a region left as words is missing; only another screen's drawing excuses it.
+    expect(task).toContain("draws as a screen of its own (a popup, a tab's body) is not missing")
+    expect(task).toContain("a region left as words instead of drawn (such as `(생략, 변경 없음)`) is missing.")
     expect(task).not.toContain("the user said a lot")
     expect(record().sketchCheck?.agent).toBe(agentId)
     const as = (e: object) => ({ ...e, agentId }) as never

@@ -135,6 +135,17 @@ How to work with it:
 - Do not write `1-mockup.html` yourself. The hook does not refuse it, but advance then tells the user the picture is older than `1-spec.md`.
 - `1-spec.md` stays the spec. The hook checks only `1-spec.md`, `plan` works from it, and `qa` checks only the completion line. A picture adds no requirement: if the to-be shows something that must hold when the work is done, say it in the completion line.
 
+### The user's comments
+
+While the run is in spec, the user can pin comments on the to-be in the frame, each on an element or on a whole screen. The hook hands the ones they saved to you with their next message, in a block that lists each one's number, screen, element and words, and for one they reopened, your last note on it. For each comment handed over:
+
+1. When its meaning is unclear, or it can be read two ways, ask the user in the chat before you write anything.
+2. Write it into `1-spec.md` at once, as you would an answer. A line of `## 기획서 대조` it changes or leaves out becomes `변경: <what instead> (사용자, YYYY-MM-DD)` or `제외 (사용자, YYYY-MM-DD: <why>)`; anything else, rewrite the part of `1-spec.md` it is about.
+3. Spawn `rein:sketcher` again as after an answer (see Visuals), once for all the comments of one message.
+4. Mark it with `mcp__rein__comment`: `status: "done"` and a one-line `note` on what changed, or `status: "declined"` and a one-line `note` on why not (it contradicts what the user settled before, say). The user reads the note on the comment's card. When you are unsure whether to decline, ask the user first.
+
+A comment the user reopens comes again with their next message; handle it the same way.
+
 ## Grading and questions
 
 A grader that sees only `1-spec.md` scores it, and you close its gaps one question at a time. The hook keeps the pace. Start once `1-spec.md` is written and, when a screen changes, its first picture is drawn (see Visuals).
@@ -183,6 +194,6 @@ Keep this stage light. Investigate first, then write the problem and the complet
 
 1. Make sure the reference is filled in (see above). With a planning document, spawn `rein:collator` again if `1-spec.md` changed since it last ran (see Planning document).
 2. Make sure the last grade is of `1-spec.md` as it is now. If you changed it after the grade, spawn `rein:grader` again; advance refuses otherwise. If the change gets a picture and `1-spec.md` changed since the last drawing, draw it again now, in the foreground (see Visuals).
-3. Call `mcp__rein__advance` without `answer`. The hook first checks that `1-spec.md` has a line under `## 완료 판정`, a filled `참조:` in the front matter and a `## 영향 범위` section with at least one `- <path> — ...` line or `없음`; if one is missing it refuses, so add it and call again. When the drawing was not compared with its planning-document picture yet, it refuses too and says what to spawn: do it, then call again (see Visuals). Then it answers that the run waits for the user, with what it knows: the ambiguity, `1-mockup.html` if there is one, with a warning when it is older than `1-spec.md`, the lines of `## 미해결 질문` if any, and, when the run came back to spec, what changed since the user approved it. If `1-mockup.html` is older, spawn `rein:sketcher` in the foreground and call advance again; if that fails, keep the warning for the user.
+3. Call `mcp__rein__advance` without `answer`. The hook first checks that `1-spec.md` has a line under `## 완료 판정`, a filled `참조:` in the front matter and a `## 영향 범위` section with at least one `- <path> — ...` line or `없음`; if one is missing it refuses, so add it and call again. While a comment of the user on `1-mockup.html` is not marked, it refuses too, handing over the ones they saved since their last message: handle them (see The user's comments), grade again and call again. When the drawing was not compared with its planning-document picture yet, it refuses too and says what to spawn: do it, then call again (see Visuals). Then it answers that the run waits for the user, with what it knows: the ambiguity, `1-mockup.html` if there is one, with a warning when it is older than `1-spec.md`, the lines of `## 미해결 질문` if any, and, when the run came back to spec, what changed since the user approved it. If `1-mockup.html` is older, spawn `rein:sketcher` in the foreground and call advance again; if that fails, keep the warning for the user.
 4. Tell the user in a few lines what the spec says, with the absolute path of `1-spec.md`, and of `1-mockup.html` if there is one, and everything step 3 gave. Tell them how to go on: they type `/rein:plan` to approve it, here or in a new session (`/rein:plan <slug>` there, the slug being this run's runId); or they tell you what to change; when the grade does not pass, they may also want more questions. Then stop.
 5. When the user tells you what to change, revise `1-spec.md` as they said, grade it again and come back to step 3. When they want more questions, go back to Grading and questions.

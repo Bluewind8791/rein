@@ -1,4 +1,4 @@
-import type { AgentSpawnInput, AgentSpawnResult, EngineInterface, Register, ToolCallResult } from "claude-code"
+import type { AgentSpawnInput, AgentSpawnResult, EngineInterface, PromptOrigin, Register, ToolCallResult } from "claude-code"
 import { ASIDE_BASH_TIMEOUT, AT_ONCE, CALL_MINUTES, captureAside, checkMinutes, exitCodeOf, isOpen, productionTargets, runnerTask, sessionStatus, startable } from "./lib/aside.ts"
 import { changeLines, readConfig, viewOf, type Config, type ConfigView, type E2e } from "./lib/config.ts"
 import { HARNESS_FILE, harnessSource, importLine, REOPEN_MARK, TAKEOVER_MARK } from "./lib/egoHarness.ts"
@@ -14,6 +14,7 @@ import { TRACE_LIMIT, traceFile, traceInput, utf8Bytes } from "./lib/trace.ts"
 import { parsePlanView, planViewData, planViewHtml } from "./lib/planView.ts"
 import { afterPlan, clearSession, fromPortable, pastPlan, toPortable, type HubInfo, type HubRecord, type HubRun, type HubStatus } from "./lib/sync.ts"
 import { quoted } from "./lib/quote.ts"
+import { COMMENTS_FILE, commentsJson, handOverText, markOne, parseComments, sendDrafts, unmarked, type Comment } from "./lib/comments.ts"
 import { ARBITER_USE, KNOWLEDGE_FILE, knowledgeDescription, knowledgeIndex, knowledgePointer, PLAN_USE, SKETCHER_USE, STATUS_USE, WORKER_USE, type Knowledge } from "./lib/knowledge.ts"
 import { applicableRules, freezeRule, ruleFile, sharedRulesOf } from "./lib/rules.ts"
 import { frameStatus, MAIN, type Activity, type End, type Land, type LandFile, type LandRepo, type LandResult } from "./lib/pane.ts"
@@ -58,6 +59,9 @@ const STATUS = "mcp__rein__status"
 const PARK = "mcp__rein__park"
 const RESUME = "mcp__rein__resume"
 const GOTO = "mcp__rein__goto"
+const COMMENT = "mcp__rein__comment"
+// where a prompt the user typed comes from; absent, the user's own too.
+const USER_ORIGINS = new Set<string>(["composer", "bridge", "sdk"])
 // the activity the frame shows, by agentId, in this session's memory and
 // the run's frame.json only. A tool call is far too frequent for $.store,
 // and the lock mutate takes would put every agent's tools in one queue; the run
@@ -124,9 +128,12 @@ const TITLE_PS = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; Select-Stri
 // reads the transcript's user lines but the tools' results (screenshots the
 // session read), and writes a pasted image's bytes from base64 on stdin.
 const USER_LINES_JS = "const rl = require('readline').createInterface({ input: require('fs').createReadStream(process.env.REIN_FILE), crlfDelay: Infinity }); rl.on('line', l => { if (l.includes('\"type\":\"user\"') && !l.includes('\"tool_result\"')) process.stdout.write(l + '\\n') })"
+// $.fs cannot rename either, so Node puts a temp file in place, again a few
+// times while Windows says EPERM or EBUSY (a reader holds the target).
+const RENAME_JS = "const fs = require('fs'); for (let i = 0; ; i++) { try { fs.renameSync(process.env.REIN_FROM, process.env.REIN_TO); break } catch (e) { if (i >= 5 || (e.code !== 'EPERM' && e.code !== 'EBUSY')) { try { fs.unlinkSync(process.env.REIN_FROM) } catch {} console.error(e.message); process.exit(1) } Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * (i + 1)) } }"
 const WRITE_BYTES_JS = "const fs = require('fs'); let b = ''; process.stdin.setEncoding('utf8'); process.stdin.on('data', d => { b += d }); process.stdin.on('end', () => { fs.mkdirSync(require('path').dirname(process.env.REIN_TO), { recursive: true }); fs.writeFileSync(process.env.REIN_TO, Buffer.from(b, 'base64')) })"
 // how each stage moves on, for the advance tool and its refusals.
-const MOVES = "How each stage moves on: spec, by mcp__rein__advance once rein:grader graded 1-spec.md as it is: the run then waits for the user, who approves 1-spec.md by typing /rein:plan (advance with 승인, D175); plan, by advance once 2-plan.md passes the hook's judgment and a rein:reviewer's design review given through mcp__rein__plan_review (after two failed reviews in one visit the user decides): the run then waits for the user, who approves 2-plan.md by typing /rein:dev (advance with 승인; what advance shows also names a config that differs from the one committed at HEAD, D120); dev, by writing dev-items.md; review, by the rein:reviewer's review.md (a failure goes to dev or plan as its ## 실패 원인 judges it, or stops the run in review for your decision, which advance takes); qa, by advance (the hook runs the qa commands: all pass moves on, once rein:impact wrote impact.md when e2e checks that passed before rest on files changed since, and with checks in 2-plan.md's ## e2e 확인 the run then waits in qa-integration for the user; after a failure, qa.md reporting a code problem sends the run to dev or plan as its ## 실패 원인 judges it, or stops it in qa for your decision, which advance takes; once the user fixed the environment advance takes their answer and reruns; a config changed while the commands ran stops the run for your decision; a config changed since plan, by advance with the approval; e2e configured but Aside unavailable, by advance with the decision); qa-integration, while it waits (e2e: wait), by advance with the user's answer only: they tested by 5-checklist.md and checked every box (/rein:land; the run goes to land), want aside or ego to run the checks (/rein:e2e, which asks which), or found a problem (back to dev or plan); on the aside path once a rein:e2e-runner agent ran each check of 2-plan.md's ## e2e 확인 and wrote its result (up to 5 at once, in the background; mcp__rein__status says how many to spawn now), on the ego path once a rein:ego-driver drove each check and a rein:ego-judge judged it from the evidence (a check handed to the user, by advance with their answer), by the rein:reviewer's completion check in e2e.md (a halt, a failed aside check, or nothing left to commit, by advance with the decision; a failed completion check halts the run until goto moves it; a layout box of 5-checklist.md left empty halts it until advance takes the user's answer that they compared and checked it, or found a layout that differs); land, by advance once the planned files that changed are staged and 6-land.md is written, which closes the run (the user commits it themselves). In any stage the main session may move the run to any stage with mcp__rein__goto, on its own judgment or the user's. In any stage, to stop, put aside or abandon the run: mcp__rein__park (it says what it takes). Call mcp__rein__status to see where the run stands."
+const MOVES = "How each stage moves on: spec, by mcp__rein__advance once rein:grader graded 1-spec.md as it is and every comment the user left on 1-mockup.html is marked with mcp__rein__comment: the run then waits for the user, who approves 1-spec.md by typing /rein:plan (advance with 승인, D175); plan, by advance once 2-plan.md passes the hook's judgment and a rein:reviewer's design review given through mcp__rein__plan_review (after two failed reviews in one visit the user decides): the run then waits for the user, who approves 2-plan.md by typing /rein:dev (advance with 승인; what advance shows also names a config that differs from the one committed at HEAD, D120); dev, by writing dev-items.md; review, by the rein:reviewer's review.md (a failure goes to dev or plan as its ## 실패 원인 judges it, or stops the run in review for your decision, which advance takes); qa, by advance (the hook runs the qa commands: all pass moves on, once rein:impact wrote impact.md when e2e checks that passed before rest on files changed since, and with checks in 2-plan.md's ## e2e 확인 the run then waits in qa-integration for the user; after a failure, qa.md reporting a code problem sends the run to dev or plan as its ## 실패 원인 judges it, or stops it in qa for your decision, which advance takes; once the user fixed the environment advance takes their answer and reruns; a config changed while the commands ran stops the run for your decision; a config changed since plan, by advance with the approval; e2e configured but Aside unavailable, by advance with the decision); qa-integration, while it waits (e2e: wait), by advance with the user's answer only: they tested by 5-checklist.md and checked every box (/rein:land; the run goes to land), want aside or ego to run the checks (/rein:e2e, which asks which), or found a problem (back to dev or plan); on the aside path once a rein:e2e-runner agent ran each check of 2-plan.md's ## e2e 확인 and wrote its result (up to 5 at once, in the background; mcp__rein__status says how many to spawn now), on the ego path once a rein:ego-driver drove each check and a rein:ego-judge judged it from the evidence (a check handed to the user, by advance with their answer), by the rein:reviewer's completion check in e2e.md (a halt, a failed aside check, or nothing left to commit, by advance with the decision; a failed completion check halts the run until goto moves it; a layout box of 5-checklist.md left empty halts it until advance takes the user's answer that they compared and checked it, or found a layout that differs); land, by advance once the planned files that changed are staged and 6-land.md is written, which closes the run (the user commits it themselves). In any stage the main session may move the run to any stage with mcp__rein__goto, on its own judgment or the user's. In any stage, to stop, put aside or abandon the run: mcp__rein__park (it says what it takes). Call mcp__rein__status to see where the run stands."
 // what the main session reads when the completion check failed.
 const COMPLETION_FAILED = "the completion check in e2e.md failed, so the run is halted in qa-integration. Tell the user what failed and decide with them where the run goes, then call mcp__rein__goto: plan to revise the design, land to accept the evidence as it is, qa-integration to run the integration entry again (checks that passed stay passed) and the completion check after it, or any other stage."
 const WRITE_TOOLS = new Set(["Write", "Edit", "NotebookEdit"])
@@ -1605,6 +1612,13 @@ async function advanceRun($: EngineInterface, run: Run, answer: string | undefin
   if (!(await $.fs.exists(path))) {
     await trace($, run, { ev: "tool", stage: run.stage, tool: ADVANCE, decision: "deny", rule: "D112", reason: "no artifact" })
     return { deny: `D112: ${path} does not exist. Write it before asking for approval.` }
+  }
+  // the user's comments on 1-mockup.html are all marked before they are
+  // asked; drafts go to the main session now.
+  const comments = run.stage === "spec" ? await commentGate($, run) : undefined
+  if (comments !== undefined) {
+    await trace($, run, { ev: "tool", stage: run.stage, tool: ADVANCE, decision: "deny", reason: "comments not marked" })
+    return { deny: comments }
   }
   const missing = run.stage === "spec" ? specProblem(await $.fs.read(path)) : undefined
   if (missing !== undefined) {
@@ -5183,6 +5197,90 @@ async function spawnSketcher($: EngineInterface, run: Run, e: AgentSpawnInput, n
   return result
 }
 
+// the user's comments on 1-mockup.html (lib/comments.ts). The frame server
+// writes comments.json too; each writer reads it, changes it and puts it
+// back whole through a temp file renamed into place. This session's own
+// changes go one at a time.
+let commentQueue: Promise<unknown> = Promise.resolve()
+function commentsJob<T>(job: () => Promise<T>): Promise<T> {
+  const p = commentQueue.then(job)
+  commentQueue = p.catch(() => {})
+  return p
+}
+
+async function readComments($: EngineInterface, dir: string): Promise<Comment[]> {
+  const path = `${dir}/${COMMENTS_FILE}`
+  if (!(await $.fs.exists(path))) return []
+  try {
+    return parseComments(await $.fs.read(path))
+  } catch (err) {
+    throw new Error(`${path} cannot be read: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+async function writeComments($: EngineInterface, dir: string, comments: Comment[]): Promise<void> {
+  const path = `${dir}/${COMMENTS_FILE}`
+  const tmp = `${path}.rein-tmp-${Math.random().toString(36).slice(2, 10)}`
+  // keep the frame's other keys (its `next` number counter)
+  const rest = (await $.fs.exists(path)) ? (JSON.parse(await $.fs.read(path)) as Record<string, unknown>) : {}
+  await $.fs.write(tmp, commentsJson(comments, rest))
+  const r = await $.process.run(["node", "-e", RENAME_JS], { env: { REIN_FROM: tmp, REIN_TO: path }, timeoutMs: 10_000 })
+  if (r.exitCode !== 0) throw new Error(`${path} could not be replaced: ${r.stderr.trim()}`)
+}
+
+// every draft comment of the run set sent; the text that hands them to the
+// main session, or undefined when there was none.
+async function handOver($: EngineInterface, run: Run, via: "prompt" | "advance"): Promise<string | undefined> {
+  const dir = (await ctxOf($, run)).dir
+  return commentsJob(async () => {
+    const comments = await readComments($, dir)
+    const drafts = comments.filter(c => c.status === "draft")
+    if (drafts.length === 0) return undefined
+    await writeComments($, dir, sendDrafts(comments, new Date(await $.clock.now()).toISOString()))
+    await trace($, run, { ev: "comments-sent", stage: "spec", via, comments: drafts.map(c => c.n) })
+    return handOverText(dir, drafts)
+  })
+}
+
+// spec's End waits until every comment is marked. Drafts are handed over
+// with the refusal; undefined when nothing is left.
+async function commentGate($: EngineInterface, run: Run): Promise<string | undefined> {
+  const sent = unmarked(await readComments($, (await ctxOf($, run)).dir), "sent")
+  const handed = await handOver($, run, "advance")
+  if (sent.length === 0 && handed === undefined) return undefined
+  const lead = `the user's comments on 1-mockup.html are not all marked yet${sent.length > 0 ? ` (handed to you before and not marked: ${sent.join(", ")})` : ""}, so 1-spec.md does not go to the user for approval. Reflect each in 1-spec.md, have rein:sketcher draw again, mark each with ${COMMENT}, then call advance again.`
+  return handed === undefined ? lead : `${lead}\n\n${handed}`
+}
+
+// the main session marks a comment it was handed: done with what changed,
+// or declined with why not. In spec only, a sent comment only.
+async function markComment($: EngineInterface, input: Record<string, unknown>, agentId: string | undefined): Promise<ToolCallResult> {
+  if (agentId !== undefined) return { deny: `${COMMENT} is called only by the main session, which reflects the user's comments in 1-spec.md. Report to the main session and stop.` }
+  const run = await getRun($)
+  if (!run) return { deny: "this session has no run open." }
+  const refuse = async (reason: string): Promise<ToolCallResult> => {
+    await trace($, run, { ev: "tool", stage: run.stage, tool: COMMENT, decision: "deny", reason })
+    return { deny: `${reason} Nothing was marked.` }
+  }
+  if (run.stage !== "spec") return refuse(`comments on 1-mockup.html are marked in the spec stage only; the run is in ${run.stage}.`)
+  const { n, status, note } = input
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 1) return refuse("n is the comment's number as it was handed to you (2 for #2).")
+  if (status !== "done" && status !== "declined") return refuse("status is done (reflected in 1-spec.md) or declined (not reflected).")
+  const line = typeof note === "string" ? note.trim() : ""
+  if (line === "" || /[\r\n]/.test(line)) return refuse("note is one line: what changed for done, why not for declined.")
+  const dir = (await ctxOf($, run)).dir
+  const at = new Date(await $.clock.now()).toISOString()
+  const out = await commentsJob(async () => {
+    const marked = markOne(await readComments($, dir), n, status, line, at)
+    if (marked.ok) await writeComments($, dir, marked.comments)
+    return marked
+  })
+  if (!out.ok) return refuse(out.reason)
+  await trace($, run, { ev: "comment", stage: "spec", n, status, note: line })
+  const left = unmarked(out.comments, "sent")
+  return { result: `Marked comment #${n} ${status}.${left.length > 0 ? ` Still to mark: ${left.join(", ")}.` : " Every comment handed to you is marked."}` }
+}
+
 // rein:impact, while work qa waits for its judgment: it runs in the
 // foreground on the hook's task, the checks in question with their diff.
 async function spawnImpact($: EngineInterface, run: Run, e: AgentSpawnInput, next: (e: AgentSpawnInput) => Promise<AgentSpawnResult>): Promise<AgentSpawnResult> {
@@ -5371,6 +5469,7 @@ function ownTool($: EngineInterface, tool: string, input: Record<string, unknown
   if (tool === PARK) return park($, input)
   if (tool === RESUME) return resume($, input)
   if (tool === GOTO) return goTo($, input)
+  if (tool === COMMENT) return markComment($, input, agentId)
   return undefined
 }
 
@@ -5486,6 +5585,20 @@ export const register: Register = (on) => {
         required: ["runId"],
       },
     })
+    await $.tool.register({
+      name: "comment",
+      description:
+        "Marks one of the user's comments on 1-mockup.html in the spec stage of a Rein run, once you reflected it in 1-spec.md or decided not to: done with one line on what changed, or declined with one line on why not. The user sees the line on the comment's card in the frame. Only a comment the hook handed to you (with the user's message, or with advance's refusal in End) can be marked; advance refuses spec's End while one is unmarked.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          n: { type: "integer", description: "The comment's number as it was handed to you (2 for #2)." },
+          status: { type: "string", enum: ["done", "declined"], description: "done: reflected in 1-spec.md; declined: not reflected." },
+          note: { type: "string", description: "One line the user reads on the card: what changed, or why not." },
+        },
+        required: ["n", "status", "note"],
+      },
+    })
     // a run this session held before an update renamed the run files
     // (claude --resume after it).
     const run = await getRun($)
@@ -5531,6 +5644,23 @@ export const register: Register = (on) => {
       void $.command.run({ command: "rename", args: run.runId }).catch(() => {})
     }
     return out
+  })
+
+  // the comments the user left on 1-mockup.html in the frame go to the main
+  // session with their next prompt, in spec only: the user's own prompt, not
+  // a background agent's notice or another session's message. A failure
+  // never holds the prompt back; the drafts then go with the next one.
+  on("prompt.submit", async ($, e, next) => {
+    const origin = (e.origin as PromptOrigin | undefined)?.kind
+    let text: string | undefined
+    let run: Run | undefined
+    try {
+      run = origin === undefined || USER_ORIGINS.has(origin) ? await getRun($) : undefined
+      if (run?.stage === "spec") text = await handOver($, run, "prompt")
+    } catch (err) {
+      if (run) await trace($, run, { ev: "error", stage: run.stage, what: "comments", error: String(err) })
+    }
+    return next(text === undefined ? e : { ...e, context: [...(e.context ?? []), text] })
   })
 
   // Rein's own /rename passes here too: any other name is the person's or
@@ -5680,7 +5810,7 @@ export const register: Register = (on) => {
 
   on("tool.call", async ($, e, next) => {
     const { tool, tool_use_id, consent, agentId, ...input } = e as typeof e & Record<string, unknown>
-    const isOwn = [OPEN_RUN, ADVANCE, STATUS, PARK, RESUME, GOTO, PLAN_REVIEW].includes(tool as string)
+    const isOwn = [OPEN_RUN, ADVANCE, STATUS, PARK, RESUME, GOTO, PLAN_REVIEW, COMMENT].includes(tool as string)
     // the run's decisions are the main session's to make.
     if (typeof agentId === "string" && [ADVANCE, PARK, RESUME, GOTO].includes(tool as string)) {
       return { deny: `D146: ${tool as string} is called only by the main session, not by a subagent. Report to the main session and stop.` }

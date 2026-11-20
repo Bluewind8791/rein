@@ -53,3 +53,120 @@ test("the local page does not open other types, files it may not read, or a body
   assert.strictEqual(await v.open("/files/proj/active/order0101/cases.xlsx", "text/plain"), 415)
   assert.deepStrictEqual(v.opened, [])
 })
+
+// a view over a temp root with one active run in the given stage
+async function commentsOn(t, { stage = "spec", readOnly = false } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rein-view-"))
+  const run = path.join(root, "proj", "active", "order0101")
+  fs.mkdirSync(path.join(run, "agent"), { recursive: true })
+  fs.writeFileSync(path.join(run, "agent", "frame.json"), JSON.stringify({ stage }))
+  const view = makeView({ root, readOnly })
+  const server = http.createServer(view.handle)
+  await new Promise(r => server.listen(0, "127.0.0.1", r))
+  t.after(() => {
+    server.close()
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+  const post = body =>
+    new Promise((resolve, reject) => {
+      const req = http.request({ host: "127.0.0.1", port: server.address().port, method: "POST", path: "/api/comments", headers: { "content-type": "application/json" } }, res => {
+        let s = ""
+        res.on("data", c => { s += c })
+        res.on("end", () => {
+          let j = null
+          try { j = JSON.parse(s) } catch {}
+          resolve({ code: res.statusCode, body: j })
+        })
+      })
+      req.on("error", reject)
+      req.end(JSON.stringify({ project: "proj", runId: "order0101", ...body }))
+    })
+  const file = path.join(run, "agent", "comments.json")
+  const stored = () => JSON.parse(fs.readFileSync(file, "utf8")).comments
+  return { run, view, post, file, stored }
+}
+
+test("a comment is added as a draft, numbered, and shown in the run list", async t => {
+  const v = await commentsOn(t)
+  const a = await v.post({ op: "add", screen: "order0101", el: "search.status", text: " 상태에 보류 추가 " })
+  assert.strictEqual(a.code, 200)
+  assert.strictEqual(a.body.comment.id, "c1")
+  assert.strictEqual(a.body.comment.n, 1)
+  assert.strictEqual(a.body.comment.status, "draft")
+  assert.strictEqual(a.body.comment.text, "상태에 보류 추가")
+  const b = await v.post({ op: "add", screen: "order0101", el: null, text: "화면 전체" })
+  assert.strictEqual(b.body.comment.n, 2)
+  assert.strictEqual(b.body.comment.el, null)
+  assert.deepStrictEqual(v.stored().map(c => [c.id, c.el, c.status]), [["c1", "search.status", "draft"], ["c2", null, "draft"]])
+  const run = v.view.snapshot().projects[0].runs[0]
+  assert.deepStrictEqual(run.comments.map(c => c.n), [1, 2])
+  assert.deepStrictEqual(fs.readdirSync(path.join(v.run, "agent")).sort(), ["comments.json", "frame.json"])
+})
+
+test("a draft is edited and deleted, and its number is not given again", async t => {
+  const v = await commentsOn(t)
+  await v.post({ op: "add", screen: "order0101", el: "list", text: "a" })
+  await v.post({ op: "add", screen: "order0101", el: "list", text: "b" })
+  assert.strictEqual((await v.post({ op: "edit", id: "c2", text: "b2" })).body.comment.text, "b2")
+  assert.strictEqual((await v.post({ op: "delete", id: "c2" })).code, 200)
+  assert.deepStrictEqual(v.stored().map(c => c.id), ["c1"])
+  assert.strictEqual((await v.post({ op: "add", screen: "order0101", el: "list", text: "c" })).body.comment.n, 3)
+})
+
+test("only a draft is edited or deleted, and only a done or declined comment reopened", async t => {
+  const v = await commentsOn(t)
+  const base = { screen: "order0101", el: null, text: "x", at: "2026-11-20T10:00:00.000Z" }
+  fs.writeFileSync(v.file, JSON.stringify({ comments: [
+    { id: "c1", n: 1, ...base, status: "sent" },
+    { id: "c2", n: 2, ...base, status: "done", note: "반영함" },
+    { id: "c3", n: 3, ...base, status: "declined", note: "범위 밖" },
+  ] }))
+  assert.strictEqual((await v.post({ op: "edit", id: "c1", text: "y" })).code, 409)
+  assert.strictEqual((await v.post({ op: "delete", id: "c2" })).code, 409)
+  assert.strictEqual((await v.post({ op: "reopen", id: "c1" })).code, 409)
+  assert.strictEqual((await v.post({ op: "reopen", id: "c9" })).code, 404)
+  const r = await v.post({ op: "reopen", id: "c2" })
+  assert.strictEqual(r.code, 200)
+  assert.deepStrictEqual([r.body.comment.status, r.body.comment.note], ["draft", "반영함"])
+  assert.strictEqual((await v.post({ op: "reopen", id: "c3" })).body.comment.status, "draft")
+  assert.deepStrictEqual(v.stored().map(c => c.status), ["sent", "draft", "draft"])
+})
+
+test("comments are refused outside spec, on the read-only page, and when malformed", async t => {
+  const plan = await commentsOn(t, { stage: "plan" })
+  assert.strictEqual((await plan.post({ op: "add", screen: "order0101", el: null, text: "x" })).code, 409)
+  assert.strictEqual(fs.existsSync(plan.file), false)
+  const ro = await commentsOn(t, { readOnly: true })
+  assert.strictEqual((await ro.post({ op: "add", screen: "order0101", el: null, text: "x" })).code, 405)
+  const v = await commentsOn(t)
+  assert.strictEqual((await v.post({ op: "add", screen: "order0101", el: null, text: "x", runId: "none" })).code, 409)
+  assert.strictEqual((await v.post({ op: "add", screen: "order0101", el: null, text: "x", runId: ".." })).code, 400)
+  assert.strictEqual((await v.post({ op: "add", screen: "order0101", el: null, text: "  " })).code, 400)
+  assert.strictEqual((await v.post({ op: "add", screen: "", el: null, text: "x" })).code, 400)
+  assert.strictEqual((await v.post({ op: "add", screen: "order0101", el: 3, text: "x" })).code, 400)
+  assert.strictEqual((await v.post({ op: "move", id: "c1" })).code, 400)
+  fs.writeFileSync(v.file, "{ not json")
+  assert.strictEqual((await v.post({ op: "add", screen: "order0101", el: null, text: "x" })).code, 500)
+  assert.strictEqual(fs.readFileSync(v.file, "utf8"), "{ not json")
+})
+
+test("a run moved out of the active folder takes no comments", async t => {
+  const v = await commentsOn(t)
+  const done = path.join(path.dirname(path.dirname(v.run)), "complete", "order0101")
+  fs.mkdirSync(path.dirname(done), { recursive: true })
+  fs.renameSync(v.run, done)
+  assert.strictEqual((await v.post({ op: "add", screen: "order0101", el: null, text: "x" })).code, 409)
+})
+
+test("the page loads pdf.js from the plugin, not the internet", async t => {
+  const v = await commentsOn(t)
+  const server = http.createServer(v.view.handle)
+  await new Promise(r => server.listen(0, "127.0.0.1", r))
+  t.after(() => server.close())
+  for (const p of ["/vendor/pdfjs/pdf.min.js", "/vendor/pdfjs/pdf.worker.min.js"]) {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}${p}`)
+    assert.strictEqual(res.status, 200)
+    assert.match(res.headers.get("content-type"), /^text\/javascript/)
+    assert.ok((await res.text()).length > 100000)
+  }
+})

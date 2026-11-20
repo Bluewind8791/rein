@@ -1,12 +1,18 @@
 <!doctype html>
 <!--
   1-mockup.html scaffold. rein:sketcher copies this file and fills it from 1-spec.md and the code.
-  - Replace every FILL marker (FILL comments, FILL in an id or the title) and delete every EXAMPLE
-    section that does not apply. No FILL marker or EXAMPLE comment may be left in 1-mockup.html.
+  - Replace every FILL marker (FILL comments, FILL in an id, a data-id or the title) and delete every
+    EXAMPLE section that does not apply. No FILL marker or EXAMPLE comment may be left in 1-mockup.html.
   - The shell (header, legend, pins, .screen, .compare, .phone) keeps the variables below and
     follows light and dark. A screen itself is drawn inside .canvas, in the service's own look.
+  - In the to-be, each element a comment could be about (a region, a table, a column header, a
+    field, a button) has a data-id: lowercase Latin, a dot-separated path unique within its screen
+    (search, search.status, search.submit, list, list.col.amount). Comments point at it.
+  - A pin group (.pins) is the last child of the element it is about. Pins about no single element
+    of a screen go in its label: <span class="pins label"> at the end of the screen's <h2>, shown
+    as chips (? 질문 N, ! 미해결 N, i 규칙 N) that open a list under the label.
   - No external fonts, scripts, images or CDN. Keep the script at the end of <body>: it shows a
-    pin's note in a bubble, and talks with Rein's frame when the page is shown there.
+    pin's note in a bubble, the label's chips, and talks with Rein's frame when the page is shown there.
 -->
 <html lang="ko">
 <head>
@@ -19,8 +25,10 @@
     --bg: #f5f6f8; --panel: #ffffff; --ink: #1a1c1f; --muted: #5b6169;
     --line: #d9dde3; --head: #eef1f5; --accent: #2563eb; --link: #2563eb;
     --pin-ask: #d97706; --pin-open: #d92d20; --pin-rule: #6b7280;
+    --cpin: #2563eb; --cpin-done: #16a34a; --cpin-declined: #9aa1ab;
     --bubble-bg: #1a1c1f; --bubble-ink: #ffffff;
     --before: #f3f4f6; --after: #eafaf1; --after-line: #16a34a;
+    --frame-bg: #e6e8ec;
   }
   /* light by default; the header's button switches to dark */
   :root[data-theme="dark"] {
@@ -28,8 +36,10 @@
     --bg: #16181d; --panel: #1e2128; --ink: #e6e8eb; --muted: #9aa1ab;
     --line: #333844; --head: #262a33; --accent: #5b8bff; --link: #9db9ff;
     --pin-ask: #f0b429; --pin-open: #ff6b5e; --pin-rule: #9aa1ab;
+    --cpin: #5b8bff; --cpin-done: #35c07a; --cpin-declined: #6b7280;
     --bubble-bg: #e6e8eb; --bubble-ink: #16181d;
     --before: #23262d; --after: #16281f; --after-line: #35c07a;
+    --frame-bg: #101216;
   }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 24px; background: var(--bg); color: var(--ink);
@@ -53,17 +63,18 @@
     margin: 20px 0; scroll-margin-top: 12px; }
   .screen > h2 { font-size: 16px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
   .screen > h2 .anchor { font-size: 12px; font-weight: normal; color: var(--muted); margin-left: 8px; }
-  /* pins: a note on the region they sit in, its text in a bubble on hover or click.
+  /* pins: a note on the element they sit on, its text in a bubble on hover or click.
      yellow ? = a [?] still to be asked, red ! = a line of ## 미해결 질문 or 현행 배치 미확인,
-     gray i = a rule 1-spec.md settles. A .pins group sits inside the top-right corner of the
-     element it is the last child of, so it never moves the layout. */
+     gray i = a rule 1-spec.md settles. A .pins group straddles the top-right corner of the
+     element it is the last child of, half outside, so it never moves the layout or hides its text. */
   :has(> .pins) { position: relative; }
-  .pins { position: absolute; top: 2px; right: 2px; z-index: 5; display: inline-flex; gap: 3px; }
+  .canvas th:has(> .pins), .canvas td:has(> .pins) { overflow: visible !important; }
+  .pins { position: absolute; top: -9px; right: -6px; z-index: 5; display: inline-flex; gap: 3px; }
   .pins.inline { position: static; vertical-align: middle; }
   .pins.list { position: static; display: flex; flex-wrap: wrap; gap: 6px; }
   .pins > .pin { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
-    width: 18px; height: 18px; margin: 0; padding: 0; border: 2px solid #fff; border-radius: 50%;
-    font: 700 11px/1 -apple-system, "Segoe UI", sans-serif; color: #fff; cursor: pointer;
+    width: 16px; height: 16px; margin: 0; padding: 0; border: 2px solid #fff; border-radius: 50%;
+    font: 700 10px/1 -apple-system, "Segoe UI", sans-serif; color: #fff; cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
   .pins > .pin:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .pins > .pin.ask { background: var(--pin-ask); }
@@ -77,6 +88,19 @@
     background: var(--bubble-bg); color: var(--bubble-ink); font-size: 12.5px; line-height: 1.45;
     box-shadow: 0 4px 14px rgba(0, 0, 0, .25); pointer-events: none; }
   #pin-bubble b { margin-right: 6px; }
+  /* the label's pins: chips per kind, each opening the list under the label */
+  .pins.label { display: none; }
+  .lchips { display: inline-flex; gap: 6px; margin-left: 10px; vertical-align: middle; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 3px; border-radius: 12px;
+    font: 600 11px/1 -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; cursor: pointer;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line); }
+  .chip .pin, .qlist .pin { pointer-events: none; }
+  .qlist { display: none; margin: 0 0 10px; padding: 6px 0; max-width: 900px; font-size: 12px; line-height: 1.5;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  .qlist.on { display: block; }
+  .qlist > div { display: flex; gap: 8px; padding: 5px 12px; border-top: 1px solid var(--head); }
+  .qlist > div:first-child { border-top: 0; }
+  .qlist b { margin-right: 6px; }
   /* as-is above, to-be below: a wide screen squeezed side by side reads badly */
   .compare { display: flex; flex-direction: column; gap: 12px; }
   .before, .after { border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
@@ -99,6 +123,44 @@
   svg .box.changed-box { stroke: var(--after-line); stroke-dasharray: 5 3; stroke-width: 2; }
   svg .edge { stroke: var(--muted); fill: none; }
   svg .arrowhead { fill: var(--muted); }
+
+  /* in Rein's frame (the script sets .rein-frame on <html>): the screens alone on a gray
+     canvas, each under its label, scaled down to the column's width */
+  .rein-frame body { background: var(--frame-bg); padding: 20px 28px 40px; }
+  .rein-frame .wrap { max-width: none; }
+  .rein-frame header, .rein-frame .disclaimer, .rein-frame .compare-arrow, .rein-frame .tag,
+  .rein-frame .screen > p.muted, .rein-frame .frame-label { display: none; }
+  .rein-frame .screen { display: flex; flex-direction: column; background: none; border: 0; border-radius: 0;
+    padding: 0; margin: 0 0 36px; }
+  .rein-frame .compare { display: contents; }
+  .rein-frame .screen > h2 { font-size: 12px; font-weight: 600; color: var(--muted); border: 0; padding: 0; margin: 0 0 8px; }
+  .rein-frame .screen:has(.after) > h2::before { content: "목표 화면 (to-be) · "; color: var(--accent); }
+  .rein-frame .before, .rein-frame .after { background: none; border: 0; border-radius: 0; padding: 0; }
+  .rein-frame .canvas { overflow: visible; box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
+  .rein-measure .pins { display: none; }
+  /* both sides: the as-is first, under its own label */
+  .rein-show-both .compare > .before { order: -1; margin-bottom: 28px; }
+  .rein-frame.rein-show-both .frame-label { display: block; }
+  .frame-label { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 8px; }
+  .frame-label::before { content: "현재 화면 (as-is) · "; color: var(--muted); }
+  /* the as-is alone: its label, and no to-be pins */
+  .rein-frame.rein-show-before .screen:has(.after) > h2::before { content: "현재 화면 (as-is) · "; color: var(--muted); }
+  .rein-frame.rein-show-before .screen > p.muted { display: block; }
+  .rein-show-before .lchips, .rein-show-before .qlist, .rein-show-before .cpins { display: none !important; }
+  /* comments: numbered teardrops outside the element's top-right corner, left of its Rein pins */
+  #rein-cpins { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 6; }
+  .cpin { position: absolute; display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border: 2px solid #fff; border-radius: 50% 50% 50% 0; cursor: pointer;
+    font: 700 10px/1 -apple-system, "Segoe UI", sans-serif; color: #fff; background: var(--cpin);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+  .cpin.done { background: var(--cpin-done); }
+  .cpin.declined { background: var(--cpin-declined); }
+  .cpins { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: middle; }
+  .cpins > .cpin { position: static; }
+  .cpin.flash { animation: rein-flash .35s ease-in-out 4 alternate; }
+  @keyframes rein-flash { to { transform: scale(1.6); box-shadow: 0 0 0 4px var(--cpin); } }
+  .rein-commenting .screen { cursor: crosshair; }
+  .rein-pick { outline: 2px solid var(--accent) !important; outline-offset: 2px !important; }
 
   /* FILL: the service's look, read from its stylesheets (the source as a comment above each
      group). Every selector starts with .canvas, so the shell keeps its own look. */
@@ -129,27 +191,40 @@
   <!-- ================================================================== -->
   <!-- EXAMPLE A: an existing screen that changes.                          -->
   <!-- A pin group is the last child of the element it is about (a div, a  -->
-  <!-- td, a th, a label), never directly inside a table, tr or ul.        -->
+  <!-- td, a th, a label), never directly inside a table, tr or ul. Pins   -->
+  <!-- about no single element go in the .pins.label group of the <h2>.    -->
   <!-- ================================================================== -->
   <section class="screen" id="FILL-screen-code">
-    <h2><!-- FILL: 화면 이름 --><span class="anchor">#FILL-screen-code</span></h2>
+    <h2><!-- FILL: 화면 이름 --><span class="anchor">#FILL-screen-code</span><span class="pins label">
+        <span class="pin ask" tabindex="0"><span class="pin-note"><b>질문 예정</b><!-- FILL: a [?] about the screen as a whole --></span></span>
+      </span></h2>
     <div class="compare">
       <div class="before">
         <span class="tag">AS-IS (현행)</span>
         <!-- as-is source: FILL path:line, path:line -->
-        <div class="canvas"><!-- FILL: the screen as it is now --></div>
+        <div class="canvas"><!-- FILL: the screen as it is now, or only the regions that change --></div>
       </div>
       <div class="compare-arrow">▼</div>
       <div class="after">
         <span class="tag">TO-BE</span>
         <div class="canvas">
-          <!-- FILL: the screen as 1-spec.md says it, each changed part with class="changed".
-               On the element a note is about, as its last child: -->
-          <span class="pins">
-            <span class="pin ask" tabindex="0"><span class="pin-note"><b>질문 예정</b><!-- FILL: the [?] word for word, then one line on what is to be decided --></span></span>
-            <span class="pin rule" tabindex="0"><span class="pin-note"><b>규칙</b><!-- FILL: the rule as 1-spec.md words it --></span></span>
-            <span class="pin open" tabindex="0"><span class="pin-note"><b>미해결</b><!-- FILL: the ## 미해결 질문 line word for word --></span></span>
-          </span>
+          <!-- FILL: the whole screen as 1-spec.md says it, each changed part with class="changed",
+               each element a comment could be about with its data-id. Each pin on the element its
+               note is about, as its last child, as on this search field and this column header: -->
+          <div data-id="FILL-search">
+            <label data-id="FILL-search.field"><!-- FILL: the field -->
+              <span class="pins">
+                <span class="pin ask" tabindex="0"><span class="pin-note"><b>질문 예정</b><!-- FILL: the [?] word for word, then one line on what is to be decided --></span></span>
+              </span>
+            </label>
+          </div>
+          <table data-id="FILL-list">
+            <tr><th data-id="FILL-list.col.name"><!-- FILL: the column -->
+                <span class="pins">
+                  <span class="pin rule" tabindex="0"><span class="pin-note"><b>규칙</b><!-- FILL: the rule as 1-spec.md words it --></span></span>
+                  <span class="pin open" tabindex="0"><span class="pin-note"><b>미해결</b><!-- FILL: the ## 미해결 질문 line word for word --></span></span>
+                </span></th></tr>
+          </table>
         </div>
       </div>
     </div>
@@ -164,7 +239,7 @@
     <p class="muted">현행 없음 — 새 화면</p>
     <div class="after">
       <span class="tag">TO-BE</span>
-      <div class="phone"><div class="canvas"><!-- FILL: the screen as 1-spec.md describes it --></div></div>
+      <div class="phone"><div class="canvas"><!-- FILL: the screen as 1-spec.md describes it, with data-id as in EXAMPLE A --></div></div>
     </div>
   </section>
 
@@ -223,17 +298,183 @@
     document.addEventListener("focusout", function () { bubble.hidden = true })
     addEventListener("scroll", function () { bubble.hidden = true }, true)
   })()
-  // in Rein's frame: the frame picks the part of each screen shown, and hears
-  // which screen was clicked, to open the planning-document page it is drawn from
+  // the label's pins: a chip per kind (? 질문 N), each opening the list of them under the label
+  ;(function () {
+    var NAME = { ask: "질문", open: "미해결", rule: "규칙" }
+    var groups = document.querySelectorAll(".screen > h2 > .pins.label")
+    for (var i = 0; i < groups.length; i++) {
+      var h2 = groups[i].parentNode, pins = groups[i].querySelectorAll(".pin")
+      var chips = document.createElement("span"), list = document.createElement("div")
+      chips.className = "lchips"
+      list.className = "qlist"
+      ;["ask", "open", "rule"].forEach(function (k) {
+        var mine = [].filter.call(pins, function (p) { return p.classList.contains(k) })
+        if (!mine.length) return
+        var chip = document.createElement("button")
+        chip.type = "button"
+        chip.className = "chip"
+        chip.innerHTML = '<span class="pins inline"><span class="pin ' + k + '"></span></span>' + NAME[k] + " " + mine.length
+        chip.addEventListener("click", function () { list.classList.toggle("on") })
+        chips.appendChild(chip)
+        mine.forEach(function (p) {
+          var row = document.createElement("div"), note = p.querySelector(".pin-note")
+          row.innerHTML = '<span class="pins inline"><span class="pin ' + k + '"></span></span><span>' + (note ? note.innerHTML : "") + "</span>"
+          list.appendChild(row)
+        })
+      })
+      h2.appendChild(chips)
+      h2.parentNode.insertBefore(list, h2.nextSibling)
+    }
+  })()
+  // in Rein's frame: the frame picks the part of each screen shown, hears which screen was
+  // clicked (to open the planning-document page it is drawn from), and, in comment mode, which
+  // element; it sends the comments, drawn here as numbered pins
   ;(function () {
     if (parent === window) return
+    var root = document.documentElement
+    root.classList.add("rein-frame", "rein-show-both")
     var HIDE = { before: ".compare > .after, .compare > .compare-arrow, .screen > .after", after: ".compare > .before, .compare > .compare-arrow" }
     var style = document.createElement("style")
     document.head.appendChild(style)
-    addEventListener("message", function (e) {
-      if (e.source !== parent || !e.data || e.data.rein !== "show") return
-      style.textContent = HIDE[e.data.show] ? HIDE[e.data.show] + " { display: none !important; }" : ""
+    var layer = document.createElement("div")
+    layer.id = "rein-cpins"
+    document.body.appendChild(layer)
+    var commenting = false, hovered = null, placed = [], byN = {}
+    function post(m) { parent.postMessage(m, "*") }
+    function nameOf(sec) {
+      var h2 = sec.querySelector(":scope > h2"), s = ""
+      if (h2) for (var i = 0; i < h2.childNodes.length; i++) if (h2.childNodes[i].nodeType === 3) s += h2.childNodes[i].nodeValue
+      return s.trim()
+    }
+    ;[].forEach.call(document.querySelectorAll(".screen > .compare > .before"), function (b) {
+      var sec = b.closest(".screen"), label = document.createElement("div")
+      label.className = "frame-label"
+      label.textContent = nameOf(sec) + " #" + sec.id
+      b.insertBefore(label, b.firstChild)
     })
+    // a screen wider than the column is scaled down to it
+    function fit() {
+      root.classList.add("rein-measure")
+      ;[].forEach.call(document.querySelectorAll(".before > .canvas, .after > .canvas"), function (c) {
+        c.style.zoom = ""
+        c.style.width = ""
+        var avail = c.parentElement.clientWidth, w = Math.max(c.offsetWidth, c.scrollWidth)
+        if (avail && w > avail + 1) { c.style.width = w + "px"; c.style.zoom = avail / w }
+      })
+      root.classList.remove("rein-measure")
+    }
+    // comment pins on elements sit in a layer over the page, placed again when the layout moves
+    function place() {
+      var seen = {}
+      placed.forEach(function (p) {
+        var r = p.el.getBoundingClientRect()
+        if (!r.width && !r.height) { p.pin.style.display = "none"; return }
+        var k = seen[p.key] = (seen[p.key] || 0) + 1
+        var rein = [].filter.call(p.el.children, function (c) { return c.classList.contains("pins") })[0]
+        var rr = rein && rein.getBoundingClientRect()
+        var right = rr && rr.width ? rr.left - 3 : r.right + 8
+        p.pin.style.display = ""
+        p.pin.style.left = right - 18 * k - 3 * (k - 1) + scrollX + "px"
+        p.pin.style.top = r.top - 15 + scrollY + "px"
+      })
+    }
+    function draw(items) {
+      layer.innerHTML = ""
+      ;[].forEach.call(document.querySelectorAll(".cpins"), function (g) { g.remove() })
+      placed = []
+      byN = {}
+      var missing = []
+      items.slice().sort(function (a, b) { return a.n - b.n }).forEach(function (it) {
+        // a reflected comment whose element or screen is gone stays in the panel only, unmarked
+        var sec = document.getElementById(it.screen)
+        if (!sec || !sec.classList.contains("screen")) { if (it.status !== "done") missing.push(it.n); return }
+        var el = null
+        if (it.el) [].some.call(sec.querySelectorAll(".after [data-id]"), function (d) { return d.getAttribute("data-id") === it.el && (el = d) })
+        if (it.el && !el) {
+          if (it.status === "done") return
+          missing.push(it.n)
+        }
+        var pin = document.createElement("span")
+        pin.className = "cpin" + (it.status === "done" ? " done" : it.status === "declined" ? " declined" : "")
+        pin.textContent = it.n
+        pin.setAttribute("data-n", it.n)
+        byN[it.n] = pin
+        if (el) {
+          layer.appendChild(pin)
+          placed.push({ el: el, pin: pin, key: it.screen + " " + it.el })
+          return
+        }
+        var h2 = sec.querySelector(":scope > h2")
+        if (!h2) return
+        var g = h2.querySelector(":scope > .cpins")
+        if (!g) { g = document.createElement("span"); g.className = "cpins"; h2.appendChild(g) }
+        g.appendChild(pin)
+      })
+      place()
+      post({ rein: "anchors", missing: missing })
+    }
+    // comment mode: the nearest element with a data-id in a to-be, or the screen as a whole
+    function targetOf(t) {
+      var sec = t.closest ? t.closest("section.screen") : null
+      if (!sec) return null
+      var el = t.closest("[data-id]")
+      if (el && (!sec.contains(el) || !el.closest(".after"))) el = null
+      return { sec: sec, el: el }
+    }
+    function hover(node) {
+      if (hovered === node) return
+      if (hovered) hovered.classList.remove("rein-pick")
+      hovered = node
+      if (node) node.classList.add("rein-pick")
+    }
+    addEventListener("message", function (e) {
+      var d = e.data
+      if (e.source !== parent || !d) return
+      if (d.rein === "show") {
+        style.textContent = HIDE[d.show] ? HIDE[d.show] + " { display: none !important; }" : ""
+        root.classList.remove("rein-show-before", "rein-show-after", "rein-show-both")
+        root.classList.add("rein-show-" + (HIDE[d.show] ? d.show : "both"))
+        fit()
+        place()
+      } else if (d.rein === "comment-mode") {
+        commenting = !!d.on
+        root.classList.toggle("rein-commenting", commenting)
+        if (!commenting) hover(null)
+      } else if (d.rein === "comments") {
+        draw(d.items || [])
+      } else if (d.rein === "focus") {
+        var pin = byN[d.n]
+        if (!pin || !pin.offsetParent) return
+        pin.scrollIntoView({ block: "center", behavior: "smooth" })
+        pin.classList.remove("flash")
+        void pin.offsetWidth
+        pin.classList.add("flash")
+      }
+    })
+    document.addEventListener("mouseover", function (e) {
+      if (!commenting) return
+      var t = targetOf(e.target)
+      hover(t ? t.el || t.sec : null)
+    })
+    // capture: a comment pin, or a pick in comment mode, does nothing else
+    document.addEventListener("mousedown", function (e) {
+      if (commenting && e.target.closest && e.target.closest("section.screen")) e.preventDefault()
+    }, true)
+    document.addEventListener("click", function (e) {
+      var c = e.target.closest ? e.target.closest(".cpin") : null
+      if (c) {
+        e.preventDefault()
+        e.stopPropagation()
+        post({ rein: "pin", n: +c.getAttribute("data-n") })
+        return
+      }
+      if (!commenting) return
+      var t = targetOf(e.target)
+      if (!t) return
+      e.preventDefault()
+      e.stopPropagation()
+      post({ rein: "pick", screen: t.sec.id, el: t.el ? t.el.getAttribute("data-id") : null })
+    }, true)
     document.addEventListener("click", function (e) {
       if (!e.target.closest || e.target.closest(".pin, a, button, input, select, textarea")) return
       var sec = e.target.closest("section.screen")
@@ -243,8 +484,12 @@
         var m = /^\s*to-be source:\s*([\s\S]*?)\s*$/.exec(n.nodeValue)
         if (m) { source = m[1]; break }
       }
-      parent.postMessage({ rein: "screen", id: sec.id, source: source }, "*")
+      post({ rein: "screen", id: sec.id, source: source })
     })
+    addEventListener("resize", function () { fit(); place() })
+    addEventListener("load", function () { fit(); place() })
+    if (window.ResizeObserver) new ResizeObserver(place).observe(document.body)
+    fit()
   })()
 </script>
 </body>

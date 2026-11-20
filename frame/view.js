@@ -3,7 +3,7 @@
 //
 //   makeView({ root, readOnly, recordOf, debounceMs, extra, opener })
 //
-// readOnly refuses checklist writes and opening files; opener(full) opens a
+// readOnly refuses checklist and comment writes and opening files; opener(full) opens a
 // file on this PC (openFile unless given); recordOf(project, slug) gives a run's
 // record, whose pc the run list then carries; extra() gives more fields of
 // the run list.
@@ -27,6 +27,9 @@ const STATIC = {
   "/md.js": ["md.js", "text/javascript; charset=utf-8"],
   "/mascot.js": ["mascot.js", "text/javascript; charset=utf-8"],
   "/app.css": ["app.css", "text/css; charset=utf-8"],
+  // pdf.js draws the planning documents beside 1-mockup.html
+  "/vendor/pdfjs/pdf.min.js": ["vendor/pdfjs/pdf.min.js", "text/javascript; charset=utf-8"],
+  "/vendor/pdfjs/pdf.worker.min.js": ["vendor/pdfjs/pdf.worker.min.js", "text/javascript; charset=utf-8"],
 }
 
 const TYPES = {
@@ -320,6 +323,38 @@ function rootFiles(runDir) {
   return out.sort((a, b) => (a.name < b.name ? -1 : 1))
 }
 
+// ---------- comments on 1-mockup.html ----------
+
+const COMMENTS = path.join("agent", "comments.json")
+const TMP = ".rein-tmp-"
+const TEXT_MAX = 4000
+
+const commentsOf = j => (j && Array.isArray(j.comments) ? j.comments : [])
+
+// a file written whole through a temp file beside it (one the hub sync
+// skips), so the hook reading it never sees half of it; the rename is tried
+// again when Windows says EPERM or EBUSY (a virus scanner holds the file)
+async function writeAtomic(file, data) {
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const tmp = `${file}${TMP}${Math.random().toString(36).slice(2, 10)}`
+  fs.writeFileSync(tmp, data)
+  for (let i = 0; ; i++) {
+    try { return fs.renameSync(tmp, file) } catch (e) {
+      if (i >= 5 || (e.code !== "EPERM" && e.code !== "EBUSY")) {
+        fs.rmSync(tmp, { force: true })
+        throw e
+      }
+      await new Promise(r => setTimeout(r, 100 * (i + 1)))
+    }
+  }
+}
+
+// the stage a run is in, as the page reads it: frame.json's, else the trace's
+function stageOf(runDir) {
+  const frame = readJson(path.join(runDir, "agent", "frame.json"))
+  return (frame && frame.stage) || traceInfo(runDir).stage || "spec"
+}
+
 // ---------- serving ----------
 
 function send(res, code, type, body) {
@@ -422,6 +457,8 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
       summary: summary(runDir, trace.load, last),
       // what land commits; kept after the run closes, with the commit's result
       land: readJson(path.join(runDir, "agent", "land.json")),
+      // the person's comments on 1-mockup.html (agent/comments.json)
+      comments: commentsOf(readJson(path.join(runDir, COMMENTS))),
       files: rootFiles(runDir),
     }
     if (recordOf) run.pc = (recordOf(project, slug) || {}).pc ?? null
@@ -492,6 +529,53 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
     json(res, 200, { ok: true, text: parts[i] })
   }
 
+  // the person's comments on 1-mockup.html, while the run is active in spec:
+  // add a draft, edit or delete a draft, reopen a done or declined one. The
+  // hook and the MCP tool move the others (agent/comments.json).
+  async function comments(req, res) {
+    if (!/^application\/json\b/.test(req.headers["content-type"] || "")) return json(res, 415, { error: "json only" })
+    let b
+    try { b = JSON.parse(await readBody(req)) } catch { return json(res, 400, { error: "bad body" }) }
+    const { project, runId, op } = b || {}
+    if (![project, runId].every(s => typeof s === "string" && NAME_OK(s))) return json(res, 400, { error: "bad run" })
+    const runDir = path.join(ROOT, project, "active", runId)
+    if (!isDir(runDir)) return json(res, 409, { error: "the run is not active" })
+    if (stageOf(runDir) !== "spec") return json(res, 409, { error: "the run is not in spec" })
+    const textOk = t => typeof t === "string" && t.trim() !== "" && t.length <= TEXT_MAX
+    const file = path.join(runDir, COMMENTS)
+    let j = {}
+    try { j = JSON.parse(fs.readFileSync(file, "utf8")) } catch (e) {
+      // a file that is there but cannot be read is not written over
+      if (e.code !== "ENOENT") return json(res, 500, { error: "comments.json unreadable" })
+    }
+    const list = commentsOf(j)
+    let out = null
+    if (op === "add") {
+      const { screen, el, text } = b
+      if (typeof screen !== "string" || !screen || screen.length > 200) return json(res, 400, { error: "bad screen" })
+      if (el !== null && (typeof el !== "string" || !el || el.length > 200)) return json(res, 400, { error: "bad el" })
+      if (!textOk(text)) return json(res, 400, { error: "bad text" })
+      // a number is never given again, even after its draft was deleted
+      const n = Math.max(Number.isInteger(j.next) ? j.next : 1, ...list.map(c => (Number.isInteger(c.n) ? c.n + 1 : 1)))
+      out = { id: `c${n}`, n, screen, el, text: text.trim(), status: "draft", at: new Date().toISOString() }
+      list.push(out)
+      j.next = n + 1
+    } else if (["edit", "delete", "reopen"].includes(op)) {
+      const k = list.findIndex(c => c && c.id === b.id)
+      if (k < 0) return json(res, 404, { error: "no comment" })
+      const c = list[k]
+      const from = op === "reopen" ? ["done", "declined"] : ["draft"]
+      if (!from.includes(c.status)) return json(res, 409, { error: `the comment is ${c.status}` })
+      if (op === "edit") {
+        if (!textOk(b.text)) return json(res, 400, { error: "bad text" })
+        out = list[k] = { ...c, text: b.text.trim() }
+      } else if (op === "delete") list.splice(k, 1)
+      else out = list[k] = { ...c, status: "draft" }
+    } else return json(res, 400, { error: "bad op" })
+    await writeAtomic(file, JSON.stringify({ ...j, comments: list }, null, 2) + "\n")
+    json(res, 200, out ? { ok: true, comment: out } : { ok: true })
+  }
+
   // open a run file the page names by its /files/ URL on this PC
   async function open(req, res) {
     if (!/^application\/json\b/.test(req.headers["content-type"] || "")) return json(res, 415, { error: "json only" })
@@ -531,6 +615,10 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
         // only the run's own PC writes its folder
         if (readOnly) return send(res, 405, "text/plain", "read only")
         return await checklist(req, res)
+      }
+      if (req.method === "POST" && p === "/api/comments") {
+        if (readOnly) return send(res, 405, "text/plain", "read only")
+        return await comments(req, res)
       }
       if (req.method === "POST" && p === "/api/open") {
         // the file is on the PC that serves the page, not the one viewing it
