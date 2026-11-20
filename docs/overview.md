@@ -80,7 +80,7 @@ run 폴더 바로 아래에는 사람이 읽거나 쓰는 파일만 둡니다. �
 
 | 단계 | run 폴더 | `agent/` |
 |---|---|---|
-| spec | `1-spec.md`, `1-mockup.html` | `grade.md` |
+| spec | `1-spec.md`, `1-mockup.html`, `brief/`(기획서 사본) | `grade.md`, `comments.json`(사용자 코멘트), `layout-verify.md`, `layout/`(렌더링한 to-be) |
 | plan | `2-plan.md`, `2-plan.html` | `test-plan.md` |
 | dev | `handoff/` | `dev-items.md`, `dev-diff.md`(마지막 회차 diff), `fails.md`(회차별 읽은 실패), `deviation.md` |
 | review | | `review.md`, `review-groups.md`, `review-<n>.md` |
