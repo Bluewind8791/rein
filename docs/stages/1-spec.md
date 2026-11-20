@@ -5,6 +5,35 @@
 
 에이전트 지시: [skills/spec/SKILL.md](../../skills/spec/SKILL.md)
 
+```mermaid
+flowchart TD
+    A["/rein:spec 요청"] --> O["status → rein:slug → open_run<br/>run 폴더 생성, 룰 동결"]
+    O -->|"config 없음"| C["rein:setup"] --> O
+    O --> S["1-spec.md 작성<br/>전제 확인·현행 동작·범위"]
+    S -->|"요청과 코드가 다름"| U["사용자에게 먼저 질문"] --> S
+    S --> K{"기획서 있음?"}
+    K -->|"있음"| CO["rein:collator<br/>빠진·틀린 요구사항"] --> M
+    K -->|"없음"| M{"화면 배치가 바뀜?"}
+    M -->|"예"| D["첫 그림<br/>rein:as-is → rein:sketcher"] --> G
+    M -->|"아니오"| G["rein:grader<br/>grade.md"]
+    G -->|"모호도 0.25 초과<br/>또는 하드 게이트"| Q["가장 약한 차원을<br/>질문 하나씩"]
+    Q --> W["답을 1-spec.md에 적음<br/>화면이 바뀌면 sketcher 백그라운드"]
+    W -->|"다음 질문"| Q
+    W -->|"질문 3개마다"| G
+    Q -->|"사용자: 충분"| N["남은 빈칸을<br/>미해결 질문으로"] --> E
+    G -->|"통과"| E["End<br/>spec이 바뀌었으면 collator·sketcher 다시"]
+    E --> V{"advance<br/>훅이 확인"}
+    V -->|"거부"| E
+    V -->|"통과"| H["사용자 대기<br/>/rein:plan 으로 승인"]
+    H -->|"고칠 곳을 말함"| R["1-spec.md 고침"] --> G
+```
+
+1. run을 엽니다(「run 시작」).
+2. 코드를 읽어 `1-spec.md`를 씁니다. 요청의 주장이 코드와 다르면 다른 질문보다 먼저 묻습니다.
+3. 기획서가 있으면 `rein:collator`, 화면 배치가 바뀌면 첫 그림을 그립니다(「기획서 대조」, 「그림」).
+4. 채점하고, 통과할 때까지 질문을 하나씩 합니다(「채점과 질문」).
+5. `advance`가 통과하면 사용자가 `/rein:plan`으로 승인합니다(「끝 — 사람 승인」).
+
 ## run 시작
 
 run이 열려 있지 않으면 훅은 아무것도 막지 않습니다. run을 여는 길은 `/rein:spec <요청>` 하나뿐입니다.
@@ -69,6 +98,23 @@ run이 열려 있지 않으면 훅은 아무것도 막지 않습니다. run을 �
 화면 배치가 바뀌거나 새 화면이 생기면 필수, 흐름·구조 변화는 도움이 될 때만 그립니다.
 목업의 to-be가 이 작업의 통일된 기획서 노릇을 하므로, 처음부터 to-be까지 그리고 답에 맞춰 고쳐 그립니다.
 에이전트 둘이 나눠 그리고, 훅이 두 파일을 합쳐 `1-mockup.html`을 씁니다.
+
+```mermaid
+flowchart TD
+    T["spec의 화면 표"] --> AS["rein:as-is<br/>agent/asis.html"]
+    SP["1-spec.md, 기획서 그림"] --> SK["rein:sketcher<br/>agent/tobe.html"]
+    AS --> SK
+    SK --> HK{"훅이 as-is 표식 확인"}
+    HK -->|"표식 없음, id 없음"| SK
+    HK -->|"합침"| MK["1-mockup.html"]
+    MK --> SRC{"to-be source 있고<br/>첫 그림 또는 End?"}
+    SRC -->|"예"| RD["훅이 렌더링<br/>agent/layout/mockup/id.png"]
+    RD --> LV["rein:layout-verifier<br/>agent/layout-verify.md"]
+    LV -->|"다름, 진전 있음"| SK
+    LV -->|"맞음, 또는 모두 진전 없음"| NX["계속<br/>첫 그림이면 채점, End면 advance"]
+    SRC -->|"아니오"| NX
+    MK -->|"사용자 코멘트, 답"| SK
+```
 
 | 에이전트 | 읽는 것 | 쓰는 것 | 언제 |
 |---|---|---|---|
