@@ -44,8 +44,10 @@ let ui = {} // what the person picked in the drawn view: tab, page, row, filter,
 const folded = { active: false, complete: false, defer: true, drop: true }
 // 1-mockup.html is shown between the planning documents on its left and a
 // timeline folded into a rail; the rail opens on a click until another
-// artifact is picked. mockShow: the part of each screen shown.
+// artifact is picked. Any other artifact shows the timeline open until the
+// person folds it. mockShow: the part of each screen shown.
 let railOpen = false
+let railFold = false
 let mockShow = "after" // "before" | "after" | "both"
 const isMock = (run) => !!run && sel.key === "1-mockup"
 
@@ -236,9 +238,10 @@ function render() {
     clearTimeout(cm.timer)
     cm = freshCm(key)
   }
-  document.querySelector(".body").classList.toggle("railed", mock && !railOpen)
+  const railed = mock ? !railOpen : railFold
+  document.querySelector(".body").classList.toggle("railed", railed)
   $("work").classList.toggle("left", mock)
-  renderLeft(run, mock && !railOpen)
+  renderLeft(run, railed)
   if (mock) autoSide(run)
   renderMain(run)
   renderSide(run)
@@ -426,7 +429,7 @@ function renderLeft(run, rail = false) {
   }).join("")
   const others = run.arts.filter((a) => a.stage === "other")
   const other = others.length ? `<div class="other"><span class="sk">그 밖의 파일</span>${others.map(artRow).join("")}</div>` : ""
-  setHTML($("left"), statusCard(run) + steps + other)
+  setHTML($("left"), `<button type="button" class="rlx fold" data-fold-rail title="타임라인 접기">«</button>` + statusCard(run) + steps + other)
 }
 
 // the ways an artifact can be shown, its default first: the frame's own
@@ -1789,7 +1792,13 @@ $("main").addEventListener("load", (e) => {
 
 $("left").addEventListener("click", (e) => {
   if (document.querySelector(".body.railed")) {
-    railOpen = true
+    if (isMock(findRun(sel.project, sel.slug))) railOpen = true
+    else railFold = false
+    return render()
+  }
+  if (e.target.closest("[data-fold-rail]")) {
+    if (isMock(findRun(sel.project, sel.slug))) railOpen = false
+    else railFold = true
     return render()
   }
   const q = e.target.closest("[data-sumq]")

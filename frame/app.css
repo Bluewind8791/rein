@@ -202,6 +202,7 @@ blockquote { margin: 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--li
 .body.railed .rail .stem { flex: none; height: 18px; }
 .rlx { font: 600 14px var(--mono); color: var(--mute); margin-bottom: 14px; }
 .rlx:hover { color: var(--ink); }
+.rlx.fold { align-self: flex-end; margin: -10px 10px 4px 0; }
 .seg { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .seg button { padding: 1px 9px; color: var(--ink2); white-space: nowrap; }
 .seg button + button { border-left: 1px solid var(--line); }
