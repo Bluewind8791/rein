@@ -213,6 +213,11 @@ async function runOne(caseName: string, n: number): Promise<Outcome> {
     stopped = abort.signal.aborted ? `time limit (${RUN_LIMIT_MS / 60_000} min)` : `error: ${String(err)}`
   } finally {
     clearTimeout(timer)
+    // Rein's frame server for this home outlives the session (it idles out
+    // after 30 minutes) and holds the run's folders until then.
+    try {
+      process.kill(JSON.parse(readFileSync(join(home, ".rein", "frame", "server.json"), "utf8")).pid)
+    } catch {}
   }
 
   const run = findRun(home)
