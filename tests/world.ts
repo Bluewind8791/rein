@@ -107,6 +107,8 @@ export type Host = {
   env?: Record<string, string>
   // Whether the hook's folder move succeeds; undefined: it does.
   move?: (from: string, to: string) => boolean
+  // Whether the hook's file removal succeeds; undefined: it does.
+  remove?: (path: string) => boolean
   // Store entries besides the run's, e.g. other runs and legacy keys.
   store?: Record<string, unknown>
   // Whether a store write fails (the engine rejects past 4 MiB); undefined: it does not.
@@ -235,6 +237,13 @@ export function world(
     const env = e.init?.env ?? {}
     const isPs = e.argv[0] === "powershell.exe" && env.REIN_FROM !== undefined
     if (e.argv[0] === "mkdir") return exited({ exitCode: 0 })
+    // the hook's file removal, PowerShell on Windows or rm elsewhere.
+    if ((e.argv[0] === "powershell.exe" && env.REIN_REMOVE !== undefined) || e.argv[0] === "rm") {
+      const path = env.REIN_REMOVE ?? e.argv.at(-1)!
+      if (host.remove?.(path) === false) return exited({ exitCode: 1, stderr: "The process cannot access the file because it is being used by another process.\r\n" })
+      delete files[path]
+      return exited({ exitCode: 0 })
+    }
     if (isPs || e.argv[0] === "mv") {
       const [from, to] = isPs ? [env.REIN_FROM!, env.REIN_TO!] : [e.argv[2]!, e.argv[3]!]
       moves.push({ from, to, argv: [...e.argv] })

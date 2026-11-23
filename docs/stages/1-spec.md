@@ -204,6 +204,7 @@ run이 spec 단계일 때 사용자는 프레임에서 to-be의 요소(또는 �
 ## 채점과 질문
 
 `rein:grader`가 `1-spec.md`만 읽고 `grade.md`를 씁니다. 대화는 보지 않습니다.
+다시 채점할 때는 훅이 grader를 띄우기 전에 이전 `grade.md`를 지웁니다. 새 grader는 이전 채점을 보지 않고 새 파일을 씁니다. 이전 점수는 run 기록과 trace에 남아 있습니다.
 
 | 차원 | feature | bugfix | improvement | 채우는 쪽 |
 |---|---|---|---|---|

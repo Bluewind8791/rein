@@ -115,6 +115,23 @@ describe("the grader (D175)", () => {
     expect(await $.agent.spawn(spawn)).toEqual(refused("D175: 1-spec.md has not changed since its last grade (ambiguity 0.1)"))
   })
 
+  test("a new grader finds no grade.md: the hook removes the last one, or refuses the spawn when it cannot", async ($, on) => {
+    const files: Record<string, string> = { [SPEC]: SPEC_TEXT }
+    let removable = true
+    world(on, files, undefined, undefined, { remove: () => removable })
+    await $.agent.spawn(spawn)
+    await $.tool.call({ tool: "Write", file_path: GRADE, content: gradeMd(), agentId: GRADER } as never)
+    expect(files[GRADE]).toBeDefined()
+    files[SPEC] = `${SPEC_TEXT}\n더 적음\n`
+    removable = false
+    expect(await $.agent.spawn(spawn)).toEqual(refused("The last grade.md could not be removed for the new grader"))
+    expect(files[GRADE]).toBeDefined()
+    removable = true
+    await $.agent.spawn(spawn)
+    expect(files[GRADE]).toBeUndefined()
+    expect(spawned).toHaveLength(2)
+  })
+
   test("reads 1-spec.md and writes grade.md, nothing else; a grade.md by anyone else is no grade", async ($, on) => {
     world(on, { [SPEC]: SPEC_TEXT, "E:/proj/src/a.ts": "x" })
     // the main session may write it, but the hook does not take it as a grade.

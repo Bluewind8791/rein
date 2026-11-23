@@ -123,6 +123,8 @@ const SKILL: Record<Stage, string> = { spec: "rein:spec", plan: "rein:plan", dev
 // paths come in through the environment, so no quoting can break them;
 // Directory.Move is one rename, so a failure leaves nothing half moved.
 const MOVE_PS = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; try { New-Item -ItemType Directory -Force -Path (Split-Path -Parent $env:REIN_TO) -ErrorAction Stop | Out-Null; [IO.Directory]::Move($env:REIN_FROM, $env:REIN_TO) } catch { [Console]::Error.WriteLine($_.Exception.GetBaseException().Message); exit 1 }"
+// the removal of one file, on Windows (removeFile).
+const REMOVE_PS = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; try { Remove-Item -LiteralPath $env:REIN_REMOVE -Force -ErrorAction Stop } catch { [Console]::Error.WriteLine($_.Exception.GetBaseException().Message); exit 1 }"
 // the last line of the transcript that records the session's name.
 const TITLE_PS = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; Select-String -LiteralPath $env:REIN_FILE -SimpleMatch -Pattern $env:REIN_PATTERN -Encoding UTF8 | Select-Object -Last 1 | ForEach-Object { $_.Line }"
 // A transcript is past what $.fs.read takes, and $.fs.write writes only
@@ -586,6 +588,20 @@ async function relocate($: EngineInterface, from: string, to: string): Promise<s
     return String(err)
   }
   return (await $.fs.exists(to)) ? undefined : `the move from ${from} to ${to} did not complete`
+}
+
+// The file at path goes: on Windows PowerShell does it (REMOVE_PS),
+// elsewhere rm. Undefined once it is gone, else why not.
+async function removeFile($: EngineInterface, path: string): Promise<string | undefined> {
+  try {
+    const r = /^[A-Za-z]:\//.test(path)
+      ? await $.process.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", REMOVE_PS], { env: { REIN_REMOVE: path } })
+      : await $.process.run(["rm", "-f", "--", path])
+    if (r.exitCode !== 0) return (r.stderr.trim() || r.stdout.trim()).split(/\r?\n/)[0]!.slice(0, 300) || `exited ${r.exitCode}`
+  } catch (err) {
+    return String(err)
+  }
+  return (await $.fs.exists(path)) ? `${path} is still there` : undefined
 }
 
 // the run leaves active/ for defer/, complete/ or drop/. In one
@@ -5951,6 +5967,13 @@ export const register: Register = (on) => {
     const refusal = run.stage === "spec" ? await graderRefusal($, run) : undefined
     if (refusal !== undefined) return { deny: refusal }
     const c = await ctxOf($, run)
+    // a new grader writes grade.md afresh: the engine lets an agent Write
+    // over a file only once it Read it, and the grader may not read the
+    // last grade (run.grades and the trace keep it).
+    if (run.stage === "spec" && (await $.fs.exists(`${c.dir}/agent/grade.md`))) {
+      const problem = await removeFile($, `${c.dir}/agent/grade.md`)
+      if (problem !== undefined) return { deny: `The last grade.md could not be removed for the new grader, so it could not write its grade: ${problem}. Remove ${c.dir}/agent/grade.md, then spawn rein:grader again.` }
+    }
     const worker = row.field === "worker"
     const prompt = worker ? await withKnowledge($, devTask(c.run, c.dir, c.root, await toBeShots($, c.dir, run.layouts ?? [])), WORKER_USE, run)
       : run.stage === "dev" ? await withKnowledge($, await judgeTask($, c, e.prompt), ARBITER_USE, run)
