@@ -1,0 +1,9 @@
+{
+  "name": "shop-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test"
+  }
+}

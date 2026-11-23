@@ -1,3 +1,6 @@
 .claude/types/
 .claude/worktrees/
 .rein/
+eval/node_modules/
+eval/results/
+!eval/fixture/.rein/

@@ -308,6 +308,35 @@ Claude Code에는 `claude plugin test <dir>`도 있습니다. 파일 시스템 �
 플러그인 아래에 깔려 `fs`·`session`·`tool.call`에도 답할 수 있습니다. 엔진은 경로를
 플랫폼 형태(Windows면 역슬래시)로 넘깁니다.
 
+## eval — 실제 모델로 run을 끝까지
+
+`claude plugin test`는 모델 없이 훅을 시험합니다. 실제 모델이 run 하나를 spec부터
+land까지 끝내는지, 결과 코드가 요청을 채우는지는 `eval/`이 봅니다. 모델 출력은
+매번 다르므로 한 번의 성패가 아니라 여러 번 돌린 통과율로 봅니다. 설계와 결정은
+이슈 #6에 있습니다.
+
+```sh
+cd eval && npm install      # 처음 한 번: Agent SDK
+node eval/run.ts                                   # case 전부, 각 3회, 3개씩 동시에
+node eval/run.ts order-total --runs 1 --parallel 1 # case 하나, 한 번
+```
+
+인증은 `claude setup-token`으로 만든 토큰입니다. `CLAUDE_CODE_OAUTH_TOKEN` 환경변수에
+두거나, 저장소 밖 파일 `~/.rein-eval-token`에 저장합니다.
+
+| | |
+|---|---|
+| fixture | `eval/fixture/` — 의존성 없는 Node 앱. 주문·회원 목록 화면, `node --test`, config에는 `qa`만 (e2e 없음) |
+| case | `eval/cases/<이름>/` — `request.md`(요청), `intent.md`(요청자의 진짜 의도), `accept.test.js`(숨긴 인수 테스트) |
+| 실행 | run마다 fixture를 임시 폴더에 복사하고 커밋한 뒤 `/rein:autopilot <요청>`으로 세션을 띄움. 플러그인은 `eval/`을 뺀 사본으로 불러 모델이 인수 테스트를 못 봄 |
+| 격리 | 세션의 `USERPROFILE`·`HOME`을 run마다 임시 폴더로 둠. 실제 `~/.rein`·허브에 닿지 않음. 사용자 설정·MCP는 `settingSources: []`, `strictMcpConfig: true`로 막음 |
+| spec 질문 | 사용자 시뮬레이터(Haiku)가 `intent.md`만 근거로 답함. 문서가 정하지 않은 것은 「나중에 정하자」 |
+| 통과 | run 폴더가 `complete/`이고 trace에 `land → 닫힘`, `halt`·`error` 없음, 커밋 하나 이상, land가 남긴 코드에서 `accept.test.js` 통과 |
+| 결과 | `eval/results/<시각>/summary.md`(표)와 run마다 트랜스크립트·시뮬레이터 기록·run 폴더 사본·`diff.patch`·인수 테스트 출력. 커밋하지 않음 |
+
+case를 더할 때 인수 테스트는 `createServer()`로 서버를 띄워 HTTP 응답만 봅니다.
+모델이 새로 만들 함수 이름에 기대면 맞게 고친 run도 실패합니다.
+
 ## 남은 일
 
 GitHub Issues에서 관리합니다.
