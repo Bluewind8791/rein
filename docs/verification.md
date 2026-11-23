@@ -331,7 +331,8 @@ node eval/run.ts order-total --runs 1 --parallel 1 # case 하나, 한 번
 | 실행 | run마다 fixture를 임시 폴더에 복사하고 커밋한 뒤 `/rein:autopilot <요청>`으로 세션을 띄움. 플러그인은 `eval/`을 뺀 사본으로 불러 모델이 인수 테스트를 못 봄 |
 | 격리 | 세션의 `USERPROFILE`·`HOME`을 run마다 임시 폴더로 둠. 실제 `~/.rein`·허브에 닿지 않음. 사용자 설정·MCP는 `settingSources: []`, `strictMcpConfig: true`로 막음 |
 | spec 질문 | 사용자 시뮬레이터(Haiku)가 `intent.md`만 근거로 답함. 문서가 정하지 않은 것은 「나중에 정하자」 |
-| 통과 | run 폴더가 `complete/`이고 trace에 `land → 닫힘`, `halt`·`error` 없음, 커밋 하나 이상, land가 남긴 코드에서 `accept.test.js` 통과 |
+| 화면 배치 | run이 `layout-unchecked`로 사람을 기다리면 러너가 사람 대신 `5-checklist.md`의 배치 칸을 체크하고 같은 세션에 `/rein:land`를 보냄. 배치가 실제로 맞는지는 판정하지 않음 |
+| 통과 | run 폴더가 `complete/`이고 trace에 `land → 닫힘`, `halt`(러너가 대답한 `layout-unchecked` 빼고)·`error` 없음, 커밋 하나 이상, land가 남긴 코드에서 `accept.test.js` 통과 |
 | 결과 | `eval/results/<시각>/summary.md`(표)와 run마다 트랜스크립트·시뮬레이터 기록·run 폴더 사본·`diff.patch`·인수 테스트 출력. 커밋하지 않음 |
 
 case를 더할 때 인수 테스트는 `createServer()`로 서버를 띄워 HTTP 응답만 봅니다.

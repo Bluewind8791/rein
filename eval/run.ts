@@ -48,7 +48,8 @@ const git = (cwd: string, ...args: string[]) => spawnSync("git", args, { cwd, en
 type Outcome = {
   name: string
   closed: boolean // the run folder is in complete/ and the trace has land → closed
-  halts: number
+  halts: number // not counting the layout waits the runner answered
+  layouts: number // layout waits the runner answered for the person
   errors: number
   commits: number // commits on top of the fixture's own
   accept: boolean
@@ -105,6 +106,17 @@ async function simulate(intent: string, questions: Question[], env: Record<strin
   return questions.map((q, i) => ({ q, answer: parsed[i]?.answer ?? "나중에 정하자", inIntent: parsed[i]?.inIntent ?? false }))
 }
 
+function readTrace(dir: string): Record<string, unknown>[] {
+  const path = join(dir, "agent", "trace.jsonl")
+  return existsSync(path) ? readFileSync(path, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l) as Record<string, unknown>) : []
+}
+
+// the run's last halt is `layout-unchecked` and nothing moved it since.
+function waitsForLayout(trace: Record<string, unknown>[]): boolean {
+  const at = trace.findLastIndex(e => e.ev === "halt")
+  return at >= 0 && (trace[at]!.halt as { rule?: string } | undefined)?.rule === "layout-unchecked" && !trace.slice(at + 1).some(e => e.ev === "stage" || e.ev === "release")
+}
+
 function findRun(home: string): { state: string; dir: string } | undefined {
   const rein = join(home, ".rein")
   if (!existsSync(rein)) return
@@ -148,9 +160,10 @@ async function runOne(caseName: string, n: number): Promise<Outcome> {
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), RUN_LIMIT_MS)
 
-  try {
+  let session: string | undefined
+  const drive = async (prompt: string) => {
     for await (const m of query({
-      prompt: `/rein:autopilot ${request}`,
+      prompt,
       options: {
         cwd: work,
         env,
@@ -160,6 +173,7 @@ async function runOne(caseName: string, n: number): Promise<Outcome> {
         permissionMode: "default",
         maxTurns: 1000,
         abortController: abort,
+        ...(session ? { resume: session } : {}),
         canUseTool: async (tool, input) => {
           if (tool !== "AskUserQuestion") return { behavior: "allow", updatedInput: input }
           const qs = (input.questions ?? []) as Question[]
@@ -171,11 +185,29 @@ async function runOne(caseName: string, n: number): Promise<Outcome> {
       },
     }) as AsyncIterable<SDKMessage>) {
       appendFileSync(transcript, JSON.stringify(m) + "\n")
-      if (m.type === "system" && m.subtype === "init") model = m.model
+      if (m.type === "system" && m.subtype === "init") {
+        model = m.model
+        session = m.session_id
+      }
       if (m.type === "result") {
         cost = m.total_cost_usd
         stopped = m.subtype === "success" ? m.result.slice(-300) : m.subtype
       }
+    }
+  }
+
+  // The layout comparison only a person makes (`layout-unchecked`): the
+  // runner stands in for them, checks the layout boxes of 5-checklist.md and
+  // types /rein:land, as the run tells them to. Whether the layout really
+  // matches is not what the eval judges.
+  let layouts = 0
+  try {
+    await drive(`/rein:autopilot ${request}`)
+    for (let run = findRun(home); run?.state === "active" && waitsForLayout(readTrace(run.dir)) && layouts < 3; run = findRun(home)) {
+      const list = join(run.dir, "5-checklist.md")
+      if (existsSync(list)) writeFileSync(list, readFileSync(list, "utf8").replace(/^(\s*- )\[ \](\s*\*\*배치 )/gm, "$1[x]$2"))
+      layouts++
+      await drive("/rein:land")
     }
   } catch (err) {
     stopped = abort.signal.aborted ? `time limit (${RUN_LIMIT_MS / 60_000} min)` : `error: ${String(err)}`
@@ -184,12 +216,10 @@ async function runOne(caseName: string, n: number): Promise<Outcome> {
   }
 
   const run = findRun(home)
-  const trace = run && existsSync(join(run.dir, "agent", "trace.jsonl"))
-    ? readFileSync(join(run.dir, "agent", "trace.jsonl"), "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l) as Record<string, unknown>)
-    : []
+  const trace = run ? readTrace(run.dir) : []
   if (run) cpSync(run.dir, join(out, "run"), { recursive: true })
   const closed = run?.state === "complete" && trace.some(e => e.ev === "stage" && e.from === "land" && e.to === null)
-  const halts = trace.filter(e => e.ev === "halt").length
+  const halts = trace.filter(e => e.ev === "halt" && (e.halt as { rule?: string } | undefined)?.rule !== "layout-unchecked").length
   const errors = trace.filter(e => e.ev === "error").length
   const commits = Number(git(work, "rev-list", "--count", "HEAD").stdout.trim() || "1") - 1
 
@@ -204,6 +234,7 @@ async function runOne(caseName: string, n: number): Promise<Outcome> {
     name,
     closed,
     halts,
+    layouts,
     errors,
     commits,
     accept: accepted.status === 0,
@@ -238,9 +269,9 @@ const lines = [
   "",
   `통과 ${outcomes.filter(passed).length}/${outcomes.length}`,
   "",
-  "| run | 통과 | land 닫힘 | halt | error | 커밋 | 인수 | 질문 (의도 밖) | 분 | 비용 USD | 멈춘 이유 |",
-  "|---|---|---|---|---|---|---|---|---|---|---|",
-  ...outcomes.map(o => `| ${o.name} | ${yes(passed(o))} | ${yes(o.closed)} | ${o.halts} | ${o.errors} | ${o.commits} | ${yes(o.accept)} | ${o.questions} (${o.outside}) | ${o.minutes} | ${o.cost.toFixed(2)} | ${o.stopped.replace(/\s+/g, " ").replace(/\|/g, "\\|").slice(0, 120)} |`),
+  "| run | 통과 | land 닫힘 | halt | 배치 대답 | error | 커밋 | 인수 | 질문 (의도 밖) | 분 | 비용 USD | 멈춘 이유 |",
+  "|---|---|---|---|---|---|---|---|---|---|---|---|",
+  ...outcomes.map(o => `| ${o.name} | ${yes(passed(o))} | ${yes(o.closed)} | ${o.halts} | ${o.layouts} | ${o.errors} | ${o.commits} | ${yes(o.accept)} | ${o.questions} (${o.outside}) | ${o.minutes} | ${o.cost.toFixed(2)} | ${o.stopped.replace(/\s+/g, " ").replace(/\|/g, "\\|").slice(0, 120)} |`),
   "",
 ]
 writeFileSync(join(results, "summary.md"), lines.join("\n"))
