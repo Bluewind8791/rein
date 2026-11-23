@@ -240,6 +240,8 @@ button.brow:hover { background: oklch(0.975 0.01 255); }
 .sb.chg { background: var(--nowbg); color: oklch(0.45 0.13 255); }
 .sb.exc { background: var(--paper2); color: var(--mute); border: 1px solid var(--line); }
 .sb.q { background: var(--workbg); color: oklch(0.45 0.12 75); }
+.sb.hold { background: var(--paper2); color: var(--ink2); border: 1px dashed var(--line); }
+.brow .el { font: 11px var(--mono); color: var(--mute); margin-left: 6px; }
 .sbrief { border-left: 1px solid var(--line); background: var(--paper2); display: flex; flex-direction: column; min-height: 0; }
 .bhd { display: flex; align-items: baseline; gap: 10px; padding: 14px 14px 8px; font: 12px var(--mono); color: var(--ink2); }
 .bhd .bx { flex: none; font-size: 15px; line-height: 1; color: var(--mute); padding: 0 2px; }

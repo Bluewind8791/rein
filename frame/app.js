@@ -33,7 +33,7 @@ let skew = 0 // server clock minus ours
 let ro = false // the hub's page: read only, and each run names its PC
 let hub = null // a local page's uploader status (/api/runs hub); null without a server
 let sel = readHash() // { project, slug, key, view, side }
-let sideAt = { page: null, req: null } // the PDF page and the 기획서 대조 row the right tab was opened for
+let sideAt = { page: null, req: null } // the PDF page and the 요구사항 row the right tab was opened for
 const sideOff = new Set() // "<project>/<slug>" of runs whose right tab the person closed
 let fav = "done"
 let shown = null // { id, sig } of what the right pane shows
@@ -800,8 +800,9 @@ function reloadFrame(iframe) {
 
 // the sections of 1-spec.md the spec view shows, in this order; the others
 // (완료 판정, 전제 확인, 현행 동작, 영향 범위, ...) are for the agents.
+// 기획서 대조 is what 요구사항 was called before #4.
 // A section without its own drawing below is shown as markdown.
-const SPEC_SHOWN = ["문제", "범위", "기획서 대조"]
+const SPEC_SHOWN = ["문제", "범위", "요구사항", "기획서 대조"]
 
 const DRAWN = { "1-spec": { draw: drawSpec }, "6-land": { draw: drawLand, plan: true } }
 
@@ -874,7 +875,7 @@ function drawSpec(pane, d, keep) {
   const body = SPEC_SHOWN.filter((n) => secs.has(n)).map((n) => {
     const lines = secs.get(n)
     if (n === "범위") return scopeSec(lines, md)
-    if (n === "기획서 대조") return briefSec(run, lines, docs)
+    if (n === "요구사항" || n === "기획서 대조") return briefSec(run, lines, docs, n)
     return `<h2>${esc(n)}</h2>${md(lines.join("\n"))}`
   }).join("")
   if (!pane.querySelector(".sdoc")) pane.innerHTML = `<div class="sdoc"><div class="doc"></div></div>`
@@ -948,12 +949,17 @@ function scopeSec(lines, md) {
   return html
 }
 
-const STATUS_WORD = /포함|변경|제외|\[\?\]/
-const STATUS_CLS = { 포함: "inc", 변경: "chg", 제외: "exc", "[?]": "q" }
+const STATUS_WORD = /포함|변경|보류|제외|\[\?\]/
+const STATUS_CLS = { 포함: "inc", 변경: "chg", 보류: "hold", 제외: "exc", "[?]": "q" }
 
-// one row of 기획서 대조: "p.N <requirement> — <status>[: <detail>]";
-// the status word is looked for anywhere, as older rows put it elsewhere
-function briefRow(text) {
+// one row of 요구사항: "p.N <requirement> — <status>[: <detail>] [<element>]";
+// the status word is looked for anywhere, as older rows put it elsewhere.
+// The element, the mockup's data-id (`-`: the whole screen), is the last
+// bracket of the line that is not [?].
+function briefRow(line) {
+  const em = /\s\[([^\]?][^\]]*)\]\s*$/.exec(line)
+  const el = em ? em[1].trim() : null
+  const text = em ? line.slice(0, em.index) : line
   const pm = /^p\.(\d+)\s+/.exec(text)
   const k = text.indexOf(" — ")
   const req = (k < 0 ? text : text.slice(0, k)).slice(pm ? pm[0].length : 0)
@@ -961,7 +967,7 @@ function briefRow(text) {
   const sm = STATUS_WORD.exec(tail) || STATUS_WORD.exec(text)
   const status = sm ? sm[0] : null
   const detail = sm && tail.startsWith(sm[0]) ? tail.slice(sm[0].length).replace(/^\s*[:：.,]?\s*/, "") : tail
-  return { p: pm ? Number(pm[1]) : null, req, status, detail, q: text.includes("[?]") }
+  return { p: pm ? Number(pm[1]) : null, req, status, detail, q: text.includes("[?]"), el }
 }
 
 // 원본: `brief/a.pptx` (p.3~p.5 = 1~3쪽, p.7 = 4쪽)
@@ -981,7 +987,7 @@ function pageOf(src, n) {
   return m ? m.at + n - m.a : null
 }
 
-function briefSec(run, lines, docs) {
+function briefSec(run, lines, docs, title) {
   // groups: each 원본 line with the rows under it; consecutive 원본 lines
   // (older runs listed them all on top) share the rows that follow
   const groups = []
@@ -1009,7 +1015,7 @@ function briefSec(run, lines, docs) {
   const ctx = { href: linkHref(run) }
   const filt = [[null, "전체", all.length], ["chg", "변경", nChg], ["q", "[?]", nQ]]
     .map(([f, label, n]) => `<button type="button" class="${(ui.filter || null) === f ? "on" : ""}" data-filter="${f || ""}">${label} <b>${n}</b></button>`).join("")
-  let html = `<h2>기획서 대조 <span class="cnt">${all.length}줄</span></h2><div class="bfilter">${filt}</div>`
+  let html = `<h2>${esc(title)} <span class="cnt">${all.length}줄</span></h2><div class="bfilter">${filt}</div>`
   for (const g of groups) {
     const rows = g.items.filter((x) => x.req !== undefined)
     // the tab of the brief/ file this group reads, when it has exactly one
@@ -1017,9 +1023,10 @@ function briefSec(run, lines, docs) {
     if (doc && !ui.first) ui.first = doc.id
     const names = g.srcs.map((s) => `<span class="nm" title="${esc(s.path)}">${esc(s.name)}</span><span class="rel">${s.note ? `(${esc(s.note)})` : ""}</span>`).join("")
     const cnt = `${rows.length}줄${rows.some((x) => x.status === "변경") ? ` · 변경 ${rows.filter((x) => x.status === "변경").length}` : ""}${rows.some((x) => x.q) ? ` · [?] ${rows.filter((x) => x.q).length}` : ""}`
+    // the lines above every 원본 line come from the request itself
     const head = g.srcs.length
       ? `<${doc ? `button type="button" data-tab="${esc(doc.id)}"` : "div"} class="bgh"><span class="srcs">${names}</span><span class="cnt">${cnt}</span></${doc ? "button" : "div"}>`
-      : ""
+      : rows.length && title === "요구사항" ? `<div class="bgh"><span class="srcs"><span class="nm">요청</span></span><span class="cnt">${cnt}</span></div>` : ""
     let body = ""
     for (const x of g.items) {
       if (x.head !== undefined) { body += `<div class="bsub">${Md.inline(x.head, ctx)}</div>`; continue }
@@ -1032,7 +1039,7 @@ function briefSec(run, lines, docs) {
       const i = jump ? ui.rows.push({ ...jump, req: x.req }) - 1 : -1
       if (!keep(x)) continue
       const badges = (x.status ? `<span class="sb ${STATUS_CLS[x.status]}">${esc(x.status)}</span>` : "") + (x.q && x.status !== "[?]" ? `<span class="sb q">[?]</span>` : "")
-      const inner = `<span class="rq">${x.p !== null ? `<span class="pn">p.${x.p}</span>` : ""}${Md.inline(x.req, ctx)}</span><span class="st">${badges}</span>` +
+      const inner = `<span class="rq">${x.p !== null ? `<span class="pn">p.${x.p}</span>` : ""}${Md.inline(x.req, ctx)}${x.el ? `<span class="el">[${esc(x.el)}]</span>` : ""}</span><span class="st">${badges}</span>` +
         (x.detail ? `<span class="dt">${Md.inline(x.detail, ctx)}</span>` : "")
       if (jump) {
         body += `<button type="button" class="brow${ui.row === i ? " on" : ""}" data-row="${i}" title="${jump.page ? `${jump.page}쪽으로` : "그림 보기"}">${inner}</button>`
@@ -1043,7 +1050,7 @@ function briefSec(run, lines, docs) {
   return html
 }
 
-// the documents of brief/ the right tab opens for 기획서 대조, by artifact
+// the documents of brief/ the right tab opens for 요구사항, by artifact
 // key. A .pptx stands for the PDF of the same name.
 function briefDocs(run) {
   const files = run.files.filter((f) => f.name.startsWith("brief/"))

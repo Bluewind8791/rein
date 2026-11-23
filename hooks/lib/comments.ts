@@ -74,7 +74,7 @@ export function handOverText(dir: string, comments: Comment[]): string {
     ? ` A \`근거:\` line under a comment is the part of a planning document (a file of ${dir}) the user boxed as its basis; read it there.`
     : ""
   return [
-    `The user left ${comments.length} comment${comments.length === 1 ? "" : "s"} on ${dir}/1-mockup.html in the frame's comment panel; they are now sent to you. For each one: reflect it in ${dir}/1-spec.md (a requirement it changes or leaves out becomes a \`변경: … (사용자, YYYY-MM-DD)\` or \`제외 (사용자, YYYY-MM-DD: …)\` line of \`## 기획서 대조\`), have rein:sketcher draw again, then mark it with mcp__rein__comment: done with one line on what changed, or declined with one line on why not. When a comment's meaning is unclear, ask the user in the chat before you mark it. advance refuses spec's End while a comment is unmarked.${basis}`,
+    `The user left ${comments.length} comment${comments.length === 1 ? "" : "s"} on ${dir}/1-mockup.html in the frame's comment panel; they are now sent to you. For each one: reflect it in ${dir}/1-spec.md (a requirement it adds, changes, puts off or leaves out becomes a line of \`## 요구사항\` ending with the element the comment is on, \`[<data-id>]\`: \`포함\`, \`변경: … (사용자, YYYY-MM-DD)\`, \`보류 (사용자, YYYY-MM-DD: …)\` or \`제외 (사용자, YYYY-MM-DD: …)\`), have rein:sketcher draw again, then mark it with mcp__rein__comment: done with one line on what changed, or declined with one line on why not. When a comment's meaning is unclear, ask the user in the chat before you mark it. advance refuses spec's End while a comment is unmarked.${basis}`,
     ...items,
   ].join("\n\n")
 }

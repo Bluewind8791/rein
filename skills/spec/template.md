@@ -46,16 +46,20 @@ slug: <runId>
 | 내보내기·보고서 | | |
 | 외부 연동 | | |
 
-## 기획서 대조
+## 요구사항
+
+- <one requirement of the request itself> — 포함 [<data-id>]
+- <a rule of the whole screen> — 포함 [-]
 
 원본: `brief/<file name of the copy>` (p.<first printed page>~p.<last> = <first file page>~<last>쪽)
-- p.<n> <one requirement of the document> — 포함
-- p.<n> <one requirement> — 변경: <what instead> (사용자, <YYYY-MM-DD>)
-- p.<n> <one requirement> — 제외 (사용자, <YYYY-MM-DD>: <why>)
-- p.<n> <one requirement> — [?] <what is undecided>
+- p.<n> <one requirement of the document> — 포함 [<data-id>]
+- p.<n> <one requirement> — 변경: <what instead> (사용자, <YYYY-MM-DD>) [<data-id>]
+- p.<n> <one requirement> — 보류 (사용자, <YYYY-MM-DD>: <why>) [<data-id>]
+- p.<n> <one requirement> — 제외 (사용자, <YYYY-MM-DD>: <why>) [<data-id>]
+- p.<n> <one requirement> — [?] <what is undecided> [<data-id>]
 
 원본: `brief/paste-<n>.png`
-- <one requirement of the pasted image> — 포함
+- <one requirement of the pasted image> — 포함 [<data-id>]
 
 ## 결정 트리
 

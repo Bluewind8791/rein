@@ -91,6 +91,7 @@ export type Run = {
   waits?: { stage: "spec" | "plan"; hash: string } // advance found 1-spec.md (as graded) or 2-plan.md (as reviewed) ready and the run stopped for the person; it waits for /rein:plan or /rein:dev while the stage and the file's SHA-256 are still these
   traceBroken?: { at: string; problem: string } // the first trace write that failed; trace.jsonl misses lines from then
   told?: string[] // the changes past a judgment the main session was told of, one key each, so each is told once
+  docsTold?: string[] // the screen documents (their paths) the main session was told of in spec, so each is told once
 }
 
 // one grade of 1-spec.md as the hook scored it: the SHA-256 of the text

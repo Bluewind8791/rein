@@ -46,13 +46,15 @@ export const spec: StageSpec = {
 // whatever the main session wrote, so nothing of the conversation reaches it.
 // Every drawing is the same: the to-be of each screen, redrawn as answers
 // come in, on the as-is rein:as-is drew once.
-export function sketcherTask(dir: string, redraw: string[] = []): string {
+export function sketcherTask(dir: string, redraw: string[] = [], docs: string[] = []): string {
   return [
-    `Draw the to-be of ${dir}/1-mockup.html. You did not see the conversation that produced the spec: draw only what ${dir}/1-spec.md says, what the planning document's pictures it names show, and the as-is in ${dir}/${ASIS_FILE}. You read no code.`,
+    `Draw the to-be of ${dir}/1-mockup.html. You did not see the conversation that produced the spec: draw only what ${dir}/1-spec.md says, what the planning document's pictures it names show, the as-is in ${dir}/${ASIS_FILE} and the screen documents named below. You read no code.`,
     "",
     `Read ${dir}/1-spec.md first, then ${dir}/${ASIS_FILE} when it exists: the as-is of each screen of \`## 화면\`, drawn already, with the service's look in its <style>.`,
-    "Write the page whole: the to-be of each screen of `## 화면`, with `<!-- rein:as-is <id> -->` where its as-is goes (for a new screen, the id of the screen it follows); the hook puts the as-is there. Each [?] of 1-spec.md is a yellow pin on the to-be where it belongs, and each line of ## 미해결 질문 a red pin. Where `## 기획서 대조` names a picture of the screen (its `원본:` line, a file in the run folder), open it with Read and draw the to-be's layout as the picture lays it out, with `<!-- to-be source: <its path relative to the run folder> (<page>) -->` inside that screen's section.",
+    "Write the page whole: the to-be of each screen of `## 화면`, with `<!-- rein:as-is <id> -->` where its as-is goes (for a new screen, the id of the screen it follows); the hook puts the as-is there. Each [?] of 1-spec.md is a yellow pin on the to-be where it belongs, and each line of ## 미해결 질문 a red pin. Where `## 요구사항` names a picture of the screen (its `원본:` line, a file in the run folder), open it with Read and draw the to-be's layout as the picture lays it out, with `<!-- to-be source: <its path relative to the run folder> (<page>) -->` inside that screen's section.",
+    "Each line of `## 요구사항` ends with the element it is about, `[<data-id>]` (`[<screen id>/<data-id>]` when `## 화면` has several screens; `-` is the whole screen): give that element this data-id.",
     "What the to-be needs and none of these says (a label, a value, a rule), leave as it is in the as-is and name it on the `spec에 없음:` line of your answer; never make it up.",
+    ...docs,
     ...redraw,
     "",
     `Write ${dir}/${TOBE_FILE}, whole, with Write; the hook refuses every other write and every tool but Read and Write, and makes ${dir}/1-mockup.html from it and the as-is. Then answer in the form your instructions give, and stop.`,

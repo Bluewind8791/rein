@@ -138,6 +138,16 @@ describe("land gate", () => {
     expect(await $.tool.call({ tool: "mcp__rein__open_run", runId: "next-task" } as never)).toEqual(expect.objectContaining({ result: expect.stringContaining("Run opened") }))
   })
 
+  test("the screen documents the run wrote are copied into the project's requirements/ as it closes, the run keeping its own", async ($, on) => {
+    const doc = "| 요소 | 요구사항 | 상태 | 근거 | run |\n|---|---|---|---|---|\n| list.cols | 목록 표 5열 | 구현됨 | 기획서 p.3 | login-fix |\n"
+    const files: Record<string, string> = { [LAND]: MESSAGE, [`${DIR}/agent/requirements/shop/order0101.md`]: doc }
+    world(on, files, undefined, RUN, gitHost(staged()))
+    const r = await relay($, ADVANCE)
+    expect(context(r)).toContain("The screen documents are updated: C:/Users/u/.rein/proj/requirements/shop/order0101.md.")
+    expect(files["C:/Users/u/.rein/proj/requirements/shop/order0101.md"]).toBe(doc)
+    expect(files[`${COMPLETE}/agent/requirements/shop/order0101.md`]).toBe(doc)
+  })
+
   test("the end names the handoff files where the folder moved them (D163)", async ($, on) => {
     world(on, { [LAND]: MESSAGE }, undefined, { ...RUN, handoff: ["01.sql"] }, gitHost(staged()))
     const r = await relay($, ADVANCE)

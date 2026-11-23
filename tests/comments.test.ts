@@ -47,7 +47,7 @@ describe("comments handed over with the user's prompt", () => {
     const block = context![0]!
     expect(block).toContain(`The user left 2 comments on ${DIR}/1-mockup.html`)
     expect(block).toContain(`reflect it in ${DIR}/1-spec.md`)
-    expect(block).toContain("`## 기획서 대조`")
+    expect(block).toContain("line of `## 요구사항` ending with the element the comment is on, `[<data-id>]`")
     expect(block).toContain("have rein:sketcher draw again, then mark it with mcp__rein__comment")
     expect(block).toContain("#1 on order0101, element search.status:\n```text\n> 코멘트 1\n```")
     expect(block).toContain("#2 on order0101, the screen as a whole (reopened by the user; your last note: 상태 선택지에 보류를 더했다):")

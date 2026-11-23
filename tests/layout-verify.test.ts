@@ -95,7 +95,7 @@ describe("spec's layout check", () => {
     const { agentId } = await spawnAs($, "rein:layout-verifier")
     const task = spawned.at(-1)!.prompt ?? ""
     expect(task).toContain(`- #dash0101: mockup ${DIR}/agent/layout/mockup/dash0101.png; document ${DIR}/brief/기획서.pdf (3쪽)`)
-    expect(task).toContain("`## 기획서 대조` section")
+    expect(task).toContain("`## 요구사항` section")
     // the mockup's other to-be screen comes along: it may draw part of the picture.
     expect(task).toContain(`All its to-be screens: #dash0101 ${DIR}/agent/layout/mockup/dash0101.png, #flow ${DIR}/agent/layout/mockup/flow.png.`)
     expect(task).toContain("compare each screen only with the part of the picture it covers")

@@ -6,8 +6,14 @@
 //
 // Local trees, with their key in base.json:
 //   <project>/rules/<domain>, <project>/knowledge/<domain>   a project's copy
+//   <project>/requirements/<domain>                          its screen documents
 //   .hub/catalog/<domain>                                    a checkout (catalog checkout)
 //   rules                                                    the shared rules
+//
+// A project's screen documents (requirements/) are compared for each domain
+// it took (rules/ or knowledge/ has it), so they come down to a PC that has
+// none yet. `catalog take` leaves them out: they are written by land, and
+// taking a domain anew must not drop the ones not sent yet.
 //
 // <root>/.hub/catalog.json keeps the last outcome (what came down, the rules
 // whose hub `paths:` differ from the local one, the conflicts); the local
@@ -40,7 +46,7 @@ const ok = (r, what) => {
 // ---------- trees ----------
 
 // a tree of a catalog domain: prefix is where its files sit in the domain
-// ("rules/", "knowledge/", or "" for a whole checkout)
+// ("rules/", "knowledge/", "requirements/", or "" for a whole checkout)
 function domainTree(root, key, domain, prefix) {
   return {
     key, kind: "catalog", dir: path.join(root, ...key.split("/")),
@@ -66,9 +72,16 @@ function localTrees(root) {
   const trees = []
   for (const p of listDir(root)) {
     if (!p.isDirectory() || !PROJECT_OK(p.name)) continue
+    const domains = new Set()
     for (const kind of ["rules", "knowledge"]) {
-      for (const d of listDir(path.join(root, p.name, kind))) if (d.isDirectory()) trees.push(domainTree(root, `${p.name}/${kind}/${d.name}`, d.name, `${kind}/`))
+      for (const d of listDir(path.join(root, p.name, kind))) {
+        if (!d.isDirectory()) continue
+        domains.add(d.name)
+        trees.push(domainTree(root, `${p.name}/${kind}/${d.name}`, d.name, `${kind}/`))
+      }
     }
+    for (const d of listDir(path.join(root, p.name, "requirements"))) if (d.isDirectory()) domains.add(d.name)
+    for (const d of [...domains].sort()) trees.push(domainTree(root, `${p.name}/requirements/${d}`, d, "requirements/"))
   }
   for (const d of listDir(path.join(root, ".hub", "catalog"))) if (d.isDirectory()) trees.push(domainTree(root, `.hub/catalog/${d.name}`, d.name, ""))
   trees.push(rulesTree(root))

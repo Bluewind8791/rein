@@ -95,7 +95,7 @@ export function specVerifierTask(dir: string, shots: Record<string, string>, sou
         ]
       : []),
     "Judge the layout only: the regions of the screen and their order, the number and order of the columns of each table, the order of the fields of a form or a search bar, and the place and size of each chart, panel, tab and button relative to the others. A difference in colors, fonts, borders, exact pixel sizes or the sample data is not one: the mockup takes the look of the service's existing screens on purpose.",
-    `The user changed or dropped some of the document's requirements: read the \`## 기획서 대조\` section of ${dir}/1-spec.md, and nothing else of it. Where the mockup follows a line marked 변경 or 제외 there and the document does not, that is not a difference.`,
+    `The user changed or dropped some of the document's requirements: read the \`## 요구사항\` section of ${dir}/1-spec.md, and nothing else of it. Where the mockup follows a line marked 변경, 보류 or 제외 there and the document does not, that is not a difference.`,
     ...(last
       ? [
           "",

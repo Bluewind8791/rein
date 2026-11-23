@@ -323,3 +323,25 @@ test("the local server syncs the catalog at start and on kick, not on a plain re
   await up.kick()
   assert.ok(h.log.includes("GET /api/catalog"))
 })
+
+test("screen documents: requirements/ of each domain a project took goes both ways, and take leaves them out", async t => {
+  const h = await hubOn(t)
+  h.put("domain.json", '{"name":"Dom"}\n')
+  h.put("knowledge/k.md", "k\n")
+  h.put("requirements/order0101.md", "| 요소 | 요구사항 |\n")
+  const home = homeOf(t, h.url)
+  const hub = makeClient({ server: h.url, pc: "PC-A", client: "cli" })
+  await take(home, hub, "proj", ["dom"])
+  // take brings the knowledge only; the next sync brings the screen documents
+  assert.strictEqual(read(home, "proj/knowledge/dom/k.md"), "k\n")
+  assert.strictEqual(read(home, "proj/requirements/dom/order0101.md"), null)
+  await sync(home, hub)
+  assert.strictEqual(read(home, "proj/requirements/dom/order0101.md"), "| 요소 | 요구사항 |\n")
+  // one land wrote here is sent
+  write(home, "proj/requirements/dom/member0101.md", "| - | 조회는 회원팀만 |\n")
+  // a project with no domain keeps its documents here only
+  write(home, "solo/requirements/order0101.md", "here only\n")
+  await sync(home, hub)
+  assert.strictEqual(h.get("requirements/member0101.md"), "| - | 조회는 회원팀만 |\n")
+  assert.ok(!h.log.some(l => l.includes("here only") || l.includes("solo")))
+})

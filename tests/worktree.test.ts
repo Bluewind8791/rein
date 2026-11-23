@@ -254,6 +254,25 @@ describe("land in worktrees", () => {
     expect(record()).toBeUndefined()
   })
 
+  test("the approval shows the rows each screen document of the run changes", async ($, on) => {
+    const head = "| 요소 | 요구사항 | 상태 | 근거 | run |\n|---|---|---|---|---|\n"
+    const kept = "| list.cols | 목록 표 5열 | 구현됨 | 기획서 p.3 | order-list |"
+    const was = "| toolbar.excel | 엑셀 다운로드 | 보류 | 기획서 p.5 | order-list |"
+    const now = "| toolbar.excel | 엑셀 다운로드 | 구현됨 | 기획서 p.5 | login-fix |"
+    const files: Record<string, string> = {
+      [LAND]: MESSAGE, [`${TREE}/.git`]: GITFILE,
+      [`${REIN}/requirements/shop/order0101.md`]: `${head}${kept}\n${was}\n`,
+      [`${DIR}/agent/requirements/shop/order0101.md`]: `${head}${kept}\n${now}\n`,
+      [`${DIR}/agent/requirements/shop/member0101.md`]: `${head}| - | 조회는 회원팀만 | 구현됨 | 사용자 요청 | login-fix |\n`,
+    }
+    const questions: string[] = []
+    const repos = { "E:/proj": { branch: "main" }, [TREE]: { branch: BRANCH, changed: ["src/login.ts"] } }
+    world(on, files, q => (questions.push(q), "취소"), LANDING, gitHost(files, repos, []))
+    await relay($, ADVANCE)
+    expect(questions[0]).toContain(`화면 문서 (run이 닫히면 ${REIN}/requirements/로 옮김):\n  shop/member0101.md (새 문서)\n    + | - | 조회는 회원팀만 | 구현됨 | 사용자 요청 | login-fix |\n  shop/order0101.md (바뀐 줄 2)\n    - ${was}\n    + ${now}`)
+    expect(files[`${REIN}/requirements/shop/order0101.md`]).toBe(`${head}${kept}\n${was}\n`)
+  })
+
   test("in an autopilot run nothing is asked: the main session is told to pass the commit itself", async ($, on) => {
     const files: Record<string, string> = { [LAND]: MESSAGE, [`${TREE}/.git`]: GITFILE }
     const log: string[][] = []

@@ -30,6 +30,7 @@ tests/            훅 시험
   - `qa`(필수): 작업 qa 명령
   - `e2e`: 앱 URL·로그인, 운영 호스트(`production`, `backends`), 시간 제한, ego 프로필
 - `~/.rein/<project>/rules/`, `knowledge/` — 허브 서버의 카탈로그에서 고른 도메인의 룰과 지식
+- `~/.rein/<project>/requirements/<도메인>/` — 화면 문서. land가 쓰고, 카탈로그의 같은 도메인 `requirements/`와 주고받음
 - `~/.rein/rules/` — 모든 프로젝트에 적용할 공용 룰 (선택). 허브 서버와 주고받음
 - `~/.rein/sync.json` — 허브 서버 주소 `{ "server": "http://<MagicDNS 이름>:7380" }` (선택). PC마다 따로 둠
 
@@ -48,6 +49,8 @@ node frame/hub.js serve --root <폴더> [--port 7380] [--bind <ip>]
 - 카탈로그는 `<폴더>/.hub/domains/<도메인>/`, 공용 룰은 `<폴더>/rules/`입니다. 각 PC의 `/rein:setup`이 카탈로그에서 도메인을 골라 받습니다.
 
 `sync.json`에 `server`가 있는 PC는 로컬 frame 서버가 run 파일을 바뀔 때마다 올립니다. 세션을 시작할 때 카탈로그와 공용 룰의 바뀐 파일을 받고, 이 PC에서 고친 파일을 보냅니다. 서버에 닿지 않으면 쌓아 두었다가 다음에 닿을 때 보냅니다.
+
+화면 문서(`<도메인>/requirements/`)도 카탈로그와 같은 길로 주고받습니다. 프로젝트가 받은 도메인(`rules/`나 `knowledge/`에 있는 도메인)마다 비교하므로, 아직 없는 PC에도 내려옵니다. land에서 run이 닫힐 때도 보냅니다. `/rein:setup`의 도메인 받기는 화면 문서를 건드리지 않습니다. 보내지 않은 문서를 지우지 않기 위해서입니다.
 
 ### git 원격에서 옮기기
 

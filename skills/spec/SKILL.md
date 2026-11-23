@@ -83,9 +83,34 @@ When there are two or more, confirm the list with the user with `AskUserQuestion
 
 The grader checks that the completion line covers every result on the list not marked `제외`.
 
-## Planning document (`## 기획서 대조`)
+## Requirements (`## 요구사항`)
 
-When the request comes with a planning document (a PDF, slides, an HTML page, a drawing of the screens, an image pasted into the conversation), its requirements go into `1-spec.md` under `## 기획서 대조`, one line each. Without one, leave the section out.
+`## 요구사항` lists the requirements this run adds, changes, puts off or drops, one line each. Write it always, with or without a planning document: a request told in words has requirements too. When the run lands, its lines go into the screen documents (see Screen documents), and the next run on the same screen starts from them.
+
+- Only this run's lines. A row a screen document has already is not copied: write only what the request adds, changes or drops.
+- Each line ends with the element it is about, `[<data-id>]`: the `data-id` of that element in the to-be, a dot-separated path in lowercase Latin (`search.period`, `list.col.amount`, `toolbar.excel`), or `[-]` for a rule of the whole screen. You name the key, and `rein:sketcher` gives the element that `data-id`. An element a screen document has already keeps its key. When `## 화면` has two or more screens, put the screen id first: `[order0101/search.period]`, `[order0101p01/-]`. A run with no `## 화면` writes its lines without an element.
+- The lines of the request itself come first, above any `원본:` line: `- <the requirement> — <status> [<element>]`.
+- The status is one of:
+  - `포함`: done as asked, or as the document says.
+  - `변경: <what instead> (사용자, YYYY-MM-DD)`: the user changed it.
+  - `보류 (사용자, YYYY-MM-DD: <why>)`: the user put it off to a later run.
+  - `제외 (사용자, YYYY-MM-DD: <why>)`: the user dropped it for good.
+  - `[?] <what is undecided>`: the request or the document leaves it open or contradicts itself, or it is not settled yet.
+- Only the user changes, puts off or leaves out a requirement. When you think one should change, ask; never write `변경`, `보류` or `제외` on your own.
+- When the user settles something about a requirement during the questions, rewrite its line at once.
+- These lines are the requirements of the screens. Do not copy them into other sections; `## 문제` says why the work is needed.
+
+### Screen documents
+
+The requirements earlier runs landed live in one screen document per screen, `~/.rein/<project>/requirements/<domain>/<screen id>.md`, a table of rows: 요소 (the `data-id`, or `-`), 요구사항, 상태 (`구현됨`, `보류` or `폐기`), 근거 and the run that last changed it. When `1-spec.md` names a screen of `## 화면` that has one, the write's result gives its path; `mcp__rein__status` names them too.
+
+- Read each one before you write the screen's lines. Its rows are decisions already made.
+- When the request touches a row (changes a `구현됨` row, or brings back a `보류` or `폐기` one), ask the user with `AskUserQuestion` before you write the line, showing the row and its 근거.
+- `rein:sketcher` keeps the rows `1-spec.md` says nothing of, and `rein:collator` reports where a planning document differs from a row. The hook gives both the documents.
+
+### Planning document
+
+When the request comes with a planning document (a PDF, slides, an HTML page, a drawing of the screens, an image pasted into the conversation), its requirements go under `## 요구사항` too, one block per document.
 
 The run keeps its own copy of each document, in the run folder's `brief/` (the folder of `1-spec.md`), since the original may move or go:
 
@@ -98,19 +123,12 @@ Then write the section:
 - Read the whole document in scope, every page: the text and the pictures. A callout, an arrow or a numbered note on a screenshot is a requirement too.
 - One block per document: a line ``원본: `brief/<file>` (<pages>)`` naming the copy in `brief/` (for slides, the `.pptx`), then that document's lines right below it, until the next `원본:` line.
 - `(<pages>)` maps the page numbers printed on the document, which the lines use, to the file's own pages (a PDF's pages, a deck's slides, counted from 1), and so gives the pages in scope: `(p.3~p.5 = 1~3쪽)`, `(p.7 = 2쪽)`. When the document prints no page numbers, the lines use the file's pages: `(p.1~p.<N> = 1~<N>쪽)`. An image has no pages: no parentheses, and its lines have no `p.<n>`.
-- Go through each document page by page, in its order, one line per requirement: `- p.<n> <the requirement> — <status>` (for an image, `- <the requirement> — <status>`). One line holds one thing: a table's columns, a click and what it opens, a default value, a button and where it sits, a rule. The layout of a new or changed screen goes here too: how many columns each table has, the order of the fields, which cells are clickable. Keep the document's words where you can; do not summarize several requirements into one line.
-- The status is one of:
-  - `포함`: done as the document says.
-  - `변경: <what instead> (사용자, YYYY-MM-DD)`: the user changed it.
-  - `제외 (사용자, YYYY-MM-DD: <why>)`: the user left it out.
-  - `[?] <what is undecided>`: the document leaves it open or contradicts itself, or it is not settled yet.
-- Only the user changes or leaves out a requirement. When you think one should change, ask; never write `변경` or `제외` on your own.
-- When the user settles something about a requirement during the questions, rewrite its line at once.
-- These lines are the requirements of the screens. Do not copy them into other sections; `## 문제` says why the work is needed.
+- Go through each document page by page, in its order, one line per requirement: `- p.<n> <the requirement> — <status> [<element>]` (for an image, `- <the requirement> — <status> [<element>]`), with the statuses above. One line holds one thing: a table's columns, a click and what it opens, a default value, a button and where it sits, a rule. The layout of a new or changed screen goes here too: how many columns each table has, the order of the fields, which cells are clickable. Keep the document's words where you can; do not summarize several requirements into one line.
+- A requirement a screen document already holds as it is needs no line. One the document asks anew or otherwise than a row does gets its line, and the question above (ask before you write it).
 
-`rein:collator` checks the section against the document. It reads `1-spec.md` and the documents its `원본:` lines name, never the conversation, so give it the path of `1-spec.md` alone. It answers with the requirements that have no line and the `포함` lines that say something else than the document; it does not report `변경`, `제외` or `[?]` lines.
+`rein:collator` checks the section against the document, only when there is a planning document. It reads `1-spec.md` and the documents its `원本:` lines name, never the conversation, so give it the path of `1-spec.md` alone; the hook adds the screen documents. It answers with the requirements that have no line, the `포함` lines that say something else than the document, and, under `지난 결정과 다름:`, the requirements of the document that differ from a row of a screen document; it does not report `변경`, `보류`, `제외` or `[?]` lines.
 
-1. Once the first `1-spec.md` is written, before the first picture and the first grade, spawn `rein:collator`. Add each missing requirement as a `포함` line, or `[?]` when the document leaves it open, and correct each line it reports. When it could not read part of a document, tell the user.
+1. Once the first `1-spec.md` is written, before the first picture and the first grade, spawn `rein:collator`. Add each missing requirement as a `포함` line, or `[?]` when the document leaves it open, and correct each line it reports. For each difference from a screen document, ask the user which holds, and write their answer as the line. When it could not read part of a document, tell the user.
 2. In End, before you call `mcp__rein__advance`, spawn it again if `1-spec.md` changed since it last ran, and do the same with its answer.
 
 ## Visuals (`1-mockup.html`)
@@ -134,7 +152,7 @@ How to work with them:
 
 - The hook writes both agents' tasks and drops your prompt, so a short prompt does. The one exception: when the user says the as-is of a screen differs from the real one, spawn `rein:as-is` with the screen's id and what the user said as the prompt. With every screen of `## 화면` drawn, the hook passes that prompt on, and it draws that screen again; the hook then joins it into `1-mockup.html` with the target as it is. The as-is is checked by no one else.
 - Anything the target must show has to be in `1-spec.md` first. When the sketcher's answer lists gaps under `spec에 없음:`, the target needed something `1-spec.md` does not say, and the sketcher did not make it up. Fill each: a fact (how the screen works today) from the code, a decision by asking the user, one question at a time as in Grading and questions. Then spawn `rein:sketcher` again.
-- When the request comes with a planning document, the layout of each new or changed screen is in `## 기획서 대조` (see Planning document) and in the document's own picture of it. The sketcher lays the target out as that picture does, in the look of the as-is; without a picture, it follows `## 기획서 대조`, and without that, the as-is's layout.
+- When the request comes with a planning document, the layout of each new or changed screen is in `## 요구사항` (see Planning document) and in the document's own picture of it. The sketcher lays the target out as that picture does, in the look of the as-is; without a picture, it follows `## 요구사항`, and without that, the as-is's layout.
 - A target drawn from a picture is checked against it twice: after the first drawing, and in End, when advance finds the drawing not compared yet. The hook renders each such screen and tells you to spawn `rein:layout-verifier` (a short prompt does; the hook writes its task). It compares the rendered target with the picture, screen by screen. When one differs, the hook's answer tells you to spawn `rein:sketcher` again in the foreground, and it draws with what differs; do so until the verifier says every screen matches. When a drawing gets no closer to the picture, the hook stops the loop: tell the user what still differs. When the hook could not render the mockup (no Chrome or Edge), it says so: tell the user and go on. Approval names the result. A drawing redone for an answer is not compared.
 - The sketcher's answer lists the anchors, `#<id>` per screen. When a question is about a region of a screen, cite its anchor, for example `1-mockup.html#order0101`, and point at what is there instead of describing it in code terms. Without a picture, name the screen, the region and the label in words.
 - The picture never blocks the spec. If an agent fails or answers `not drawn`, go on, and tell the user what is missing.
@@ -146,7 +164,7 @@ How to work with them:
 While the run is in spec, the user can pin comments on the to-be in the frame, each on an element or on a whole screen. The hook hands the ones they saved to you with their next message, in a block that lists each one's number, screen, element and words, and for one they reopened, your last note on it. For each comment handed over:
 
 1. When its meaning is unclear, or it can be read two ways, ask the user in the chat before you write anything.
-2. Write it into `1-spec.md` at once, as you would an answer. A line of `## 기획서 대조` it changes or leaves out becomes `변경: <what instead> (사용자, YYYY-MM-DD)` or `제외 (사용자, YYYY-MM-DD: <why>)`; anything else, rewrite the part of `1-spec.md` it is about.
+2. Write it into `1-spec.md` at once, as you would an answer. A requirement it adds, changes, puts off or leaves out becomes a line of `## 요구사항` ending with the element the comment is on: `포함`, `변경: <what instead> (사용자, YYYY-MM-DD)`, `보류 (사용자, YYYY-MM-DD: <why>)` or `제외 (사용자, YYYY-MM-DD: <why>)`; anything else, rewrite the part of `1-spec.md` it is about.
 3. Spawn `rein:sketcher` again as after an answer (see Visuals), once for all the comments of one message.
 4. Mark it with `mcp__rein__comment`: `status: "done"` and a one-line `note` on what changed, or `status: "declined"` and a one-line `note` on why not (it contradicts what the user settled before, say). The user reads the note on the comment's card. When you are unsure whether to decline, ask the user first.
 
@@ -156,7 +174,7 @@ A comment the user reopens comes again with their next message; handle it the sa
 
 The user's decisions often rest on one another: whether a limit on rows matters depends on whether the export takes the current page or the whole search result. A question asked before the decision it rests on gets an answer built on a guess, and the answer is thrown away later. `## 결정 트리` lists the user's decisions with what each rests on, so that you ask only those whose ground is settled.
 
-- Write it with the first `1-spec.md`, one line per decision the user has to make: each `[?]` of any section (`## 범위` and `## 기획서 대조` too), and later each gap a grade names. A fact the code fills never goes in it. The questions on the premise and on the results come first, outside the tree. With nothing to ask, leave the section out.
+- Write it with the first `1-spec.md`, one line per decision the user has to make: each `[?]` of any section (`## 범위` and `## 요구사항` too), and later each gap a grade names. A fact the code fills never goes in it. The questions on the premise and on the results come first, outside the tree. With nothing to ask, leave the section out.
 - One line per decision: `- Q<n> <the decision> — 선행: <the Q numbers it rests on, or 없음> — 위치: <the section its answer goes in> — <status>`. Number the lines in the order you add them. A number never changes; it never starts with `D`.
 - The status is one of:
   - `열림`: not answered yet.
@@ -207,7 +225,7 @@ If the user wants to stop, put aside or abandon the run, at any point, call `mcp
 ## Do not
 
 - Propose or design a solution. That is `plan`'s job.
-- Split scope into "in / out" lists. Three exceptions: the rows of `## 범위`, one per part of the system, the `제외` lines of `## 기획서 대조`, the user's own decisions about a planning document, and the `제외` lines of the results in `## 문제`, the user's own decisions about the request.
+- Split scope into "in / out" lists. Three exceptions: the rows of `## 범위`, one per part of the system, the `보류` and `제외` lines of `## 요구사항`, the user's own decisions about a requirement, and the `제외` lines of the results in `## 문제`, the user's own decisions about the request.
 - Turn the completion check into a list of acceptance criteria. It is one line, even when it names edge cases.
 - Edit source code. The worker writes it in dev.
 
