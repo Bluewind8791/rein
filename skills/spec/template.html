@@ -166,6 +166,8 @@
   @keyframes rein-flash { to { transform: scale(1.6); box-shadow: 0 0 0 4px var(--cpin); } }
   .rein-commenting .screen { cursor: crosshair; }
   .rein-pick { outline: 2px solid var(--accent) !important; outline-offset: 2px !important; }
+  .rein-shown { animation: rein-shown 1.6s ease-out; }
+  @keyframes rein-shown { 0%, 50% { outline: 3px solid var(--cpin); outline-offset: 3px; } 100% { outline: 3px solid transparent; outline-offset: 3px; } }
 
   /* FILL: only the parts the as-is does not have. The hook puts the as-is's <style> (the
      service's look, read from its stylesheets) right before this block. Every selector starts
@@ -469,6 +471,16 @@
         pin.classList.remove("flash")
         void pin.offsetWidth
         pin.classList.add("flash")
+      } else if (d.rein === "element") {
+        // a row of 지난 결정: its element in a to-be, or the screen as a whole
+        var sec = document.getElementById(d.screen)
+        if (!sec || !sec.classList.contains("screen")) return
+        var el = sec
+        if (d.el) [].some.call(sec.querySelectorAll(".after [data-id]"), function (x) { return x.getAttribute("data-id") === d.el && (el = x) })
+        el.scrollIntoView({ block: "center", behavior: "smooth" })
+        el.classList.remove("rein-shown")
+        void el.offsetWidth
+        el.classList.add("rein-shown")
       }
     })
     document.addEventListener("mouseover", function (e) {

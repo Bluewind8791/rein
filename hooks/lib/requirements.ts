@@ -45,6 +45,24 @@ export function specNotice(docs: ScreenDoc[]): string {
   return `Screen documents from earlier runs, the requirements landed so far for screens of \`## 화면\`: ${docs.map(d => d.path).join(", ")}. Read each now. Each row is a decision already made: 요소 is the element's data-id, 상태 구현됨, 보류 or 폐기. In \`## 요구사항\` write only the lines this run adds, changes or drops, and reuse a document's element keys. When the request touches a row of them (changes a 구현됨 row, brings back a 보류 or 폐기 one), ask the user before you write it. rein:sketcher and rein:collator get these documents from the hook.`
 }
 
+// a screen of `## 화면` with no document yet, and the 1-spec.md of each
+// completed run whose `## 화면` named it: its first document is written
+// from them at land.
+export type EarlierRuns = { id: string; specs: string[] }
+
+const earlierList = (runs: EarlierRuns[]) => runs.map(r => `${r.id} (${r.specs.join(", ")})`).join("; ")
+
+// the main session's line in spec on screens with no document yet that
+// earlier runs touched.
+export function earlierNotice(runs: EarlierRuns[]): string {
+  return `Screens of \`## 화면\` with no screen document yet that completed runs touched before: ${earlierList(runs)}. Read those 1-spec.md files now: what they landed is a decision already made, asked about as a document's row is. Their lines name no element; the data-ids are in each run folder's 1-mockup.html. At land the first document of such a screen is written from them and this run.`
+}
+
+// land's line on them, after the screen documents' status.
+export function earlierLand(runs: EarlierRuns[]): string {
+  return ` No document yet for: ${earlierList(runs)}. Write it from those runs' \`## 요구사항\` (or \`## 기획서 대조\`) lines and this run's, giving each of their lines the element of its run's 1-mockup.html data-id; a line whose element you cannot tell is left out.`
+}
+
 // the sketcher's lines on the screen documents.
 export function sketcherLines(docs: ScreenDoc[]): string[] {
   if (docs.length === 0) return []

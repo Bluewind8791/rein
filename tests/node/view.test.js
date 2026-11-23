@@ -204,3 +204,36 @@ test("the page loads pdf.js from the plugin, not the internet", async t => {
     assert.ok((await res.text()).length > 100000)
   }
 })
+
+// a screen document of the screen page and a spec that names the screen
+const DOC = "---\n화면: order0101\n이름: 주문 목록\n갱신: 2026-11-20 (run order-list)\n---\n\n| 요소 | 요구사항 | 상태 | 근거 | run |\n|---|---|---|---|---|\n| search.period | 기간 기본값 30일 | 구현됨 | 기획서 p.4 → 사용자 변경 2026-11-10 | order-list |\n"
+const SPEC = "# 주문 목록\n\n## 화면\n\n| id | 이름 | URL |\n|---|---|---|\n| order0101 | 주문 목록 | /order/list |\n| order0101p01 | 주문 팝업 | - |\n\n## 요구사항\n\n- 기간 기본값 7일 — 포함 [order0101/search.period]\n원본: `brief/a.pdf`\n- p.3 목록 5열 — 변경: 6열 (사용자, 2026-11-10) [order0101p01/list.cols]\n- 정하지 않은 것 [?]\n- 화면을 모르는 줄 [x.y]\n"
+
+test("the run list carries each project's screen documents, with or without a domain", t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rein-view-"))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  fs.mkdirSync(path.join(root, "proj", "complete"), { recursive: true })
+  fs.mkdirSync(path.join(root, "proj", "requirements", "shop"), { recursive: true })
+  fs.writeFileSync(path.join(root, "proj", "requirements", "shop", "order0101.md"), DOC)
+  fs.writeFileSync(path.join(root, "proj", "requirements", "member0101.md"), DOC.replace("order0101", "member0101"))
+  const docs = makeView({ root }).snapshot().docs.sort((a, b) => (a.id < b.id ? -1 : 1))
+  assert.deepStrictEqual(docs.map(d => [d.project, d.domain, d.id]), [["proj", null, "member0101"], ["proj", "shop", "order0101"]])
+  assert.deepStrictEqual(docs[1], {
+    project: "proj", domain: "shop", id: "order0101", name: "주문 목록", updated: "2026-11-20 (run order-list)",
+    rows: [{ el: "search.period", req: "기간 기본값 30일", status: "구현됨", basis: "기획서 p.4 → 사용자 변경 2026-11-10", run: "order-list" }],
+  })
+})
+
+test("a run's summary names the screens of its spec and the 요구사항 lines that name an element", t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rein-view-"))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const run = path.join(root, "proj", "complete", "order-list")
+  fs.mkdirSync(run, { recursive: true })
+  fs.writeFileSync(path.join(run, "1-spec.md"), SPEC)
+  const s = makeView({ root }).runOf("proj", "complete", "order-list").summary
+  assert.deepStrictEqual(s.screens, [{ id: "order0101", name: "주문 목록" }, { id: "order0101p01", name: "주문 팝업" }])
+  assert.deepStrictEqual(s.reqs, [
+    { screen: "order0101", el: "search.period", line: "기간 기본값 7일 — 포함 [order0101/search.period]", src: null },
+    { screen: "order0101p01", el: "list.cols", line: "p.3 목록 5열 — 변경: 6열 (사용자, 2026-11-10) [order0101p01/list.cols]", src: "`brief/a.pdf`" },
+  ])
+})

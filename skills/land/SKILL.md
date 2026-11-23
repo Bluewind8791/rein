@@ -100,6 +100,7 @@ A screen document holds the requirements landed so far for one screen, so that t
 
 - Rows of the same element: replace a row the line changes or contradicts, and add a row for a requirement no row holds. Which is which is your judgment; the user sees each changed row when they approve. Never delete a row: a dropped requirement stays, `폐기`.
 - Leave every row no line touches as it is, and update `갱신:`.
+- A screen with no document yet that earlier completed runs touched: status names their `1-spec.md` after `No document yet for:`. Write its first document from their lines in `## 요구사항` (or `## 기획서 대조`) and this run's, the earlier runs first, so this run's rows replace theirs. Their lines name no element: find it among the `data-id`s of that run folder's `1-mockup.html`, and leave out a line whose element you cannot tell. The run column is the run the line came from.
 
 In a run in worktrees, the approval in step 3 shows the rows each document adds and drops. When the run closes, the hook copies the documents into `~/.rein/<project>/requirements/`, and the local frame server sends them to the hub. The run folder keeps its own copy.
 

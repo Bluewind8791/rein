@@ -65,6 +65,16 @@ describe("spec", () => {
     expect(collator).toContain(`${DOC}. Read each. A requirement of the planning documents that a row holds as the document says is not missing. Report under \`지난 결정과 다름:\``)
   })
 
+  test("a screen with no document: the main session is told once of the completed runs that named it, and status names them", async ($, on) => {
+    const OLD = `${REIN}/complete/order-list/1-spec.md`
+    world(on, { [OLD]: WITH_SCREENS, [`${REIN}/complete/member-list/1-spec.md`]: SPEC_TEXT }, undefined, { stage: "spec", runId: "login-fix" })
+    const told = context(await $.tool.call({ tool: "Write", file_path: SPEC, content: WITH_SCREENS } as never))
+    expect(told).toContain(`Screens of \`## 화면\` with no screen document yet that completed runs touched before: order0101 (${OLD}). Read those 1-spec.md files now`)
+    expect(told).not.toContain("member-list")
+    expect(context(await $.tool.call({ tool: "Write", file_path: SPEC, content: `${WITH_SCREENS}\n` } as never))).not.toContain("completed runs touched before")
+    expect(await status($)).toContain(`screen documents of the screens of \`## 화면\`: none yet; earlier completed runs of the screens with none: order0101 (${OLD})`)
+  })
+
   test("the sketcher's task without documents says nothing of them", async ($, on) => {
     world(on, { [SPEC]: WITH_SCREENS, [`${DIR}/agent/asis.html`]: ASIS }, undefined, { stage: "spec", runId: "login-fix" })
     await $.agent.spawn({ tool_use_id: "s", prompt: "draw", description: "draw", subagentType: "rein:sketcher", background: false } as never)
@@ -76,6 +86,12 @@ describe("land status", () => {
   test("status names where the updated copies go and the project's domains", async ($, on) => {
     world(on, { [DOC]: DOC_TEXT, [SPEC]: WITH_SCREENS, [`${REIN}/knowledge/shop/a.md`]: "x" }, undefined, { stage: "land", runId: "login-fix" })
     expect(await status($)).toContain(`screen documents of the screens of \`## 화면\` (order0101): ${DOC}. The updated copies go in ${DIR}/agent/requirements/, as <domain>/<screen id>.md; the project's domains: shop.`)
+  })
+
+  test("a screen with no document: land is told to write the first one from the earlier runs", async ($, on) => {
+    const OLD = `${REIN}/complete/order-list/1-spec.md`
+    world(on, { [SPEC]: WITH_SCREENS, [OLD]: WITH_SCREENS }, undefined, { stage: "land", runId: "login-fix" })
+    expect(await status($)).toContain(`No document yet for: order0101 (${OLD}). Write it from those runs' \`## 요구사항\` (or \`## 기획서 대조\`) lines and this run's, giving each of their lines the element of its run's 1-mockup.html data-id`)
   })
 
   test("a project with no domain writes <screen id>.md", async ($, on) => {

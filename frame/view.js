@@ -1,12 +1,13 @@
 // The Rein frame's view of one root: it reads the runs under it and serves
 // the page, the run list, the run files and the change events.
 //
-//   makeView({ root, readOnly, recordOf, debounceMs, extra, opener })
+//   makeView({ root, readOnly, recordOf, debounceMs, extra, opener, docFiles })
 //
 // readOnly refuses checklist and comment writes and opening files; opener(full) opens a
 // file on this PC (openFile unless given); recordOf(project, slug) gives a run's
 // record, whose pc the run list then carries; extra() gives more fields of
-// the run list.
+// the run list; docFiles() lists the screen documents the run list carries
+// (each project's requirements/ unless given).
 //
 // Zero dependencies; Node 18 or later.
 "use strict"
@@ -17,6 +18,8 @@ const { spawn } = require("child_process")
 const { NAME_OK } = require("./text.js")
 
 const STATES = ["active", "complete", "defer", "drop"]
+// the hub's screen documents, under its catalog
+const CATALOG_DOCS = /^\.hub[\\/]domains[\\/][^\\/]+[\\/]requirements([\\/]|$)/
 const DEBOUNCE_MS = 200
 const HEARTBEAT_MS = 25 * 1000
 
@@ -184,10 +187,9 @@ function section(lines, name) {
   return out
 }
 
-function parseSpec(src) {
-  const lines = src.split(/\r?\n/)
+// the front matter of a file's lines, and the lines after it
+function front(lines) {
   const fm = {}
-  let body = lines
   if (lines[0] && lines[0].trim() === "---") {
     const end = lines.findIndex((l, k) => k > 0 && l.trim() === "---")
     if (end > 0) {
@@ -195,9 +197,59 @@ function parseSpec(src) {
         const m = /^([^:\s][^:]*):\s*(.*)$/.exec(l)
         if (m) fm[m[1].trim()] = m[2].trim().replace(/^(["'])(.*)\1$/, "$2").trim()
       }
-      body = lines.slice(end + 1)
+      return { fm, body: lines.slice(end + 1) }
     }
   }
+  return { fm, body: lines }
+}
+
+// a markdown table's rows as objects keyed by its header cells, the
+// separator row left out
+function tableOf(lines) {
+  const rows = lines.filter(l => /^\s*\|/.test(l))
+  if (rows.length < 2) return []
+  const head = cells(rows[0])
+  return rows.slice(1)
+    .filter(r => !/^\s*\|?\s*:?-{2,}/.test(r))
+    .map(r => {
+      const c = cells(r)
+      return Object.fromEntries(head.map((h, k) => [h, c[k] || ""]))
+    })
+}
+
+// the element a line of "## 요구사항" ends with, which rein:sketcher keeps
+// as a data-id: [<data-id>], [-] for the whole screen, and
+// [<screen id>/<data-id>] when "## 화면" has more than one screen. [?] is
+// not one.
+const TAG = /\s\[([^\]?][^\]]*)\]\s*$/
+
+// the lines of "## 요구사항" (or the older "## 기획서 대조") that name
+// their element: { screen, el, line, src }, src the 원본 above the line
+// (null: the request itself)
+function reqLines(lines, ids) {
+  const out = []
+  let src = null
+  for (const l of lines) {
+    const t = l.trim()
+    const o = /^원본\s*[:：]\s*(.*)$/.exec(t)
+    if (o) { src = o[1].trim(); continue }
+    const r = /^[-*+]\s+(.*)$/.exec(t)
+    const m = r && TAG.exec(r[1])
+    if (!m) continue
+    let el = m[1].trim()
+    let screen = ids.length === 1 ? ids[0] : null
+    const k = el.indexOf("/")
+    if (k > 0 && ids.includes(el.slice(0, k))) {
+      screen = el.slice(0, k)
+      el = el.slice(k + 1).trim()
+    }
+    if (screen && el) out.push({ screen, el, line: r[1], src })
+  }
+  return out
+}
+
+function parseSpec(src) {
+  const { fm, body } = front(src.split(/\r?\n/))
   let title = null
   let fence = false
   for (const l of body) {
@@ -210,7 +262,20 @@ function parseSpec(src) {
     .filter(Boolean)
     .map(m => m[1].replace(/^\[\?\]\s*/, "").trim())
     .filter(q => q && q !== "없음")
-  return { title, goal: fm["목표"] || null, ref: fm["참조"] || null, questions }
+  const screens = tableOf(section(body, "화면"))
+    .map(r => ({ id: (r.id || "").replace(/`/g, "").trim(), name: (r["이름"] || "").trim() }))
+    .filter(r => r.id && r.id !== "-")
+  const ids = screens.map(x => x.id)
+  const reqs = reqLines([...section(body, "요구사항"), ...section(body, "기획서 대조")], ids)
+  return { title, goal: fm["목표"] || null, ref: fm["참조"] || null, questions, screens, reqs }
+}
+
+// a screen document (requirements/<domain>/<id>.md): its front matter and
+// its rows, one per element
+function parseDoc(src) {
+  const { fm, body } = front(src.split(/\r?\n/))
+  const rows = tableOf(body).map(r => ({ el: r["요소"] || "", req: r["요구사항"] || "", status: r["상태"] || "", basis: r["근거"] || "", run: r.run || "" }))
+  return { name: fm["이름"] || null, updated: fm["갱신"] || null, rows }
 }
 
 // the cells of a markdown table row; a | inside backticks or after \ is text
@@ -283,7 +348,7 @@ function summary(runDir, load, frame) {
   const first = names => names.map(n => path.join(runDir, n)).find(f => fs.existsSync(f))
   const specFile = first(["1-spec.md", "spec.md"])
   const planFile = first(["2-plan.md", "plan.md"])
-  const spec = (specFile && parsed(specFile, parseSpec)) || { title: null, goal: null, ref: null, questions: [] }
+  const spec = (specFile && parsed(specFile, parseSpec)) || { title: null, goal: null, ref: null, questions: [], screens: [], reqs: [] }
   const rows = (planFile && parsed(planFile, parsePlan)) || []
   const questions = spec.questions.map(q => ({ q, a: [] }))
   const assumptions = []
@@ -300,6 +365,8 @@ function summary(runDir, load, frame) {
     questions,
     assumptions,
     assumed: rows.length,
+    screens: spec.screens,
+    reqs: spec.reqs,
   }
 }
 
@@ -445,7 +512,7 @@ function openFile(full) {
   c.unref()
 }
 
-function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUNCE_MS, extra = null, opener = openFile }) {
+function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUNCE_MS, extra = null, opener = openFile, docFiles = null }) {
   const ROOT = path.resolve(root)
 
   // a project is a folder directly under the root with a run state folder.
@@ -482,8 +549,34 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
     return run
   }
 
+  // the screen documents of each project: requirements/<domain>/<id>.md,
+  // or requirements/<id>.md (domain null) for a project with no domain
+  function projectDocs() {
+    const out = []
+    for (const project of projects()) {
+      const dir = path.join(ROOT, project, "requirements")
+      for (const d of listDir(dir)) {
+        if (d.isFile() && d.name.endsWith(".md")) out.push({ project, domain: null, file: path.join(dir, d.name) })
+        else if (d.isDirectory() && NAME_OK(d.name)) {
+          for (const f of listDir(path.join(dir, d.name))) {
+            if (f.isFile() && f.name.endsWith(".md")) out.push({ project, domain: d.name, file: path.join(dir, d.name, f.name) })
+          }
+        }
+      }
+    }
+    return out
+  }
+
+  function docs() {
+    return (docFiles ? docFiles() : projectDocs()).flatMap(({ project, domain, file }) => {
+      const doc = parsed(file, parseDoc)
+      return doc ? [{ project, domain, id: path.basename(file, ".md"), ...doc }] : []
+    })
+  }
+
   function snapshot() {
     return {
+      docs: docs(),
       projects: projects().map(name => ({
         name,
         runs: STATES.flatMap(state =>
@@ -665,8 +758,9 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
     }
   }
 
-  // watch the whole root but frame/ and .hub/ (the servers' own files); on a
-  // change that alters what /api/runs shows, tell the pages. A trace grows
+  // watch the whole root but frame/ and .hub/ (the servers' own files, but
+  // for the catalog's screen documents); on a change that alters what
+  // /api/runs shows, tell the pages. A trace grows
   // with every tool call, so compare snapshots instead of signalling every
   // write. onName(name) hears every change, name null when unknown.
   function watch(onName = () => {}) {
@@ -683,7 +777,7 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
     const start = () => {
       try {
         const w = fs.watch(ROOT, { recursive: true }, (_, name) => {
-          if (name && own.some(dir => (String(name) + path.sep).startsWith(dir))) return
+          if (name && own.some(dir => (String(name) + path.sep).startsWith(dir)) && !CATALOG_DOCS.test(String(name))) return
           onName(name ? String(name) : null)
           if (timer) clearTimeout(timer)
           timer = setTimeout(fire, debounceMs)
@@ -702,4 +796,4 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
   return { root: ROOT, clients, runOf, snapshot, anyActive, handle, watch, broadcast }
 }
 
-module.exports = { makeView, send, json, streamFile, readJson, listDir, STATES }
+module.exports = { makeView, send, json, streamFile, readJson, listDir, STATES, parseSpec, parseDoc }

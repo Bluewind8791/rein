@@ -16,7 +16,7 @@ import { afterPlan, clearSession, fromPortable, pastPlan, toPortable, type HubIn
 import { quoted } from "./lib/quote.ts"
 import { AS_IS, ASIS_FILE, asIsBlocks, joinMockup, TOBE_FILE } from "./lib/mockup.ts"
 import { COMMENTS_FILE, commentsJson, handOverText, markOne, parseComments, sendDrafts, unmarked, type Comment } from "./lib/comments.ts"
-import { collatorLines, docChangeLines, REQ_DIR, sketcherLines, specNotice, type ScreenDoc } from "./lib/requirements.ts"
+import { collatorLines, docChangeLines, earlierLand, earlierNotice, REQ_DIR, sketcherLines, specNotice, type EarlierRuns, type ScreenDoc } from "./lib/requirements.ts"
 import { ARBITER_USE, KNOWLEDGE_FILE, knowledgeDescription, knowledgeIndex, knowledgePointer, AS_IS_USE, PLAN_USE, STATUS_USE, WORKER_USE, type Knowledge } from "./lib/knowledge.ts"
 import { applicableRules, freezeRule, ruleFile, sharedRulesOf } from "./lib/rules.ts"
 import { frameStatus, MAIN, type Activity, type End, type Land, type LandFile, type LandRepo, type LandResult } from "./lib/pane.ts"
@@ -1512,15 +1512,36 @@ async function publishDocs($: EngineInterface, dir: string): Promise<string> {
   return `${done.length > 0 ? ` The screen documents are updated: ${done.join(", ")}.` : ""}${failed.length > 0 ? ` Copying these screen documents out of ${dir}/${REQ_DIR} failed: ${failed.join("; ")}; tell the user, who copies them into ${project}/requirements/ by hand.` : ""}`
 }
 
+// the ids with no screen document, and the 1-spec.md of each completed
+// run of the project (but the one in `self`) whose `## 화면` names them.
+async function earlierRuns($: EngineInterface, ids: string[], self: string): Promise<EarlierRuns[]> {
+  if (ids.length === 0) return []
+  const base = `${await projectDir($)}/complete`
+  if (!(await $.fs.exists(base))) return []
+  const specs: { path: string; ids: string[] }[] = []
+  for (const e of await $.fs.list(base)) {
+    const path = `${base}/${e.name}/1-spec.md`
+    if (e.kind !== "dir" || `${base}/${e.name}` === self || !(await $.fs.exists(path))) continue
+    specs.push({ path, ids: screenRows(await $.fs.read(path)).map(r => r.id) })
+  }
+  return ids.map(id => ({ id, specs: specs.filter(s => s.ids.includes(id)).map(s => s.path) })).filter(r => r.specs.length > 0)
+}
+
 // the main session wrote 1-spec.md in spec: the screen documents of the
-// screens of `## 화면` it was not told of yet, once each.
+// screens of `## 화면` it was not told of yet, once each, and the earlier
+// runs of the screens with none.
 async function docsNotice($: EngineInterface, dir: string): Promise<string | undefined> {
-  const docs = await screenDocs($, screenRows(await $.fs.read(`${dir}/1-spec.md`)).map(r => r.id))
+  const ids = screenRows(await $.fs.read(`${dir}/1-spec.md`)).map(r => r.id)
+  const docs = await screenDocs($, ids)
   const told = (await getRun($))?.docsTold ?? []
   const fresh = docs.filter(d => !told.includes(d.path))
-  if (fresh.length === 0) return undefined
-  await mutate($, r => (r?.stage === "spec" ? { ...r, docsTold: [...(r.docsTold ?? []), ...fresh.map(d => d.path)] } : undefined))
-  return specNotice(fresh)
+  const earlier = (await earlierRuns($, ids.filter(id => !docs.some(d => d.id === id)), dir))
+    .map(r => ({ ...r, specs: r.specs.filter(s => !told.includes(s)) }))
+    .filter(r => r.specs.length > 0)
+  if (fresh.length === 0 && earlier.length === 0) return undefined
+  const paths = [...fresh.map(d => d.path), ...earlier.flatMap(r => r.specs)]
+  await mutate($, r => (r?.stage === "spec" ? { ...r, docsTold: [...(r.docsTold ?? []), ...paths] } : undefined))
+  return [fresh.length > 0 ? specNotice(fresh) : "", earlier.length > 0 ? earlierNotice(earlier) : ""].filter(Boolean).join(" ")
 }
 
 // the screen documents status names in spec and land: the ones of the
@@ -1532,9 +1553,10 @@ async function docsLines($: EngineInterface, run: Run, dir: string): Promise<str
   if (ids.length === 0) return ""
   const docs = await screenDocs($, ids)
   const found = docs.length > 0 ? docs.map(d => d.path).join(", ") : "none yet"
-  if (run.stage === "spec") return `\nscreen documents of the screens of \`## 화면\`: ${found}`
+  const earlier = await earlierRuns($, ids.filter(id => !docs.some(d => d.id === id)), dir)
+  if (run.stage === "spec") return `\nscreen documents of the screens of \`## 화면\`: ${found}${earlier.length > 0 ? `; earlier completed runs of the screens with none: ${earlier.map(r => `${r.id} (${r.specs.join(", ")})`).join("; ")}` : ""}`
   const domains = await domainsOf($)
-  return `\nscreen documents of the screens of \`## 화면\` (${ids.join(", ")}): ${found}. The updated copies go in ${dir}/${REQ_DIR}/, as <domain>/<screen id>.md; the project's domains: ${domains.length > 0 ? domains.join(", ") : `none (write <screen id>.md; it stays on this PC)`}.`
+  return `\nscreen documents of the screens of \`## 화면\` (${ids.join(", ")}): ${found}. The updated copies go in ${dir}/${REQ_DIR}/, as <domain>/<screen id>.md; the project's domains: ${domains.length > 0 ? domains.join(", ") : `none (write <screen id>.md; it stays on this PC)`}.${earlier.length > 0 ? earlierLand(earlier) : ""}`
 }
 
 // an agent's task with the knowledge index after it, the run's

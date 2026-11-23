@@ -107,6 +107,7 @@ The requirements earlier runs landed live in one screen document per screen, `~/
 - Read each one before you write the screen's lines. Its rows are decisions already made.
 - When the request touches a row (changes a `구현됨` row, or brings back a `보류` or `폐기` one), ask the user with `AskUserQuestion` before you write the line, showing the row and its 근거.
 - `rein:sketcher` keeps the rows `1-spec.md` says nothing of, and `rein:collator` reports where a planning document differs from a row. The hook gives both the documents.
+- A screen with no document yet that earlier completed runs touched: the write's result names their `1-spec.md` instead. Read them the same way: what they landed is a decision already made. Land writes the screen's first document from them.
 
 ### Planning document
 
