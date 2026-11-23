@@ -167,6 +167,7 @@ The user's decisions often rest on one another: whether a limit on rows matters 
 - The tree only records. Write each answer into the section `위치:` names, as before (the `[?]` there settled). The grader does not score the tree, and `plan` designs from the other sections.
 - **The frontier** is the set of `열림` lines whose every `선행` line is `결정`. Ask only from it, the line on the weakest dimension of the last grade first.
 - After each answer, update the tree before the next question: mark the line answered, mark `정리됨` each line the answer made unneeded, add each decision the answer opened with its `선행`, then take the frontier again.
+- When a line becomes `정리됨`, look at each line that rests on it: mark it `정리됨` too, or, when it still needs an answer, take the number out of its `선행` (`없음` when none is left). Otherwise it never reaches the frontier.
 - When the user leaves a question open, mark its line `미룸`, and with it every `열림` line that rests on it, directly or through other lines. Write the question under `## 미해결 질문` as well.
 - When the user points out a dependence the tree missed, fix that line's `선행`, and set back to `열림` the lines answered before the decision they rest on.
 
