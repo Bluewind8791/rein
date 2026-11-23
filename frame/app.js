@@ -557,8 +557,10 @@ const canComment = (run) => !!run && run.state === "active" && run.stageShort ==
 // what the input holds; on: the selected card; missing: the n of comments
 // whose element the mockup lacks; old: null until the mockup answers, true
 // when it never does; sent: what the mockup was last given; srcs: the
-// mockup's screens, id -> { name, source }
-const freshCm = (key) => ({ key, mode: false, pick: null, edit: null, text: "", on: null, missing: new Set(), old: null, err: null, busy: false, sent: null, srcs: null, timer: null })
+// mockup's screens, id -> { name, source }; basis: the n of the draft whose
+// basis box is being picked on the planning document; flash: the n of the
+// box to scroll to and flash once it is drawn
+const freshCm = (key) => ({ key, mode: false, pick: null, edit: null, text: "", on: null, missing: new Set(), old: null, err: null, busy: false, sent: null, srcs: null, timer: null, basis: null, flash: null })
 let cm = freshCm(null)
 
 const commentsOfRun = (run) => (run.comments || []).filter((c) => c && Number.isInteger(c.n) && typeof c.screen === "string").sort((a, b) => a.n - b.n)
@@ -619,6 +621,8 @@ function renderPanel(run, mock = isMock(run)) {
   p.hidden = !mock
   if (!mock) return setHTML(p, "")
   const can = canComment(run)
+  const canBasis = can && briefDocs(run).some(boxable)
+  pickingBasis(run)
   const list = commentsOfRun(run)
   const drafts = list.filter((c) => c.status === "draft").length
   const open = list.filter((c) => c.status === "draft" || c.status === "sent").length
@@ -637,6 +641,16 @@ function renderPanel(run, mock = isMock(run)) {
       : doc ? `<button type="button" class="csrc" data-csrc="${esc(s.source)}" title="기획서 열에서 보기">${esc(baseOf(doc.id))}${doc.ext === "pdf" && src.page ? ` · p.${src.page}` : ""}</button>`
       : `<span class="csrc">${esc(s.source)}</span>`
     const editing = can && cm.edit === c.n && c.status === "draft"
+    // the basis box on the planning document, and setting it while a draft
+    let bas = ""
+    if (c.basis) bas = `<button type="button" class="cbas" data-cbas title="기획서 열에서 보기">← 기획서 ${Number.isInteger(c.basis.page) ? `p.${c.basis.page}` : esc(baseOf(c.basis.doc))}` +
+      `${c.basis.quote ? ` · <q>${esc(c.basis.quote)}</q>` : " · 글자 없음"}</button>`
+    let bacts = ""
+    if (canBasis && c.status === "draft" && !editing) {
+      bacts = cm.basis === c.n ? `<button type="button" data-cact="basis-cancel">고르는 중… (Esc 취소)</button>`
+        : c.basis ? `<button type="button" data-cact="basis">다시 지정</button><button type="button" data-cact="basis-clear">근거 지우기</button>`
+        : `<button type="button" data-cact="basis">기획서에서 근거 지정</button>`
+    }
     let acts = ""
     if (can && !editing && c.status === "draft") acts = `<button type="button" data-cact="edit">고치기</button><button type="button" data-cact="del">지우기</button>`
     else if (can && (c.status === "done" || c.status === "declined")) acts = `<button type="button" data-cact="reopen">다시 열기</button>`
@@ -647,6 +661,7 @@ function renderPanel(run, mock = isMock(run)) {
       (miss ? `<div class="cmiss">요소 없음</div>` : "") +
       (editing ? input("save-edit") : `<div class="ctx">${esc(c.text || "")}</div>`) +
       (c.note ? `<div class="cnote"><b>Rein</b>${esc(c.note)}</div>` : "") +
+      (bas || bacts ? `<div class="cbrow">${bas}<span class="sp"></span>${bacts}</div>` : "") +
       (srcHtml || acts ? `<div class="cact">${srcHtml}<span class="sp"></span>${acts}</div>` : "") + `</div>`
   }).join("")
   const pick = can && cm.pick
@@ -694,7 +709,8 @@ async function postComment(run, body) {
     cm.err = "저장하지 못했습니다. 프레임 서버에 닿지 않습니다."
   }
   cm.busy = false
-  if (ok) {
+  // a basis box leaves the comment being written as it is
+  if (ok && body.op !== "basis") {
     cm.pick = null
     cm.edit = null
     cm.text = ""
@@ -1098,6 +1114,7 @@ function renderSide(run) {
   aside.hidden = $("grip").hidden = !a
   if (!a) {
     aside._sig = null
+    aside._doc = null
     closePdf(aside)
     aside.innerHTML = ""
     return
@@ -1110,6 +1127,7 @@ function renderSide(run) {
   const own = d.ext === "pdf" && $("work").classList.contains("left")
   const sig = [run.project, run.state, run.slug, a.key, own ? "pdf.js" : page].join("/")
   const ver = `${d.file.mtime}:${d.file.size}`
+  aside._doc = d.file.name
   // the viewer is rebuilt only when it shows something else, so a PDF keeps
   // its place; a changed file is reloaded where it is scrolled to
   if (aside._sig !== sig) {
@@ -1120,7 +1138,7 @@ function renderSide(run) {
     let view
     if (own) view = `<div class="pdfv"></div>`
     else if (d.how === "frame") view = `<iframe src="${url}${page ? `#page=${page}` : ""}" title="${esc(d.file.name)}"></iframe>`
-    else if (d.how === "img") view = `<div class="bimg"><img src="${url}" alt="${esc(d.file.name)}"></div>`
+    else if (d.how === "img") view = `<div class="bimg"><div class="pgc"><img src="${url}" alt="${esc(d.file.name)}"><div class="bxs"></div></div></div>`
     else if (d.how === "md") view = `<div class="doc"></div>`
     else {
       const [act, label] = fileAct(d.file.name)
@@ -1129,6 +1147,13 @@ function renderSide(run) {
     aside.innerHTML = `<div class="bhead"></div><div class="bview${own ? " own" : ""}">${view}</div><div class="bft"></div>`
     if (own) openPdf(aside, url)
     if (d.how === "md") sideMd(run, d.file, aside, sig, false)
+    // beside 1-mockup.html an image is shown large on a click, as a PDF page is
+    if (d.how === "img") {
+      aside.querySelector(".bimg .pgc").addEventListener("click", (e) => {
+        if (e.target.closest(".bpin") || !$("work").classList.contains("left")) return
+        openZoom({ img: aside.querySelector(".bimg img").src, doc: aside._doc })
+      })
+    }
   } else if (aside._ver !== ver) {
     aside._ver = ver
     if (own) {
@@ -1158,9 +1183,140 @@ function renderSide(run) {
     sideAt.req ? `<span>선택한 줄: <b>${Md.inline(sideAt.req, { href: (u) => u })}</b></span>` : "",
     d.dl ? `<span>원본 <a href="${fileUrl(run, d.dl.name)}" ${dlAct}>${esc(baseOf(d.dl.name))}</a> ${dlLabel}</span>` : "",
   ].filter(Boolean).join("")
-  setHTML(aside.querySelector(".bhead"), head)
+  // while a comment's basis box is being picked
+  const boxes = own || d.how === "img"
+  const hint = !$("work").classList.contains("left") || pickingBasis(run) === null ? ""
+    : `<div class="bpick">${boxes ? `코멘트 ${cm.basis}의 근거: 쪽을 눌러 크게 본 뒤 끌어서 상자를 그리세요.` : "이 문서에는 근거 상자를 그릴 수 없습니다. PDF나 이미지 기획서를 고르세요."} Esc 취소</div>`
+  setHTML(aside.querySelector(".bhead"), head + hint)
   setHTML(aside.querySelector(".bft"), foot)
   aside.querySelector(".bft").hidden = !foot
+  paintBoxes(run)
+}
+
+// ----- the comments' basis boxes on the planning documents (PDF or image) -----
+
+const boxable = (d) => d.ext === "pdf" || IMAGE.has(d.ext)
+// the planning document a comment's basis box is on
+const basisDocOf = (run, c) => (c.basis ? briefDocs(run).find((x) => x.show.name === c.basis.doc || x.id === c.basis.doc) : null)
+
+// the n of the draft whose basis box is being picked, or null; picking ends
+// when that comment is gone, no longer a draft, or cannot be changed
+function pickingBasis(run) {
+  if (cm.basis !== null && !(canComment(run) && commentsOfRun(run).some((c) => c.n === cm.basis && c.status === "draft"))) cm.basis = null
+  return cm.basis
+}
+
+const boxStyle = (b) => `left:${b.x * 100}%;top:${b.y * 100}%;width:${b.w * 100}%;height:${b.h * 100}%`
+
+// the boxes of the document beside the mockup, on its pages in the column
+// and on the page shown large; a box asked for is scrolled to and flashed
+function paintBoxes(run) {
+  const aside = $("side")
+  const name = $("work").classList.contains("left") ? aside._doc : null
+  const list = run && name ? commentsOfRun(run).filter((c) => c.basis && c.basis.doc === name) : []
+  for (const host of document.querySelectorAll("#side .bxs, #pzoom .bxs")) {
+    const page = host.dataset.page ? Number(host.dataset.page) : undefined
+    const here = list.filter((c) => c.basis.page === page)
+    setHTML(host, here.map((c) => {
+      const st = c.status === "done" || c.status === "declined" ? c.status : ""
+      return `<div class="bbox ${st}${cm.on === c.n ? " on" : ""}" data-bn="${c.n}" style="${boxStyle(c.basis)}">` +
+        `<button type="button" class="bpin ${st}" data-bn="${c.n}" title="코멘트 ${c.n}">${c.n}</button></div>`
+    }).join(""))
+    const f = cm.flash !== null && host.closest("#side") ? host.querySelector(`.bbox[data-bn="${cm.flash}"]`) : null
+    if (f) {
+      cm.flash = null
+      f.scrollIntoView({ block: "center" })
+      f.classList.add("flash")
+    }
+  }
+}
+
+// the document of a comment's basis box in the column, scrolled to the box
+function showBasis(run, c) {
+  const d = basisDocOf(run, c)
+  if (!d) return
+  cm.flash = c.n
+  const page = Number.isInteger(c.basis.page) ? c.basis.page : null
+  if (sel.side !== d.id) return openSide(d.id, page)
+  const pdf = $("side")._pdf
+  if (pdf && page) pdf.go(page)
+  paintBoxes(run)
+}
+
+// pick the basis box of draft c: the column shows a document a box can be
+// drawn on, and a page shown large takes the box
+function startBasis(run, c) {
+  cm.basis = c.n
+  cm.on = c.n
+  renderPanel(run)
+  const docs = briefDocs(run).filter(boxable)
+  if (docs.some((d) => d.id === sel.side)) return renderSide(run)
+  const d = basisDocOf(run, c) || docs[0]
+  if (d) openSide(d.id, c.basis && Number.isInteger(c.basis.page) ? c.basis.page : null)
+}
+
+function stopBasis(run) {
+  cm.basis = null
+  renderSide(run)
+  renderPanel(run)
+}
+
+// the text of a PDF page inside box b (fractions of the page), in the
+// order pdf.js reads it; "" when there is none
+async function textIn(page, b) {
+  try {
+    const vp = page.getViewport({ scale: 1 })
+    const tc = await page.getTextContent()
+    let s = ""
+    for (const it of tc.items) {
+      if (typeof it.str !== "string" || !it.transform) continue
+      const [x, y] = vp.convertToViewportPoint(it.transform[4] + it.width / 2, it.transform[5] + it.height / 2)
+      const fx = x / vp.width, fy = y / vp.height
+      if (fx >= b.x && fx <= b.x + b.w && fy >= b.y && fy <= b.y + b.h) s += it.str + (it.hasEOL ? " " : "")
+    }
+    return s.replace(/\s+/g, " ").trim().slice(0, 500)
+  } catch {
+    return ""
+  }
+}
+
+// a drag on the page shown large draws the basis box of the comment being
+// picked; on release the box is saved and the page closes
+function drawOn(host, src) {
+  const tmp = host.querySelector(".bdraw")
+  const clamp = (v) => Math.max(0, Math.min(1, v))
+  const at = (e) => {
+    const r = host.getBoundingClientRect()
+    return [clamp((e.clientX - r.left) / r.width), clamp((e.clientY - r.top) / r.height)]
+  }
+  const rect = (a, b) => ({ x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) })
+  let from = null
+  host.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest(".bpin")) return
+    e.preventDefault()
+    host.setPointerCapture(e.pointerId)
+    from = at(e)
+  })
+  host.addEventListener("pointermove", (e) => {
+    if (from) setHTML(tmp, `<div class="bbox tmp" style="${boxStyle(rect(from, at(e)))}"></div>`)
+  })
+  host.addEventListener("pointerup", async (e) => {
+    if (!from) return
+    const b = rect(from, at(e))
+    from = null
+    setHTML(tmp, "")
+    // a click, not a drag
+    if (b.w < 0.01 || b.h < 0.01) return
+    const run = findRun(sel.project, sel.slug)
+    const c = run && commentsOfRun(run).find((x) => x.n === pickingBasis(run))
+    if (!c) return closeZoom()
+    const quote = src.page ? await textIn(src.page, b) : ""
+    closeZoom()
+    cm.basis = null
+    cm.flash = c.n
+    renderSide(run)
+    postComment(run, { op: "basis", id: c.id, basis: { doc: src.doc, ...(src.page ? { page: src.n } : {}), ...b, quote } })
+  })
 }
 
 // ----- planning documents drawn by pdf.js (vendor/pdfjs, loaded on first use) -----
@@ -1237,7 +1393,7 @@ function openPdf(aside, url) {
   })
   box.addEventListener("click", (e) => {
     const sec = e.target.closest(".pg")
-    if (!st.closed && sec && sec._page) openZoom(sec._page, st.pages.indexOf(sec) + 1, st.total)
+    if (!st.closed && sec && sec._page && !e.target.closest(".bpin")) openZoom({ page: sec._page, n: st.pages.indexOf(sec) + 1, total: st.total, doc: aside._doc })
   })
   aside._pdf = st
   ;(async () => {
@@ -1255,12 +1411,14 @@ function openPdf(aside, url) {
         const sec = document.createElement("div")
         sec.className = "pg"
         sec.title = "크게 보기"
-        sec.innerHTML = `<div class="lab"><b>기획서</b> · p.${n} / ${doc.numPages}</div><canvas style="aspect-ratio: ${vp.width} / ${vp.height}"></canvas>`
+        sec.innerHTML = `<div class="lab"><b>기획서</b> · p.${n} / ${doc.numPages}</div>` +
+          `<div class="pgc"><canvas style="aspect-ratio: ${vp.width} / ${vp.height}"></canvas><div class="bxs" data-page="${n}"></div></div>`
         sec._page = page
         box.appendChild(sec)
         st.pages.push(sec)
         st.io.observe(sec)
         if (st.want === n) st.go(n)
+        paintBoxes(findRun(sel.project, sel.slug))
       }
       head()
     } catch {
@@ -1276,22 +1434,34 @@ function closePdf(aside) {
   aside._pdf = null
 }
 
-// one page large over the planning documents and the mockup; Esc or a click
+// one page large over the planning documents and the mockup, with its basis
+// boxes; while a basis box is picked, a drag on it draws one. src: { page,
+// n, total, doc } for a PDF page, { img, doc } for an image. Esc or a click
 // outside the page closes it
-function openZoom(page, n, total) {
+function openZoom(src) {
   closeZoom()
+  const run = findRun(sel.project, sel.slug)
+  const pick = pickingBasis(run)
   const z = document.createElement("div")
   z.id = "pzoom"
   z.className = "pzoom"
   z.style.right = `${$("cpanel").hidden ? 0 : $("cpanel").offsetWidth}px`
-  z.innerHTML = `<div class="pzbox"><div class="lab"><b>기획서</b> · p.${n} / ${total}<button type="button" class="evx" title="닫기 (Esc)">×</button></div><canvas></canvas></div>`
+  const lab = src.page ? `p.${src.n} / ${src.total}` : esc(baseOf(src.doc))
+  z.innerHTML = `<div class="pzbox"><div class="lab"><b>기획서</b> · ${lab}<button type="button" class="evx" title="닫기 (Esc)">×</button></div>` +
+    (pick !== null ? `<div class="zhint">끌어서 코멘트 ${pick}의 근거 상자를 그리세요. Esc 취소</div>` : "") +
+    `<div class="pgc zpg${pick !== null ? " can" : ""}">${src.page ? "<canvas></canvas>" : `<img src="${esc(src.img)}" alt="">`}` +
+    `<div class="bxs"${src.page ? ` data-page="${src.n}"` : ""}></div><div class="bdraw"></div></div></div>`
   $("work").appendChild(z)
-  const vp = page.getViewport({ scale: 1 })
-  const v = page.getViewport({ scale: Math.min(6, ((z.clientWidth - 64) * devicePixelRatio) / vp.width) })
-  const c = z.querySelector("canvas")
-  c.width = Math.floor(v.width)
-  c.height = Math.floor(v.height)
-  page.render({ canvasContext: c.getContext("2d"), viewport: v })
+  if (src.page) {
+    const vp = src.page.getViewport({ scale: 1 })
+    const v = src.page.getViewport({ scale: Math.min(6, ((z.clientWidth - 64) * devicePixelRatio) / vp.width) })
+    const c = z.querySelector("canvas")
+    c.width = Math.floor(v.width)
+    c.height = Math.floor(v.height)
+    src.page.render({ canvasContext: c.getContext("2d"), viewport: v })
+  }
+  if (pick !== null) drawOn(z.querySelector(".zpg"), src)
+  paintBoxes(run)
 }
 
 function closeZoom() {
@@ -1673,11 +1843,23 @@ $("menu").addEventListener("click", (e) => {
 document.addEventListener("click", (e) => {
   $("menu").hidden = $("cmenu").hidden = true
   // a page shown large closes on a click anywhere but on it
-  if (!e.target.closest("#pzoom canvas, .pdfv .pg")) closeZoom()
+  if (!e.target.closest("#pzoom .zpg, .pdfv .pg, .bimg .pgc")) closeZoom()
+  // a basis box's pin picks its comment and scrolls the mockup to it
+  const pin = e.target.closest(".bpin[data-bn]")
+  const run = pin && findRun(sel.project, sel.slug)
+  if (run) {
+    cm.on = Number(pin.dataset.bn)
+    renderPanel(run)
+    paintBoxes(run)
+    const c = $("cpanel").querySelector(`.ccard[data-cn="${cm.on}"]`)
+    if (c) c.scrollIntoView({ block: "nearest" })
+    toMock({ rein: "focus", n: cm.on })
+  }
 })
 document.addEventListener("keydown", (e) => {
   if (ev && evKey(e)) return
   if (e.key === "Escape" && closeZoom()) return
+  if (e.key === "Escape" && cm.basis !== null) return stopBasis(findRun(sel.project, sel.slug))
   if (e.key === "Escape") $("menu").hidden = $("cmenu").hidden = true
   // C: the comment mode, when focus is not in a text field
   const t = e.target
@@ -1696,6 +1878,11 @@ $("cpanel").addEventListener("click", (e) => {
   const card = e.target.closest(".ccard[data-cn]")
   const n = card ? Number(card.dataset.cn) : null
   const c = n !== null ? commentsOfRun(run).find((x) => x.n === n) : null
+  if (c && e.target.closest("[data-cbas]")) {
+    cm.on = c.n
+    renderPanel(run)
+    return showBasis(run, c)
+  }
   const b = e.target.closest("[data-cact]")
   if (b) {
     const act = b.dataset.cact
@@ -1720,6 +1907,9 @@ $("cpanel").addEventListener("click", (e) => {
       return
     }
     if (act === "reopen") return postComment(run, { op: "reopen", id: c.id })
+    if (act === "basis") return startBasis(run, c)
+    if (act === "basis-cancel") return stopBasis(run)
+    if (act === "basis-clear") return postComment(run, { op: "basis", id: c.id, basis: null })
     return
   }
   if (!c || e.target.closest("textarea")) return

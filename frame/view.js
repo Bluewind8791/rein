@@ -331,6 +331,23 @@ const TEXT_MAX = 4000
 
 const commentsOf = j => (j && Array.isArray(j.comments) ? j.comments : [])
 
+// a comment's basis box on a planning document: the file in brief/, the PDF
+// page (none on an image), the box as fractions of the page from its top
+// left, and the text the frame read inside it ("" when it found none).
+// undefined when it is not that.
+function basisOf(x) {
+  if (!x || typeof x !== "object") return undefined
+  const { doc, page, quote } = x
+  if (typeof doc !== "string" || doc.length > 300 || !/^brief\//.test(doc) || doc.includes("\\") || doc.split("/").some(s => s === ".." || s === "." || s === "")) return undefined
+  if (page !== undefined && !(Number.isInteger(page) && page >= 1)) return undefined
+  if (typeof quote !== "string" || quote.length > 500) return undefined
+  const [bx, by, bw, bh] = ["x", "y", "w", "h"].map(k => x[k])
+  const ok = [bx, by, bw, bh].every(v => typeof v === "number" && v >= 0 && v <= 1) && bw > 0 && bh > 0 && bx + bw <= 1.001 && by + bh <= 1.001
+  if (!ok) return undefined
+  const r = v => Math.round(v * 10000) / 10000
+  return { doc, ...(page !== undefined ? { page } : {}), x: r(bx), y: r(by), w: r(bw), h: r(bh), quote: quote.replace(/\s+/g, " ").trim() }
+}
+
 // a file written whole through a temp file beside it (one the hub sync
 // skips), so the hook reading it never sees half of it; the rename is tried
 // again when Windows says EPERM or EBUSY (a virus scanner holds the file)
@@ -530,8 +547,9 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
   }
 
   // the person's comments on 1-mockup.html, while the run is active in spec:
-  // add a draft, edit or delete a draft, reopen a done or declined one. The
-  // hook and the MCP tool move the others (agent/comments.json).
+  // add a draft, edit or delete a draft or set its basis box, reopen a done
+  // or declined one. The hook and the MCP tool move the others
+  // (agent/comments.json).
   async function comments(req, res) {
     if (!/^application\/json\b/.test(req.headers["content-type"] || "")) return json(res, 415, { error: "json only" })
     let b
@@ -560,7 +578,7 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
       out = { id: `c${n}`, n, screen, el, text: text.trim(), status: "draft", at: new Date().toISOString() }
       list.push(out)
       j.next = n + 1
-    } else if (["edit", "delete", "reopen"].includes(op)) {
+    } else if (["edit", "delete", "reopen", "basis"].includes(op)) {
       const k = list.findIndex(c => c && c.id === b.id)
       if (k < 0) return json(res, 404, { error: "no comment" })
       const c = list[k]
@@ -569,6 +587,12 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
       if (op === "edit") {
         if (!textOk(b.text)) return json(res, 400, { error: "bad text" })
         out = list[k] = { ...c, text: b.text.trim() }
+      } else if (op === "basis") {
+        // null takes the basis box away
+        const basis = b.basis === null ? null : basisOf(b.basis)
+        if (basis === undefined) return json(res, 400, { error: "bad basis" })
+        const { basis: _, ...rest } = c
+        out = list[k] = basis ? { ...rest, basis } : rest
       } else if (op === "delete") list.splice(k, 1)
       else out = list[k] = { ...c, status: "draft" }
     } else return json(res, 400, { error: "bad op" })

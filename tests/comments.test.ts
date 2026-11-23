@@ -53,6 +53,7 @@ describe("comments handed over with the user's prompt", () => {
     expect(block).toContain("#2 on order0101, the screen as a whole (reopened by the user; your last note: 상태 선택지에 보류를 더했다):")
     expect(block).not.toContain("#3")
     expect(block).not.toContain("#4")
+    expect(block).not.toContain("근거")
     const after = read(files)
     expect(after.map(c => c.status)).toEqual(["sent", "sent", "sent", "done"])
     expect(after[0]!.sentAt).toBe(new Date(0).toISOString())
@@ -62,6 +63,22 @@ describe("comments handed over with the user's prompt", () => {
     expect(files[TRACE]).toContain(`"ev":"comments-sent","stage":"spec","via":"prompt","comments":[1,2]`)
     // sent already: the next prompt carries nothing.
     expect(await submit($)).toBeUndefined()
+  })
+
+  test("a comment's basis box goes as a 근거 line: the text in it, else where it is", async ($, on) => {
+    const files: Record<string, string> = {
+      [SPEC]: SPEC_TEXT,
+      [FILE]: store(
+        comment(1, "draft", { basis: { doc: "brief/order.pdf", page: 4, x: 0.1, y: 0.2, w: 0.3, h: 0.1, quote: "조회 기간:\n기본 `7일`" } }),
+        comment(2, "draft", { basis: { doc: "brief/order.png", x: 0.125, y: 0, w: 0.5, h: 0.25, quote: "" } }),
+      ),
+    }
+    world(on, files, () => undefined, undefined, renaming(files))
+    on("prompt.submit", async (_$, e) => ({ text: e.text, context: e.context }))
+    const block = (await submit($))![0]!
+    expect(block).toContain("A `근거:` line under a comment is the part of a planning document")
+    expect(block).toContain("> 코멘트 1\n```\n근거: brief/order.pdf p.4 — \"조회 기간: 기본 '7일'\"")
+    expect(block).toContain("> 코멘트 2\n```\n근거: brief/order.png — 상자 안 글자 없음, 쪽 왼쪽 위에서 x 12.5%, y 0%, 너비 50%, 높이 25%")
   })
 
   test("no drafts, no file: nothing is added or written", async ($, on) => {

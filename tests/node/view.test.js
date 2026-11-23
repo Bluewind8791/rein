@@ -132,6 +132,40 @@ test("only a draft is edited or deleted, and only a done or declined comment reo
   assert.deepStrictEqual(v.stored().map(c => c.status), ["sent", "draft", "draft"])
 })
 
+test("a draft's basis box is set, replaced and cleared; a sent one's is not", async t => {
+  const v = await commentsOn(t)
+  await v.post({ op: "add", screen: "order0101", el: "search.period", text: "기간 기본값" })
+  const box = { doc: "brief/order.pdf", page: 4, x: 0.1, y: 0.2, w: 0.30004, h: 0.1, quote: " 조회 기간:\n 기본 7일 " }
+  const a = await v.post({ op: "basis", id: "c1", basis: box })
+  assert.strictEqual(a.code, 200)
+  assert.deepStrictEqual(a.body.comment.basis, { doc: "brief/order.pdf", page: 4, x: 0.1, y: 0.2, w: 0.3, h: 0.1, quote: "조회 기간: 기본 7일" })
+  // an image has no page
+  const img = { doc: "brief/order.png", x: 0, y: 0, w: 1, h: 0.5, quote: "" }
+  assert.deepStrictEqual((await v.post({ op: "basis", id: "c1", basis: img })).body.comment.basis, img)
+  assert.deepStrictEqual(v.stored()[0].basis, img)
+  const cleared = await v.post({ op: "basis", id: "c1", basis: null })
+  assert.strictEqual(cleared.code, 200)
+  assert.strictEqual("basis" in cleared.body.comment, false)
+  assert.strictEqual("basis" in v.stored()[0], false)
+  for (const bad of [
+    { ...box, doc: "1-spec.md" },
+    { ...box, doc: "brief/../1-spec.md" },
+    { ...box, doc: "brief\\a.pdf" },
+    { ...box, page: 0 },
+    { ...box, page: 1.5 },
+    { ...box, x: 0.8, w: 0.3 },
+    { ...box, w: 0 },
+    { ...box, y: -0.1 },
+    { ...box, quote: 3 },
+    { ...box, quote: "x".repeat(501) },
+    "brief/order.pdf",
+  ]) assert.strictEqual((await v.post({ op: "basis", id: "c1", basis: bad })).code, 400, JSON.stringify(bad))
+  const c = v.stored()[0]
+  fs.writeFileSync(v.file, JSON.stringify({ comments: [{ ...c, status: "sent" }] }))
+  assert.strictEqual((await v.post({ op: "basis", id: "c1", basis: box })).code, 409)
+  assert.strictEqual((await v.post({ op: "basis", id: "c9", basis: box })).code, 404)
+})
+
 test("comments are refused outside spec, on the read-only page, and when malformed", async t => {
   const plan = await commentsOn(t, { stage: "plan" })
   assert.strictEqual((await plan.post({ op: "add", screen: "order0101", el: null, text: "x" })).code, 409)
