@@ -57,6 +57,13 @@ slug: <runId>
 원본: `brief/paste-<n>.png`
 - <one requirement of the pasted image> — 포함
 
+## 결정 트리
+
+- Q1 <a decision the user makes> — 선행: 없음 — 위치: <section> — 결정: <the answer> (사용자, <YYYY-MM-DD>)
+- Q2 <a decision resting on Q1> — 선행: Q1 — 위치: <section> — 열림
+- Q3 <a decision an answer made unneeded> — 선행: Q1 — 위치: <section> — 정리됨: <why>
+- Q4 <a decision the user left open> — 선행: 없음 — 위치: <section> — 미룸 (사용자, <YYYY-MM-DD>)
+
 ## 미해결 질문
 
 - <a question the user left open>

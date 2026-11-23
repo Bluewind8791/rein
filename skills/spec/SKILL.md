@@ -58,6 +58,8 @@ And the **reference**: the external issue or ticket number, which goes into the 
 
 And, only when there are any, the **open questions**: what the user chose to leave open, when they answer a question with "later" or say it is enough while gaps are left. One line each under `## 미해결 질문`: `- <question>`. Never put a gap there yourself: a gap the user decides is asked (see Grading and questions). The user sees these lines when they approve the spec, and `plan` writes an assumption for each in `2-plan.md`. Anything undecided inside another section is marked there with `[?]`.
 
+And, when the user has decisions to make, the **decision tree** (`## 결정 트리`): the record of those decisions and what each rests on, from which you pick each question (see Decision tree).
+
 Write the file in Korean, in the form of `template.md` in this skill's directory. Read it with `Read` before you write `1-spec.md`, and keep its front matter keys and headings exactly as they are.
 
 Leave out `## 미해결 질문` when nothing is open.
@@ -150,6 +152,24 @@ While the run is in spec, the user can pin comments on the to-be in the frame, e
 
 A comment the user reopens comes again with their next message; handle it the same way.
 
+## Decision tree (`## 결정 트리`)
+
+The user's decisions often rest on one another: whether a limit on rows matters depends on whether the export takes the current page or the whole search result. A question asked before the decision it rests on gets an answer built on a guess, and the answer is thrown away later. `## 결정 트리` lists the user's decisions with what each rests on, so that you ask only those whose ground is settled.
+
+- Write it with the first `1-spec.md`, one line per decision the user has to make: each `[?]` of any section (`## 범위` and `## 기획서 대조` too), and later each gap a grade names. A fact the code fills never goes in it. The questions on the premise and on the results come first, outside the tree. With nothing to ask, leave the section out.
+- One line per decision: `- Q<n> <the decision> — 선행: <the Q numbers it rests on, or 없음> — 위치: <the section its answer goes in> — <status>`. Number the lines in the order you add them. A number never changes; it never starts with `D`.
+- The status is one of:
+  - `열림`: not answered yet.
+  - `결정: <the answer> (사용자, YYYY-MM-DD)`.
+  - `정리됨: <why>`: an answer made it unneeded.
+  - `미룸 (사용자, YYYY-MM-DD)`: the user left it open.
+- Keep a closed line: change its status, never delete it.
+- The tree only records. Write each answer into the section `위치:` names, as before (the `[?]` there settled). The grader does not score the tree, and `plan` designs from the other sections.
+- **The frontier** is the set of `열림` lines whose every `선행` line is `결정`. Ask only from it, the line on the weakest dimension of the last grade first.
+- After each answer, update the tree before the next question: mark the line answered, mark `정리됨` each line the answer made unneeded, add each decision the answer opened with its `선행`, then take the frontier again.
+- When the user leaves a question open, mark its line `미룸`, and with it every `열림` line that rests on it, directly or through other lines. Write the question under `## 미해결 질문` as well.
+- When the user points out a dependence the tree missed, fix that line's `선행`, and set back to `열림` the lines answered before the decision they rest on.
+
 ## Grading and questions
 
 A grader that sees only `1-spec.md` scores it, and you close its gaps one question at a time. The hook keeps the pace. Start once `1-spec.md` is written and, when a screen changes, its first picture is drawn (see Visuals).
@@ -161,19 +181,19 @@ A grader that sees only `1-spec.md` scores it, and you close its gaps one questi
 2. If the grade passes, go to End.
 3. Otherwise do what the summary says:
    - A fact with a gap (현행 동작, 영향 범위): read the code and fill it in. Never ask the user for a fact.
-   - Ask the user **one** question with `AskUserQuestion`, on the first gap of the weakest dimension the summary names, citing the anchor of the screen region it is about when there is a picture. One question per call; the hook refuses more.
+   - Add the gap of the weakest dimension the summary names to `## 결정 트리`, with the decisions it rests on, unless a line holds it already. Then ask the user **one** question with `AskUserQuestion`, from the tree's frontier (see Decision tree), citing the anchor of the screen region it is about when there is a picture. One question per call; the hook refuses more.
    - Open the question with one line on where the grading stands, so the user sees why they are asked: the dimension it is about, its score and the ambiguity of the last grade, for example `[완료 판정 0.4 · 모호도 0.42]`.
    - Put the option you recommend first, with `(추천)` at the end of its label, and word the question so that choosing it is a plain yes: the user never has to say no to something first to take it. Recommend only what the code, the planning document or another screen's precedent supports, and say which in the option's description. When nothing supports one option over the others, recommend none.
    - Write the question for someone who knows the screens, not the code. Its first sentence says how it works now and what would change, in the words the screen shows; leave out column, table and class names. A word the screen does not show (a status code such as `01`, a term from the code or the data), and a term of the business the user may not know even when the screen shows it (an accounting or legal term, say), gets its meaning in the same sentence, with a small example in numbers. When the options give different numbers or rows, show a few real rows of each side by side.
    - When the question settles how a screen behaves in a state the planning document does not draw (no data for the period, a failed lookup, a missing value), first find how other screens of the same app show that state, in the same menu first. Offer those as the options, each with its `path:line`. If the user picks a way no screen uses, say so on the spec line: `(선례 없음)`.
-   - Write the answer into `1-spec.md` at once, before the next question.
+   - Write the answer into `1-spec.md` at once, and update `## 결정 트리`, before the next question.
    - The user may answer with a question of their own instead: what a word or an option means, how it works today, whether the planning document says so, how another screen does it, or a request to explain it more simply. That is not an answer, even when it leans one way ("X만 빼면 되는 거 아니야?"). Do not write it into `1-spec.md` as a decision, and do not move on to another gap. Investigate if it needs the code or the data, then answer it in text, in the screen's words. End with your question again, reworded with what you just explained, and stop the turn. Their next message answers it; write that into `1-spec.md`. When they ask for simpler words, keep to them for every question after, not only this one.
    - After 3 questions, spawn the grader again. The hook refuses a 4th question until a grade comes in.
    - If the summary says the last three grades barely moved, the questions are going in circles. Ask from another angle, one of these, each at most once per run:
      - **The opposite**: question the assumption under the gap. "If this condition did not hold, would the answer change?" It shows whether the condition is a real requirement or a habit.
      - **The smallest version**: ask what the smallest result is that would still be worth having. When the user narrows the request, rewrite the completion line to match; whatever they leave for later goes to `## 미해결 질문` only when they say so.
      - **The core**: when the words for the thing keep shifting between answers (a screen, a list and a report for the same thing), ask which one screen, value or record the request is about, before any detail.
-4. If the user says it is enough (`충분`, or the like), move each gap still open to `## 미해결 질문`, then go to End. Show them the ambiguity left, as advance gives it, when the run stops for their approval.
+4. If the user says it is enough (`충분`, or the like), move each gap still open to `## 미해결 질문`, mark each `열림` line of `## 결정 트리` `미룸`, then go to End. Show them the ambiguity left, as advance gives it, when the run stops for their approval.
 
 ## Moving the run
 

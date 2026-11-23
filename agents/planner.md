@@ -81,6 +81,8 @@ Read `1-spec.md`: the problem, the current behaviour, the completion check (`## 
 
 Each line under `## 미해결 질문` is a question the user saw and chose to leave open when they approved the spec. Do not ask it again under `사람에게`, and do not settle it silently: give it a row of `## 결정 사항`, the question as 결정, what you assume as 채택, and `가정: <why this one>` as 근거. The user sees these rows when they approve `2-plan.md`.
 
+`## 결정 트리`, when there is one, is the record of the questions asked in spec. Its lines are neither requirements nor open questions: the decisions are in the other sections, and a line marked `미룸` is under `## 미해결 질문` as well.
+
 A `[?]` left in another section of `1-spec.md` (a line of `## 기획서 대조`, a row of `## 범위`, a sentence anywhere) is undecided too: the spec passed its grade with it still open. Treat it the same way: a row of `## 결정 사항` with what is undecided as 결정, what you assume as 채택 and `가정: <why this one>` as 근거, and design on that assumption.
 
 ### 2. Approach and detailed design

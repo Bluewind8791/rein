@@ -151,7 +151,8 @@ describe("the grader (D175)", () => {
     const said = context(r)
     expect(said).toContain("ambiguity 0.38")
     expect(said).toContain("Fill these facts by reading the code, never by asking: 현행 동작: 현행 동작의 빈칸.")
-    expect(said).toContain("Ask the user one question on the weakest dimension asked of them, 경계 조건: 경계 조건의 빈칸")
+    expect(said).toContain("ask the user one question from the tree's frontier")
+    expect(said).toContain("The gap, 경계 조건: 경계 조건의 빈칸")
     expect(said).toContain("At most 3 questions before the next grade.")
     expect(said).not.toContain("of 12")
     const status = ((await $.tool.call(STATUS)) as { result: string }).result

@@ -188,7 +188,7 @@ export function graderTask(dir: string, type: SpecType): string {
     "Score each dimension from 0 to 1, with at most two decimals. 1: a reader of the file alone finds a single reading and nothing to ask. Each dimension has three anchors, for 0.2, 0.6 and 1.0; a spec between two anchors scores between them. When unsure, score lower.",
     ...DIMENSIONS.flatMap(d => [`- ${d.name}: ${d.asks}.`, ...d.anchors[type].map((a, i) => `  - ${["0.2", "0.6", "1.0"][i]}: ${a}.`)]),
     "",
-    `Cite the words of 1-spec.md that support each score in \`근거:\` lines, copied exactly. A dimension with no quote the hook finds in 1-spec.md word for word counts at most ${CITED}. \`[?]\` marks something undecided: count it as a blank, and never quote a line holding \`[?]\`. \`빈칸:\` is the dimension's first gap, as one sentence a question could answer: what is missing or can be read more than one way; \`없음\` when nothing is. Do not add the scores up; the hook does.`,
+    `Cite the words of 1-spec.md that support each score in \`근거:\` lines, copied exactly. A dimension with no quote the hook finds in 1-spec.md word for word counts at most ${CITED}. \`[?]\` marks something undecided: count it as a blank, and never quote a line holding \`[?]\`. \`## 결정 트리\` is the record of the questions asked: score and quote only the other sections. \`빈칸:\` is the dimension's first gap, as one sentence a question could answer: what is missing or can be read more than one way; \`없음\` when nothing is. Do not add the scores up; the hook does.`,
     "",
     `Write ${dir}/agent/grade.md, whole, once, with Write, in exactly this form, one section per dimension:`,
     "",
@@ -262,7 +262,7 @@ export function gradeSummary(grades: Grade[], specText: string): string {
   const steps = [
     ...(scope.length > 0 ? [`Hard gate: ${scope.join("; ")}. Give every row 대상 or 제외 (<why>): from the code where the work plainly does not reach that part, by asking the user where the request leaves it open.`] : []),
     ...(facts.length > 0 ? [`Fill these facts by reading the code, never by asking: ${facts.map(d => `${d.name}: ${d.gap}`).join("; ")}.`] : []),
-    ...(weakest ? [`Ask the user one question on the weakest dimension asked of them, ${weakest.name}: ${weakest.gap}`] : []),
+    ...(weakest ? [`Add the gap of the weakest dimension asked of them to \`## 결정 트리\` with the decisions it rests on, unless a line holds it already, then ask the user one question from the tree's frontier (an 열림 line whose every 선행 is 결정), the weakest dimension first. The gap, ${weakest.name}: ${weakest.gap}`] : []),
     ...(steady(grades) ? ["The last three grades moved the ambiguity by 0.05 or less: the questions are going in circles. Ask from another angle the skill has not used in this run: the opposite (would the answer change if the condition did not hold), the smallest version still worth having, or the core (which one screen, value or record the request is about)."] : []),
     `At most ${EVERY} questions before the next grade. Write each answer into 1-spec.md before the next question.`,
   ]
