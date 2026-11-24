@@ -42,7 +42,7 @@
 
 목업을 그리는 두 에이전트는 훅이 도구도 제한합니다. `rein:as-is`는 Read·Grep·Glob으로 코드를 읽고 Write·Edit으로 `agent/asis.html`만 씁니다. `rein:sketcher`는 Read로 읽고 Write로 `agent/tobe.html`만 쓰며, 코드를 찾아볼 수 없습니다. `1-mockup.html`은 훅이 두 파일을 합쳐 씁니다.
 
-reviewer·review-splitter·worker와 몫이 끝난 에이전트의 Bash는 읽기만 하는 명령(`cat`·`head`·`tail`·`wc`·`ls`·`grep`·`rg`·`find`·`cut`·`sed -n '<줄>p'`, 서로 파이프로 이을 수 있음)과 읽기 전용 git(`diff`·`status`·`log`·`show`·`grep`·`ls-tree`, 뒤에 읽기 명령을 파이프로 이을 수 있음)만 돕니다. qa-integration의 완료 판정 reviewer도 같습니다. worker는 설계 파일의 `rm`도 됩니다. 체이닝(`;`·`&&`), 리다이렉트, 치환은 셸로 쓰거나 확인 못 한 것을 돌릴 수 있어 거절하고, 거절 메시지가 Read·Grep·Glob을 안내합니다.
+reviewer·review-splitter·worker와 몫이 끝난 에이전트의 Bash는 읽기만 하는 명령(`cat`·`head`·`tail`·`wc`·`ls`·`grep`·`rg`·`find`·`cut`·`sed -n '<줄>p'`, 서로 파이프로 이을 수 있음)과 읽기 전용 git(`diff`·`status`·`log`·`show`·`grep`·`ls-tree`, 저작자 확인용 `config --get user.name`·`user.email`, 뒤에 읽기 명령을 파이프로 이을 수 있음)만 돕니다. qa-integration의 완료 판정 reviewer도 같습니다. worker는 설계 파일의 `rm`도 됩니다. 체이닝(`;`·`&&`), 리다이렉트, 치환은 셸로 쓰거나 확인 못 한 것을 돌릴 수 있어 거절하고, 거절 메시지가 Read·Grep·Glob을 안내합니다.
 
 ## 결정 — `advance`
 

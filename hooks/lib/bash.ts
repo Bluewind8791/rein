@@ -44,7 +44,15 @@ export function checkChain(command: string): { words: string[] } | { deny: strin
 }
 
 const READ_ONLY = new Set(["diff", "status", "log", "show", "grep", "ls-tree"])
-const READ_ONLY_NAMES = "diff, status, log, show, grep, ls-tree"
+const READ_ONLY_NAMES = "diff, status, log, show, grep, ls-tree, config [--get] user.name|user.email"
+
+// `git config [--get] user.name|user.email`: the author a rule may ask
+// for, as git resolves it (includeIf included). Any other config form
+// could write or list more.
+const authorRead = (rest: string[]) => {
+  const args = rest[0] === "--get" ? rest.slice(1) : rest
+  return args.length === 1 && (args[0] === "user.name" || args[0] === "user.email")
+}
 
 // options that write a file or run a command from a read-only git,
 // abbreviations included (git takes an unambiguous prefix of a long option;
@@ -79,6 +87,7 @@ export function readOnlyGit(words: string[], repos: string[] | undefined, root: 
     i += 2
   }
   const sub = words[i]
+  if (sub === "config" && authorRead(words.slice(i + 1))) return undefined
   if (sub === undefined || !READ_ONLY.has(sub)) {
     return `D117: only git ${READ_ONLY_NAMES} may run here, with at most --no-pager and -C <repository> before them; got ${sub ?? "nothing"}.`
   }
@@ -187,7 +196,7 @@ export function hardenGit(words: string[]): string {
   const repo = words[i] === "-C" ? words.slice(i, i + 2) : []
   i += repo.length
   const sub = words[i]!
-  const off = sub === "status" || sub === "ls-tree" ? [] : sub === "grep" ? ["--no-textconv"] : ["--no-ext-diff", "--no-textconv"]
+  const off = sub === "status" || sub === "ls-tree" || sub === "config" ? [] : sub === "grep" ? ["--no-textconv"] : ["--no-ext-diff", "--no-textconv"]
   const head = ["git", ...BASH_HARDEN, "--no-pager"]
   return [...head, ...repo, sub, ...off, ...words.slice(i + 1)].map(quoteWord).join(" ")
 }

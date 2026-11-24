@@ -40,6 +40,8 @@ describe("bash policy", () => {
       "git diff --no-index a b",
       "git -C E:/proj grep -n -e foo HEAD -- src",
       "git -C E:/proj ls-tree -r --name-only HEAD src",
+      "git -C E:/proj config user.name",
+      "git config --get user.email",
     ]) {
       expect([cmd, policy(cmd)]).toEqual([cmd, undefined])
     }
@@ -84,6 +86,12 @@ describe("bash policy", () => {
       ["git -C", "D117"],
       ["python x.py", "D117"],
       ["GIT_EXTERNAL_DIFF=x git diff", "D117"],
+      ["git config user.name x", "D117"],
+      ["git config --global user.name", "D117"],
+      ["git config --file a user.name", "D117"],
+      ["git config --list", "D117"],
+      ["git config core.pager", "D117"],
+      ["git config --get user.name --show-origin", "D117"],
     ]
     for (const [cmd, rule] of cases) expect([cmd, policy(cmd)]).toEqual([cmd, expect.stringContaining(rule)])
   })

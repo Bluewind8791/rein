@@ -22,7 +22,7 @@ export function devCommand(words: string[], run: Run, root: string): string[] | 
   if (words[0] !== "rm") {
     const git = readOnlyGit(words, run.repos ?? [], root)
     if (git === undefined) return []
-    return { deny: words[0] === "git" ? git : "D161: in dev Bash runs only rm of planned files or read-only git (diff, status, log, show, grep, ls-tree)." }
+    return { deny: words[0] === "git" ? git : "D161: in dev Bash runs only rm of planned files or read-only git (diff, status, log, show, grep, ls-tree, config [--get] user.name|user.email)." }
   }
   let i = 1
   if (words[i] === "-f") i++
