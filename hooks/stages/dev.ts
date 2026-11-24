@@ -225,9 +225,10 @@ export function toDev(run: Run, failFile: string): { run: Run; context: string }
   return { run: next, context: devEntry(next) }
 }
 
-// back to plan, where the person approves the revised design (D62).
+// back to plan, where the person approves the revised design (D62), or the
+// main session does while the session that sent it there holds the run.
 export function toPlan(run: Run, failFile: string, why: string): { run: Run; context: string } {
-  return { run: { ...leave(run), stage: "plan", failFile, d62: true }, context: d62Entry(why, failFile) }
+  return { run: { ...leave(run), stage: "plan", failFile, d62: true, back: run.owner }, context: d62Entry(why, failFile) }
 }
 
 // the run stops where it is, and the main session sends it to dev or
@@ -257,5 +258,5 @@ export function routeJudged(run: Run, failFile: string, cause: Cause): { run: Ru
 // again: one arbiter per plan pass.
 export function afterDeviation(run: Run, verdict: "합당" | "부당", file: string): Run {
   const next: Run = { ...run, arbiter: undefined, deviation: { verdict, file } }
-  return verdict === "합당" ? { ...next, stage: "plan", keepRetries: true } : next
+  return verdict === "합당" ? { ...next, stage: "plan", keepRetries: true, back: run.owner } : next
 }

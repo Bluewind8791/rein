@@ -370,10 +370,9 @@ describe("review hardening", () => {
     expect(parseCover(`${COVER}${before}`)).toEqual({ cover: [{ part: "잠긴다", by: "확인 불가", reason: "예시라 확인할 것이 없음" }] })
   })
 
-  test("D62: after a design failure the run stops in plan until the user approves the new plan", async ($, on) => {
+  test("D62: after a design failure the run stops in plan until the new plan is approved, in the same session by the main session itself", async ($, on) => {
     const files: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": JSON.stringify({ qa: ["t"] }), [`${DIR}/1-spec.md`]: SPEC_TEXT }
-    let answer: string | undefined
-    world(on, files, () => answer, { ...REVIEW_RUN, retries: 3 })
+    world(on, files, undefined, { ...REVIEW_RUN, retries: 3 })
     await $.agent.spawn(spawn)
     const r = await $.tool.call(write(REVIEW, FAIL_DESIGN, REVIEWER))
     expect(context(r)).toContain("stops here. Tell the user")
@@ -382,9 +381,8 @@ describe("review hardening", () => {
     expect(context(await $.tool.call(write(`${DIR}/2-plan.md`, plan)))).toEqual("")
     expect(await status($)).toContain("stage: plan")
     await reviewed($)
-    expect(await relay($, { tool: "mcp__rein__advance" } as never)).toEqual({ result: expect.stringContaining("D62: this waits for the user; nothing changed.") })
-    answer = "승인"
-    const ok = await relay($, { tool: "mcp__rein__advance" } as never)
+    expect(await relay($, { tool: "mcp__rein__advance" } as never)).toEqual({ result: expect.stringContaining("D62: back in plan in the session that sent it here: the user is not asked here; nothing changed yet.") })
+    const ok = await $.tool.call({ tool: "mcp__rein__advance", answer: "승인", said: "same session" } as never)
     expect(ok).toEqual(expect.objectContaining({ result: "Approved. The run is now in the dev stage." }))
     const s = await status($)
     expect(s).toContain("stage: dev")

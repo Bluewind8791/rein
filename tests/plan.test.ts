@@ -1,5 +1,5 @@
 import { describe, expect } from "claude-code/testing"
-import { relay, COVER, DIR, grade, planned, REIN, reviewed, spawned, SPEC_TEXT, store, world, test } from "./world.ts"
+import { relay, COVER, DIR, grade, planned, REIN, reviewed, SESSION, spawned, SPEC_TEXT, store, world, test } from "./world.ts"
 
 // The plan stage: its write allowlist, the approval at advance once
 // 2-plan.md has the form, and the rules open_run freezes for it.
@@ -507,6 +507,30 @@ describe("the design review in plan", () => {
     await $.tool.call(write(`${DIR}/2-plan.md`, PLAN.replace("세션에", "저장소에")))
     await reviewed($, "잠금 해제가 빠짐")
     expect(await relay($, ADVANCE)).toEqual({ result: expect.stringContaining("this waits for the user; nothing changed. Tell them what the hook knows below, giving the paths, then stop. They read it and type /rein:dev to approve it") })
+  })
+
+  test("back in plan in the session that sent it there, a reviewed revised design is approved by the main session itself", async ($, on) => {
+    const questions: string[] = []
+    world(on, { ...REPOS, [`${DIR}/2-plan.md`]: PLAN }, q => (questions.push(q), "승인"), { ...PLAN_RUN, d62: true, back: SESSION })
+    await reviewed($)
+    const r = (await relay($, ADVANCE)) as { result?: string }
+    expect(r.result).toContain(`D62: back in plan in the session that sent it here: the user is not asked here; nothing changed yet. Tell them in one line what passed, giving the paths below, then call mcp__rein__advance again now with answer "승인" and said "same session".`)
+    expect(r.result).toContain(`같은 세션에서 plan으로 되돌아온 run이라 고친 2-plan.md를 바로 승인하고 dev 단계로 넘어갑니다. (${DIR}/2-plan.md)`)
+    expect(questions).toHaveLength(0)
+    expect(await $.tool.call({ tool: "mcp__rein__advance", answer: "승인", said: "same session" } as never)).toEqual(expect.objectContaining({ result: "Approved. The run is now in the dev stage." }))
+    expect(store.get("runs:proj/login-fix")).not.toHaveProperty("back")
+  })
+
+  test("back in plan but held by another session than the one that sent it, the revised design waits for /rein:dev", async ($, on) => {
+    world(on, { ...REPOS, [`${DIR}/2-plan.md`]: PLAN }, undefined, { ...PLAN_RUN, d62: true, back: "s0" })
+    await reviewed($)
+    expect(await relay($, ADVANCE)).toEqual({ result: expect.stringContaining("this waits for the user; nothing changed. Tell them what the hook knows below, giving the paths, then stop. They read it and type /rein:dev to approve it") })
+  })
+
+  test("goto from a later stage back to plan marks the session that sent it there", async ($, on) => {
+    world(on, { ...REPOS }, undefined, { stage: "dev", runId: "login-fix" })
+    await $.tool.call({ tool: "mcp__rein__goto", stage: "plan" } as never)
+    expect(store.get("runs:proj/login-fix")).toMatchObject({ stage: "plan", back: SESSION })
   })
 
   test("back in plan after the design passed, the review judges only what changed since, in every round of the visit", async ($, on) => {

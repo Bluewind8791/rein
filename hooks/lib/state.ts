@@ -87,6 +87,7 @@ export type Run = {
   sketchCheck?: SketchCheck // the to-be screens drawn from a planning-document picture, and rein:layout-verifier's comparison of the last drawing with it
   asked?: number // the questions the main session asked the user in spec
   grades?: Grade[] // every grade of 1-spec.md, oldest first
+  back?: string // the session that sent the run back to plan after its design was approved (a D62 return, a deviation judged 합당, or goto from a later stage); while that session still holds the run, its main session approves the revised design itself, as in an autopilot run
   autopilot?: true // opened by /rein:autopilot: the main session itself passes 1-spec.md's approval, 2-plan.md's (reviewed, config as at HEAD), the e2e run in Ego and the commit, with said "autopilot", where the hook's result says so
   waits?: { stage: "spec" | "plan"; hash: string } // advance found 1-spec.md (as graded) or 2-plan.md (as reviewed) ready and the run stopped for the person; it waits for /rein:plan or /rein:dev while the stage and the file's SHA-256 are still these
   traceBroken?: { at: string; problem: string } // the first trace write that failed; trace.jsonl misses lines from then

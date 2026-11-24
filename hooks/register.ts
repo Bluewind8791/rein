@@ -1699,10 +1699,11 @@ function waiting(rule: string, facts: string, to: Stage, fix: string): ToolCallR
 }
 
 // an autopilot run where the user would have answered (1-spec.md's or
-// 2-plan.md's approval, the e2e run, the commit): the main session passes
-// that answer itself, said "autopilot", so the trace tells it from a person's.
-function selfAnswer(rule: string, facts: string, answer: string): ToolCallResult {
-  return { result: `${rule ? `${rule}: ` : ""}autopilot run: the user is not asked here; nothing changed yet. Tell them in one line what passed, giving the paths below, then call mcp__rein__advance again now with answer "${answer}" and said "autopilot".\n\nWhat the hook knows here:\n${facts}` }
+// 2-plan.md's approval, the e2e run, the commit), or a revised design back
+// in plan in the session that sent it there: the main session passes that
+// answer itself, said as given, so the trace tells it from a person's.
+function selfAnswer(rule: string, facts: string, answer: string, why = "autopilot run", said = "autopilot"): ToolCallResult {
+  return { result: `${rule ? `${rule}: ` : ""}${why}: the user is not asked here; nothing changed yet. Tell them in one line what passed, giving the paths below, then call mcp__rein__advance again now with answer "${answer}" and said "${said}".\n\nWhat the hook knows here:\n${facts}` }
 }
 
 const labelList = (options: string[]) => options.map(o => `"${o}"`).join(", ")
@@ -1908,13 +1909,14 @@ async function goTo($: EngineInterface, input: Record<string, unknown>): Promise
   const cleared: Partial<Run> = {
     worker: undefined, arbiter: undefined, reviewer: undefined, splitter: undefined, reviewGroups: undefined, verifier: undefined, deviation: undefined,
     failFile: undefined, d62: undefined, keepRetries: undefined, halt: undefined, e2e: undefined, qaVisit: undefined,
-    heads: undefined, landRepos: undefined,
+    heads: undefined, landRepos: undefined, back: undefined,
     planReviewer: undefined, planReview: undefined, planVerdicts: undefined,
   }
   const moved = await mutate($, r => {
     if (r?.runId !== run.runId || r.stage !== run.stage) return undefined
     if (reenter) return { ...r, retries: 0, ...frozen, ...sealed }
-    return { ...(judged ? base : r), ...cleared, retries: 0, ...frozen, ...landAt, ...sealed, ...spec, stage: to === "qa-integration" ? "qa" : to }
+    const back = to === "plan" && PAST_PLAN.has(run.stage) ? { back: r.owner } : {}
+    return { ...(judged ? base : r), ...cleared, ...back, retries: 0, ...frozen, ...landAt, ...sealed, ...spec, stage: to === "qa-integration" ? "qa" : to }
   })
   if (!moved) return unplant("the run changed meanwhile; nothing was moved. Call goto again.")
   await trace($, run, { ev: "stage", from: run.stage, to, tool: GOTO, said: saidOf(input), ...(judged ? { files: judged.files, repos: judged.repos } : {}) })
@@ -2192,7 +2194,7 @@ async function nothingToCommit($: EngineInterface, run: Run, answer: string | un
     return unanswered("D95", "통합 qa는 통과했지만 git status에 바뀐 계획 파일이 없어 커밋할 것이 없습니다 (D95). 어떻게 할까요?", [TO_PLAN, END_RUN])
   }
   if (answer === TO_PLAN) {
-    const moved = await mutate($, r => (r?.stage === "qa-integration" && !r.halt ? { ...r, stage: "plan", d62: true, failFile: file, verifier: undefined } : undefined))
+    const moved = await mutate($, r => (r?.stage === "qa-integration" && !r.halt ? { ...r, stage: "plan", d62: true, back: r.owner, failFile: file, verifier: undefined } : undefined))
     if (!moved) return { deny: "D95: the run changed while the question was open; nothing was moved." }
     await trace($, run, { ev: "stage", from: "qa-integration", to: "plan", answer, rule: "D95" })
     return { result: "The user sent the run back to plan.", context: [d62Entry("git status shows no planned file changed, so there was nothing to commit (D95)", file)] }
@@ -2247,17 +2249,24 @@ async function approvePlan($: EngineInterface, run: Run, answer: string | undefi
   const planting = fresh.length > 0 ? `
 
 승인하면 이 저장소마다 지금 HEAD에서 run의 워크트리(.claude/worktrees/${run.runId})를 만들고 그 안에서 작업합니다. 커밋 안 된 변경은 들어가지 않습니다: ${fresh.join(", ")}` : ""
-  // autopilot approves only a reviewed design with every config as at HEAD;
+  // autopilot, and a revised design back in plan in the session that sent
+  // it there, approve only a reviewed design with every config as at HEAD;
   // anything else waits for the user as in any run.
-  const self = run.autopilot === true && reviewed && head === ""
-  const lead = self ? `autopilot이 ${run.d62 ? "고친 " : ""}2-plan.md를 승인하고 dev 단계로 넘어갑니다.` : `${run.d62 ? "고친 " : ""}2-plan.md가 승인을 기다립니다. /rein:dev를 입력하면 승인하고 dev 단계로 넘어갑니다.`
+  const returned = run.back !== undefined && run.back === (await $.session.id())
+  const self = (run.autopilot === true || returned) && reviewed && head === ""
+  const lead = !self ? `${run.d62 ? "고친 " : ""}2-plan.md가 승인을 기다립니다. /rein:dev를 입력하면 승인하고 dev 단계로 넘어갑니다.`
+    : run.autopilot ? `autopilot이 ${run.d62 ? "고친 " : ""}2-plan.md를 승인하고 dev 단계로 넘어갑니다.`
+      : "같은 세션에서 plan으로 되돌아온 run이라 고친 2-plan.md를 바로 승인하고 dev 단계로 넘어갑니다."
   const facts = `${lead} (${path})${unreviewed}${freeze}${head}${planting}`
   const ruleOf = rule ? { rule } : {}
   if (answer === undefined) {
     await trace($, run, { ev: "tool", stage: "plan", tool: ADVANCE, decision: "deny", ...ruleOf, reason: "no answer" })
     await mutate($, r => (r?.stage === "plan" ? { ...r, waits: { stage: "plan", hash } } : undefined))
     const view = await writePlanView($, c, judged.plan)
-    if (self) return selfAnswer(rule, view ? `${facts}\n\n코드 변경: ${view}` : facts, APPROVE)
+    if (self) {
+      const shown = view ? `${facts}\n\n코드 변경: ${view}` : facts
+      return run.autopilot ? selfAnswer(rule, shown, APPROVE) : selfAnswer(rule, shown, APPROVE, "back in plan in the session that sent it here", "same session")
+    }
     const fix = head === "" ? "continue the planner with what they want changed" : "continue the planner with what they want changed, or have .rein/config.json fixed (they fix it, or /rein:setup does with their confirmation)"
     return waiting(rule, view ? `${facts}\n\n코드 변경은 브라우저로 열어 지금 코드와 나란히 볼 수 있습니다. (${view})` : facts, "dev", `${fix} (the rein:plan skill says how), then call advance again without answer.`)
   }
@@ -3335,7 +3344,7 @@ function planPassed(run: Run, j: Extract<PlanJudgment, { ok: true }>): Run {
     outside: [...(run.outside ?? []), ...j.outside.filter(o => !(run.outside ?? []).some(x => same(x, o)))],
     configHashes: j.hashes, configSeen: j.views, retries: run.keepRetries ? run.retries : 0,
     frozen: { ...run.frozen, plan: j.plan, planSpec: run.frozen?.spec },
-    failFile: undefined, arbiter: undefined, deviation: undefined, keepRetries: undefined, d62: undefined, splitter: undefined,
+    failFile: undefined, arbiter: undefined, deviation: undefined, keepRetries: undefined, d62: undefined, back: undefined, splitter: undefined,
     planReviewer: undefined, planReview: undefined, planVerdicts: undefined,
     halt: undefined, e2e: undefined, qaVisit: undefined, passed: keptPasses(run, j.checks, j.hashes, j.views),
   }
@@ -3611,7 +3620,7 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
   const specPath = `${c.dir}/1-spec.md`
   const completion = completionLine(await $.fs.read(specPath))
   if (completion === undefined) {
-    const moved = await mutate($, r => (ready(r) ? { ...r, stage: "plan", halt: undefined, busy: undefined, verifier: undefined, e2e: undefined, qaVisit: undefined, d62: true, failFile: specPath } : undefined))
+    const moved = await mutate($, r => (ready(r) ? { ...r, stage: "plan", halt: undefined, busy: undefined, verifier: undefined, e2e: undefined, qaVisit: undefined, d62: true, back: r.owner, failFile: specPath } : undefined))
     if (!moved) return `The run left ${from} before the e2e entry.`
     await trace($, run, { ev: "stage", from, to: "plan", rule: "D36" })
     return d62Entry(`${lead}, but 1-spec.md has no line under ## 완료 판정, so integration qa has nothing to check it against (D36); tell the user the approved spec is missing its completion line`, specPath)

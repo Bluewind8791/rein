@@ -6,7 +6,7 @@ import { sha256Text } from "../hooks/lib/hash.ts"
 import { checkConfig, judgeCover, parseChecks, parseCover } from "../hooks/lib/parse.ts"
 import type { CheckRun } from "../hooks/lib/state.ts"
 import { allChecked, asideSection, asideTick, carriedTick, egoTick, handChecked, parseImpact, tick, unchecked, UNSHOT } from "../hooks/stages/qaIntegration.ts"
-import { relay, COVER, DIR, gitSub, planned, ran, SPEC_TEXT, spawned, store, world, type Host, test } from "./world.ts"
+import { relay, COVER, DIR, gitSub, planned, ran, SESSION, SPEC_TEXT, spawned, store, world, type Host, test } from "./world.ts"
 
 // 2-plan.md's aside checks and how they cover the
 // completion line, config e2e.apps, one rein:e2e-runner agent per check, up
@@ -792,7 +792,7 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
     const r = await $.tool.call(answer("plan으로 보냄"))
     expect(context(r)).toContain(`The user found a problem in the integration test; ${LIST} holds the checklist and what they found.`)
     expect(context(r)).toContain("D62")
-    expect(store.get("runs:proj/login-fix")).toMatchObject({ stage: "plan", d62: true, failFile: LIST, retries: 0 })
+    expect(store.get("runs:proj/login-fix")).toMatchObject({ stage: "plan", d62: true, back: SESSION, failFile: LIST, retries: 0 })
   })
 
   test("e2e 실행 runs the aside checks; each one that passes checks its box", async ($, on) => {
