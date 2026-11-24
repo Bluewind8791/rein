@@ -45,7 +45,7 @@ node frame/hub.js serve --root <폴더> [--port 7380] [--bind <ip>]
 - `<폴더>`는 그 PC의 `~/.rein`과 다른 폴더입니다 (예: `D:\rein-hub`). 구조는 `~/.rein`과 같습니다.
 - 그 PC의 Tailscale 주소에서만 듣고, tailnet 안의 요청만 받습니다.
 - `node frame/hub.js print-task --root <폴더>`가 로그온 때 서버를 띄우는 작업 스케줄러 명령을 보여 줍니다.
-- 브라우저로 `http://<MagicDNS 이름>:7380`을 열면 모든 PC의 run을 읽기 전용으로 봅니다. 위쪽 막대의 「화면」은 카탈로그의 화면 문서를 화면별로 보여 줍니다([6-land.md](./stages/6-land.md#프레임의-화면-페이지)).
+- 브라우저로 `http://<MagicDNS 이름>:7380`을 열면 모든 PC의 run을 읽기 전용으로 봅니다. 왼쪽 아이콘 막대의 「화면」은 카탈로그의 화면 문서를 화면별로 보여 줍니다([6-land.md](./stages/6-land.md#프레임의-화면-페이지)).
 - 카탈로그는 `<폴더>/.hub/domains/<도메인>/`, 공용 룰은 `<폴더>/rules/`입니다. 각 PC의 `/rein:setup`이 카탈로그에서 도메인을 골라 받습니다.
 
 `sync.json`에 `server`가 있는 PC는 로컬 frame 서버가 run 파일을 바뀔 때마다 올립니다. 세션을 시작할 때 카탈로그와 공용 룰의 바뀐 파일을 받고, 이 PC에서 고친 파일을 보냅니다. 서버에 닿지 않으면 쌓아 두었다가 다음에 닿을 때 보냅니다.

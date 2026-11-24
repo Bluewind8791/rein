@@ -52,14 +52,24 @@ let doc = null // { src, run } of the markdown on screen
 let drawn = null // { run, a, src, plan } of the spec or land view on screen
 let ui = {} // what the person picked in the drawn view: tab, page, row, filter, why
 const folded = { active: false, complete: false, defer: true, drop: true }
-// 1-mockup.html is shown between the planning documents on its left and a
-// timeline folded into a rail; the rail opens on a click until another
-// artifact is picked. Any other artifact shows the timeline open until the
-// person folds it. mockShow: the part of each screen shown.
-let railOpen = false
+// 1-mockup.html is shown with the planning documents on its left. The
+// explorer stays open until the person folds it into a rail.
+// mockShow: the part of each screen shown.
 let railFold = false
 let mockShow = "after" // "before" | "after" | "both"
 const isMock = (run) => !!run && sel.key === "1-mockup"
+
+// what this browser remembers: the theme, the open editor tabs of each run
+// and whether the comment panel is closed; storage may be blocked
+const lsGet = (k) => { try { return localStorage.getItem(k) } catch { return null } }
+const lsSet = (k, v) => { try { localStorage.setItem(k, v) } catch {} }
+let theme = lsGet("rein.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+document.documentElement.dataset.theme = theme
+// "<project>/<slug>" -> the artifact keys open as editor tabs, in order
+const etabs = (() => { try { return new Map(Object.entries(JSON.parse(lsGet("rein.etabs") || "{}"))) } catch { return new Map() } })()
+let cpOff = lsGet("rein.cpoff") === "1"
+// "<project>/<slug>|<stage>" -> whether the person unfolded (true) or folded (false) that stage in the explorer
+const stgOpen = new Map()
 
 // ---------- location hash: #<project>/<slug>/<artifact>[/md][&r=<artifact on the right>] ----------
 // the screen page: #~screens[/<screen key>] (SCREENS_HASH)
@@ -253,21 +263,23 @@ function render() {
   document.title = run ? `${run.slug} · Rein` : screens ? "화면 · Rein" : "Rein"
   renderTop(run, tabs)
   renderHub()
+  renderStatus(run)
   if (screens) {
     renderScreens()
     writeHash()
     return tick()
   }
   const mock = isMock(run)
-  if (!mock) railOpen = false
   const key = mock ? `${run.project}/${run.slug}` : null
   if (cm.key !== key) {
     clearTimeout(cm.timer)
     cm = freshCm(key)
   }
-  const railed = mock ? !railOpen : railFold
+  const railed = railFold
   document.querySelector(".body").classList.toggle("railed", railed)
   $("work").classList.toggle("left", mock)
+  $("work").classList.toggle("nocp", mock && cpOff)
+  if (run) keepTab(run)
   renderLeft(run, railed)
   if (mock) autoSide(run)
   renderMain(run)
@@ -283,19 +295,61 @@ function render() {
   tick()
 }
 
+const ICON = {
+  run: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg>`,
+  screens: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>`,
+  all: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`,
+  sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
+  moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`,
+  comment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>`,
+}
+
+// the run tabs, the theme button and the icon rail: run | 화면 | 전체 run
 function renderTop(run, tabs) {
   document.querySelector(".brand").textContent = ro ? "HUB" : "REIN"
   const screens = sel.screen != null
+  const menu = !$("menu").hidden
   const n = screenList().length
-  setHTML($("rmode"), `<button type="button" class="${screens ? "" : "on"}" data-mode="run">run</button>` +
-    `<button type="button" class="${screens ? "on" : ""}" data-mode="screens">화면${n ? ` <span class="n">${n}</span>` : ""}</button>`)
-  setHTML($("tabs"), tabs.map((r) => {
+  const btn = (attr, on, label, icon, count) => `<button type="button" ${attr} class="${on ? "on" : ""}" title="${label}" aria-label="${label}">${icon}${count ? `<span class="n">${count}</span>` : ""}</button>`
+  setHTML($("arail"), btn(`data-mode="run"`, !screens && !menu, "run", ICON.run, 0) +
+    btn(`data-mode="screens"`, screens && !menu, "화면", ICON.screens, n) +
+    btn(`data-allruns`, menu, `전체 run ${allRuns().length}`, ICON.all, allRuns().length))
+  // the open run stays a tab even when it is closed
+  const shown = run && !tabs.some((r) => r.project === run.project && r.slug === run.slug) ? [...tabs, run] : tabs
+  setHTML($("tabs"), shown.map((r) => {
     const on = run && r.project === run.project && r.slug === run.slug ? " on" : ""
+    const label = r.state === "active" ? TAB_ST[r.status] || r.stageShort : STATUS[r.status]
     return `<div class="rtab${on}" data-p="${esc(r.project)}" data-s="${esc(r.slug)}" title="${esc(r.project)} / ${esc(r.slug)} · ${STATUS[r.status]}${r.pc ? ` · ${esc(r.pc)}` : ""}">` +
-      `<span class="d ${r.status}"></span><span>${esc(r.slug)}</span><span class="st">${r.pc ? `${esc(r.pc)} · ` : ""}${TAB_ST[r.status] || r.stageShort}</span></div>`
+      `<span class="d ${r.status}"></span><span>${esc(r.slug)}</span><span class="st ${r.status}">${r.pc ? `${esc(r.pc)} · ` : ""}${label}</span></div>`
   }).join(""))
-  $("allruns").textContent = `전체 run ${allRuns().length} ▾`
-  if (!$("menu").hidden) renderMenu(run)
+  const dark = theme === "dark"
+  setHTML($("theme"), `${dark ? ICON.sun : ICON.moon}${dark ? "라이트" : "다크"}`)
+  $("theme").title = dark ? "라이트 모드로 전환" : "다크 모드로 전환"
+  if (menu) renderMenu(run)
+}
+
+// the status bar: the open run's stage and time, its start, and how many runs are open
+function renderStatus(run) {
+  const parts = []
+  if (ro) parts.push(`<span>허브 · 읽기 전용</span>`)
+  if (run) {
+    const st = run.stageShort
+    const tone = run.status === "run" ? "now" : run.status === "done" ? "done" : run.status === "ask" || run.status === "halt" ? run.status : ""
+    const from = Date.parse(run.stages[st] || run.opened)
+    const live = run.state === "active" && !isNaN(from)
+    parts.push(`<span class="${tone}">● ${esc(st)} ${KO[st] || ""} · ${STATUS[run.status]}</span>`)
+    if (live) parts.push(`<span data-from="${from}"></span>`)
+    const calls = run.view ? (run.view.pills || []).filter((p) => p.pulse).length : 0
+    if (calls) parts.push(`<span>실행 중 ${calls}</span>`)
+    const opened = Date.parse(run.opened)
+    if (!isNaN(opened)) {
+      const to = Date.parse(run.closed)
+      const tail = run.state === "active" ? ` · <span data-age="${opened}"></span>` : !isNaN(to) ? ` · 총 ${fmtSpan(to - opened)}` : ""
+      parts.push(`<span>시작 ${fmtDate(opened)}${tail}</span>`)
+    }
+  } else if (sel.screen != null) parts.push(`<span>화면 ${screenList().length}</span>`)
+  parts.push(`<span>진행 중 run ${tabRuns().length}</span>`)
+  setHTML($("sinfo"), parts.join(""))
 }
 
 // the local page's badge of the hub server: reached, sending, or not reached
@@ -358,11 +412,11 @@ function statusCard(run) {
   let what
   if (run.state === "active") {
     const from = Date.parse(run.stages[st] || run.opened)
-    what = `${KO[st] || st}${isNaN(from) ? "" : ` · <span data-from="${from}"></span>`}`
+    what = `${st} ${KO[st] || ""} · ${run.status === "run" ? "" : `${STATUS[run.status]} · `}${isNaN(from) ? "" : `<span data-from="${from}"></span>`}`
   } else if (run.state === "complete") {
     what = `완료${run.closed ? ` · ${fmtDate(run.closed)}` : ""}`
   } else {
-    what = `${KO[st] || st}에서 ${STATUS[run.status]} · ${fmtDate(run.closed || run.touched)}`
+    what = `${st}에서 ${STATUS[run.status]} · ${fmtDate(run.closed || run.touched)}`
   }
   let ag = ""
   if (run.view) {
@@ -375,8 +429,10 @@ function statusCard(run) {
     const marks = (run.view.marks || []).length ? `<div class="marks">${run.view.marks.map((m) => `<span class="mark">${esc(m)}</span>`).join("")}</div>` : ""
     if (pills || marks) ag = `<div class="ag">${pills}${marks}</div>`
   }
+  const s = run.summary
+  const title = s && s.title ? Md.inline(s.title, { href: linkHref(run) }) : esc(run.slug)
   return `<div class="scard"><canvas class="cv c48" width="24" height="24" data-anim="${ANIM[run.status]}"></canvas>` +
-    `<div style="min-width:0"><div class="stage ${CARD[run.status]}">${st} · ${STATUS[run.status]}</div><div class="what">${what}</div></div>${summary(run)}${ag}</div>`
+    `<div class="shd"><b class="rtitle">${title}</b><div class="stage ${CARD[run.status]}">${what}</div></div>${summary(run)}${ag}</div>`
 }
 
 // a link in a run file, relative to dir of the run folder ("" or "agent/")
@@ -389,24 +445,16 @@ const linkHref = (run, dir = "") => (u) => {
   return fileUrl(run, dir + name) + (k < 0 ? "" : u.slice(k))
 }
 
-// title, goal, where the run works, when it started and its open questions;
+// goal, reference and open questions under the card's title;
 // a line whose data is missing is left out
 function summary(run) {
   const s = run.summary
   if (!s) return ""
   const md = (t) => Md.inline(t, { href: linkHref(run) })
+  // the title heads the card, the repositories are listed under the stage
+  // tree, the start in the status bar
   const rows = []
   if (s.ref) rows.push(["참조", md(s.ref), ""])
-  for (const t of s.trees || []) {
-    if (t.repo) rows.push(["레포", esc(t.base ? `${t.repo} · ${t.base}` : t.repo), "mono"])
-    if (t.branch) rows.push(["트리", esc(t.branch), "mono"])
-  }
-  const from = Date.parse(run.opened)
-  if (!isNaN(from)) {
-    const to = Date.parse(run.closed)
-    const tail = run.state === "active" ? ` · <span data-age="${from}"></span>` : !isNaN(to) ? ` · 총 ${fmtSpan(to - from)}` : ""
-    rows.push(["시작", fmtDate(from) + tail, ""])
-  }
   let chip = ""
   if (s.questions.length) {
     const id = `${run.project}/${run.slug}`
@@ -422,15 +470,14 @@ function summary(run) {
     }
   }
   const parts = [
-    s.title ? `<h1 class="rtitle">${md(s.title)}</h1>` : "",
-    s.goal ? `<div class="goal"><b>목표</b><span>${md(s.goal)}</span></div>` : "",
+    s.goal ? `<p class="goal">${md(s.goal)}</p>` : "",
     rows.length ? `<div class="sumrow">${rows.map(([k, v, c]) => `<span class="k">${k}</span><span${c ? ` class="${c}"` : ""}>${v}</span>`).join("")}</div>` : "",
     chip,
   ].join("")
   return parts ? `<div class="sum">${parts}</div>` : ""
 }
 
-// rail: the timeline folded to its stage marks, while 1-mockup.html is shown
+// rail: the explorer folded to its stage marks
 function renderLeft(run, rail = false) {
   if (!run) return setHTML($("left"), `<div class="empty">run이 없습니다</div>`)
   if (rail) {
@@ -441,22 +488,39 @@ function renderLeft(run, rail = false) {
     }).join("")
     return setHTML($("left"), `<button type="button" class="rlx" title="타임라인 펼치기">»</button>${marks}`)
   }
-  const steps = CHAIN.map((s, i) => {
-    const tone = run.tones[s] || "wait"
-    const glyph = tone === "done" ? "✓" : tone === "bad" ? "!" : ""
-    const stem = i === CHAIN.length - 1 ? "" : `<div class="stem${tone === "done" ? " done" : ""}"></div>`
-    const when = tone !== "wait" && run.stages[s] ? fmtDate(run.stages[s]) : ""
-    let arts = run.arts.filter((a) => a.stage === s && !a.sub).map(artRow).join("")
+  // the stage tree: every stage is unfolded until the person folds it
+  const id = `${run.project}/${run.slug}`
+  const isOpen = (s) => stgOpen.get(`${id}|${s}`) !== false
+  const files = (s) => {
+    let out = run.arts.filter((a) => a.stage === s && !a.sub).map(artRow).join("")
     for (const sub of Object.keys(SUB_STAGE)) {
       const in_ = run.arts.filter((a) => a.stage === s && a.sub === sub)
-      if (in_.length) arts += `<div class="subh"><span>${sub}/</span><span class="ext">${in_.length}</span></div>` + in_.map(artRow).join("")
+      if (in_.length) out += `<div class="subh"><span>${sub}/</span><span class="ext">${in_.length}</span></div>` + in_.map(artRow).join("")
     }
-    return `<div class="tls"><div class="rail"><div class="node ${tone}">${glyph}</div>${stem}</div>` +
-      `<div class="tlb"><div class="tlh"><span class="sn ${tone}">${s}</span><span class="sk">${KO[s]}</span><span class="when">${when}</span></div>${arts}</div></div>`
+    return out
+  }
+  const GLYPH = { done: "✓", now: "●", bad: "!", wait: "○", held: "–" }
+  const steps = CHAIN.map((s, i) => {
+    const tone = run.tones[s] || "wait"
+    const when = tone !== "wait" && run.stages[s] ? fmtDate(run.stages[s]) : ""
+    const inner = files(s)
+    const open = !!inner && isOpen(s)
+    return `<button type="button" class="xg ${tone}" data-stg="${s}" aria-expanded="${open}"${inner ? "" : " disabled"}>` +
+      `<span class="tw">${inner ? (open ? "▾" : "▸") : ""}</span><span class="g ${tone}">${GLYPH[tone] || ""}</span>` +
+      `<span class="nm">${i + 1} ${s}</span><span class="sk">${KO[s]}</span><span class="when">${when}</span></button>` + (open ? inner : "")
   }).join("")
   const others = run.arts.filter((a) => a.stage === "other")
-  const other = others.length ? `<div class="other"><span class="sk">그 밖의 파일</span>${others.map(artRow).join("")}</div>` : ""
-  setHTML($("left"), `<button type="button" class="rlx fold" data-fold-rail title="타임라인 접기">«</button>` + statusCard(run) + steps + other)
+  const otherOpen = others.length && isOpen("other")
+  const other = others.length
+    ? `<button type="button" class="xg" data-stg="other" aria-expanded="${!!otherOpen}"><span class="tw">${otherOpen ? "▾" : "▸"}</span><span class="g"></span><span class="nm">그 밖의 파일</span><span class="when">${others.length}</span></button>` + (otherOpen ? others.map(artRow).join("") : "")
+    : ""
+  const trees = (run.summary && run.summary.trees) || []
+  const repos = trees.length
+    ? `<div class="xh">저장소 ${trees.length}</div>` + trees.map((t) => `<div class="repo" title="${esc([t.repo, t.base, t.branch].filter(Boolean).join(" · "))}">` +
+      `<span>${esc(t.repo || "")}</span><span class="b">${esc(t.branch || t.base || "")}</span></div>`).join("")
+    : ""
+  setHTML($("left"), `<div class="xh">RUN<button type="button" class="rlx fold" data-fold-rail title="탐색기 접기">«</button></div>` + statusCard(run) +
+    `<div class="xh">산출물</div>` + steps + other + repos)
 }
 
 // the ways an artifact can be shown, its default first: the frame's own
@@ -472,18 +536,66 @@ function viewsOf(a) {
 
 const VIEW_LABEL = { draw: "화면 보기", html: "HTML 보기", md: "원본 md" }
 
+// ---------- editor tabs: the artifacts of a run kept open above the main view ----------
+
+const tabKeys = (run) => {
+  const id = `${run.project}/${run.slug}`
+  const keys = (etabs.get(id) || []).filter((k) => run.arts.some((a) => a.key === k && !a.none))
+  etabs.set(id, keys)
+  return keys
+}
+
+function saveTabs() {
+  lsSet("rein.etabs", JSON.stringify(Object.fromEntries(etabs)))
+}
+
+// the artifact shown gets a tab, after the tab that was shown before it
+let lastTab = null
+function keepTab(run) {
+  if (!sel.key) return
+  const keys = tabKeys(run)
+  if (!keys.includes(sel.key)) {
+    const at = keys.indexOf(lastTab)
+    keys.splice(at < 0 ? keys.length : at + 1, 0, sel.key)
+    saveTabs()
+  }
+  lastTab = sel.key
+}
+
+// close a tab; when it is the one shown, its neighbor is shown instead
+function closeTab(run, key) {
+  const keys = tabKeys(run)
+  const i = keys.indexOf(key)
+  if (i < 0 || keys.length < 2) return
+  keys.splice(i, 1)
+  saveTabs()
+  if (sel.key === key) {
+    sel.key = keys[Math.min(i, keys.length - 1)]
+    sel.view = null
+  }
+  render()
+}
+
 function crumb(run, a, view) {
-  const parts = [run.slug, a ? (a.stage === "other" ? "기타" : a.stage) : null, a ? a.label : null].filter(Boolean)
-  const path = parts.map((p, i) => `<span${i === parts.length - 1 ? ' class="on"' : ""}>${esc(p)}</span>`).join("<span>›</span>")
+  const keys = tabKeys(run)
+  const many = keys.length > 1
+  const tabs = keys.map((k) => {
+    const x = run.arts.find((y) => y.key === k)
+    return `<div class="etab${k === sel.key ? " on" : ""}" title="${esc(k)}"><button type="button" class="nm" data-etab="${esc(k)}">${esc(x.label)}<span class="ext">${extLabel(x)}</span></button>` +
+      (many ? `<button type="button" class="ex" data-etabx="${esc(k)}" aria-label="${esc(x.label)} 닫기">×</button>` : "") + `</div>`
+  }).join("")
   let right = ""
   if (a) {
     const views = viewsOf(a)
-    for (const v of views) if (v !== view) right += `<button type="button" data-view="${v === views[0] ? "" : v}">${VIEW_LABEL[v]}</button><span>·</span>`
+    for (const v of views) if (v !== view) right += `<button type="button" data-view="${v === views[0] ? "" : v}">${VIEW_LABEL[v]}</button>`
     const f = view === "html" ? a.html : view === "md" || view === "draw" ? a.md : a.file
     right += `<a href="${fileUrl(run, f.name)}" target="_blank" rel="noopener">새 탭 ↗</a>`
-    if (isMock(run)) right = `${showSeg()}<span class="ctogw" id="ctog"></span><span>·</span>${right}`
+    if (isMock(run)) {
+      const n = commentsOfRun(run).length
+      right = `${showSeg()}<span class="ctogw" id="ctog"></span><button type="button" class="cpt${cpOff ? "" : " on"}" data-cpt aria-pressed="${!cpOff}" title="코멘트 패널 ${cpOff ? "열기" : "닫기"}">${ICON.comment}코멘트 ${n}</button>${right}`
+    }
   }
-  return `<div class="mhd"><div class="crumb">${path}<span class="sp"></span>${right}</div></div>`
+  return `<div class="mhd"><div class="etabs">${tabs}</div><span class="sp"></span><div class="macts">${right}</div></div>`
 }
 
 // ---------- 1-mockup.html: which part of each screen, and its planning document ----------
@@ -540,6 +652,7 @@ addEventListener("message", (e) => {
     cm.edit = null
     cm.text = ""
     cm.err = null
+    openPanel()
     renderPanel(run)
     const t = $("cpanel").querySelector("[data-cin]")
     if (t) {
@@ -548,11 +661,20 @@ addEventListener("message", (e) => {
     }
   } else if (m.rein === "pin" && Number.isInteger(m.n)) {
     cm.on = m.n
+    openPanel()
     renderPanel(run)
     const c = $("cpanel").querySelector(`.ccard[data-cn="${m.n}"]`)
     if (c) c.scrollIntoView({ block: "nearest" })
   }
 })
+
+// a new comment or a pin picked in the mockup opens the panel the person closed
+function openPanel() {
+  if (!cpOff) return
+  cpOff = false
+  lsSet("rein.cpoff", "0")
+  render()
+}
 
 // the planning document a `to-be source` names, opened at its page
 function jumpBrief(run, source) {
@@ -681,7 +803,7 @@ async function mockScreens(run, file) {
 
 function renderPanel(run, mock = isMock(run)) {
   const p = $("cpanel")
-  p.hidden = !mock
+  p.hidden = !mock || cpOff
   if (!mock) return setHTML(p, "")
   const can = canComment(run)
   const canBasis = can && briefDocs(run).some(boxable)
@@ -810,6 +932,16 @@ function renderMain(run) {
   const sig = `${file.mtime}:${file.size}` + (view === "draw" ? run.files.map((f) => `|${f.name}:${f.mtime}`).join("") + JSON.stringify(run.land) : "")
   const url = fileUrl(run, file.name)
   if (shown && shown.id === id) {
+    // the tab bar changes without the view: closed tabs, the comment panel
+    const h = main.querySelector(".mhd")
+    const head = crumb(run, a, view)
+    if (h && h._html !== head) {
+      const t = document.createElement("div")
+      t.innerHTML = head
+      t.firstChild._html = head
+      h.replaceWith(t.firstChild)
+      main._html = null
+    }
     if (shown.sig === sig) return
     shown.sig = sig
     if (view === "md") return showMd(run, file, true)
@@ -850,8 +982,115 @@ async function showMd(run, file, keep) {
   doc = { src, run }
   const list = file.name === "5-checklist.md"
   const checkable = list && run.state === "active" && !ro
-  pane.querySelector(".doc").innerHTML = Md.render(src, { href: linkHref(run), checkable, item: list ? checkItem : null })
+  const d = pane.querySelector(".doc")
+  d.innerHTML = Md.render(src, { href: linkHref(run), checkable, item: list ? checkItem : null })
+  if (list) dressChecklist(d)
   if (keep) pane.scrollTop = top
+}
+
+// 5-checklist.md as cards: a progress box under the title, the how-to list
+// as commands, and each check as a card with 할 일 and 기대 side by side
+function dressChecklist(d) {
+  d.classList.add("ckdoc")
+  let seenPage = false
+  for (const el of d.children) {
+    if (el.tagName === "H2") seenPage = true
+    if (!el.matches("ul.ul")) continue
+    if (!seenPage) { el.classList.add("howto"); continue }
+    let cards = 0
+    for (const li of el.children) {
+      const head = li.querySelector(":scope > span")
+      const strong = head && head.firstElementChild
+      if (!strong || strong.tagName !== "STRONG" || head.firstChild !== strong) continue
+      li.classList.add("ck")
+      cards++
+      const sub = li.querySelector(":scope > ul.ul")
+      if (!sub) continue
+      const items = [...sub.children]
+      const lead = (x) => (x.querySelector(":scope > span") || x).textContent.trim()
+      const todo = items.find((x) => /^할 일/.test(lead(x)))
+      const exp = items.find((x) => /^기대/.test(lead(x)))
+      if (!todo || !exp) continue
+      sub.classList.add("ckgrid")
+      todo.classList.add("todo")
+      exp.classList.add("exp")
+      let after = false
+      for (const x of items) {
+        if (x === todo) after = true
+        else if (after && x !== exp) x.classList.add("after")
+      }
+      head.insertAdjacentHTML("beforeend", `<span class="ckn"></span>`)
+    }
+    if (cards) el.classList.add("cks")
+  }
+  // each page heading with what follows it, up to the next one, as one card
+  for (const h of [...d.querySelectorAll(":scope > h2")]) {
+    const sec = document.createElement("section")
+    sec.className = "cksec"
+    const body = document.createElement("div")
+    body.className = "ckb"
+    for (let n = h.nextElementSibling; n && !/^H[12]$|^HR$/.test(n.tagName);) {
+      const next = n.nextElementSibling
+      body.appendChild(n)
+      n = next
+    }
+    h.replaceWith(sec)
+    const hd = document.createElement("div")
+    hd.className = "cksh"
+    hd.append(h)
+    hd.insertAdjacentHTML("beforeend", `<span class="ckn"></span>`)
+    sec.append(hd, body)
+  }
+  // "통합 테스트 체크리스트 — title": the kind above the title
+  const title = d.querySelector(":scope > h1")
+  const top = document.createElement("div")
+  top.className = "cktop"
+  if (title) {
+    const head = document.createElement("div")
+    const t = title.textContent
+    const k = t.indexOf(" — ")
+    if (k > 0 && !title.children.length) {
+      head.insertAdjacentHTML("beforeend", `<span class="eb">${esc(t.slice(0, k))}</span>`)
+      title.textContent = t.slice(k + 3)
+    }
+    title.replaceWith(top)
+    head.append(title)
+    top.append(head)
+  }
+  top.insertAdjacentHTML("beforeend", `<span class="ckcount"><b></b><span></span></span>`)
+  if (!title) d.prepend(top)
+  top.insertAdjacentHTML("afterend", `<div class="ckseg"></div>`)
+  countChecklist(d)
+}
+
+// the counts from the boxes as they are now, again after each click
+function countChecklist(d) {
+  const top = d && d.querySelector(".cktop")
+  if (!top) return
+  const count = (el) => {
+    const bs = [...el.querySelectorAll("input.cb")]
+    return [bs.filter((b) => b.checked).length, bs.length]
+  }
+  const segs = []
+  for (const li of d.querySelectorAll("li.ck")) {
+    const [n, all] = count(li)
+    const ok = all > 0 && n === all
+    li.classList.toggle("ok", ok)
+    const c = li.querySelector(":scope > span > .ckn")
+    if (c) c.textContent = all ? `${ok ? "✓ " : ""}${n} / ${all}` : ""
+    if (all) segs.push(`<i class="${ok ? "ok" : n ? "part" : ""}"></i>`)
+  }
+  for (const sec of d.querySelectorAll(".cksec")) {
+    const [n, all] = count(sec)
+    const c = sec.querySelector(".cksh > .ckn")
+    c.textContent = all ? `${n} / ${all}` : ""
+    c.classList.toggle("ok", all > 0 && n === all)
+  }
+  const [on, all] = count(d)
+  top.querySelector(".ckcount b").textContent = String(on)
+  top.querySelector(".ckcount span").textContent = ` / ${all} 칸 확인`
+  const seg = d.querySelector(".ckseg")
+  if (seg) seg.innerHTML = segs.join("")
 }
 
 // a reload keeps the scroll position, except in a run's page or picture: the
@@ -2020,10 +2259,17 @@ function goScreens(key = "") {
   render()
 }
 
-$("rmode").addEventListener("click", (e) => {
+$("arail").addEventListener("click", (e) => {
+  if (e.target.closest("[data-allruns]")) {
+    e.stopPropagation()
+    $("menu").hidden = !$("menu").hidden
+    return renderTop(findRun(sel.project, sel.slug), tabRuns())
+  }
   const b = e.target.closest("[data-mode]")
   if (!b) return
+  $("menu").hidden = true
   if (b.dataset.mode === "screens") return goScreens(sel.screen || "")
+  if (sel.screen == null) return render()
   if (sel.screen == null) return
   sel = lastRun ? { ...lastRun, screen: null } : { project: null, slug: null, key: null, view: null, side: null, screen: null }
   render()
@@ -2065,11 +2311,11 @@ $("tabs").addEventListener("click", (e) => {
   if (t) pick(t.dataset.p, t.dataset.s)
 })
 
-$("allruns").addEventListener("click", (e) => {
-  e.stopPropagation()
-  const m = $("menu")
-  m.hidden = !m.hidden
-  if (!m.hidden) renderMenu(findRun(sel.project, sel.slug))
+$("theme").addEventListener("click", () => {
+  theme = theme === "dark" ? "light" : "dark"
+  document.documentElement.dataset.theme = theme
+  lsSet("rein.theme", theme)
+  renderTop(findRun(sel.project, sel.slug), tabRuns())
 })
 
 $("menu").addEventListener("click", (e) => {
@@ -2083,8 +2329,16 @@ $("menu").addEventListener("click", (e) => {
   if (r) pick(r.dataset.p, r.dataset.s)
 })
 
+// the all-runs menu closed from outside: the rail stops marking it
+function closeMenu() {
+  if ($("menu").hidden) return
+  $("menu").hidden = true
+  if (data) renderTop(findRun(sel.project, sel.slug), tabRuns())
+}
+
 document.addEventListener("click", (e) => {
-  $("menu").hidden = $("cmenu").hidden = true
+  closeMenu()
+  $("cmenu").hidden = true
   // a page shown large closes on a click anywhere but on it
   if (!e.target.closest("#pzoom .zpg, .pdfv .pg, .bimg .pgc")) closeZoom()
   // a basis box's pin picks its comment and scrolls the mockup to it
@@ -2103,7 +2357,10 @@ document.addEventListener("keydown", (e) => {
   if (ev && evKey(e)) return
   if (e.key === "Escape" && closeZoom()) return
   if (e.key === "Escape" && cm.basis !== null) return stopBasis(findRun(sel.project, sel.slug))
-  if (e.key === "Escape") $("menu").hidden = $("cmenu").hidden = true
+  if (e.key === "Escape") {
+    closeMenu()
+    $("cmenu").hidden = true
+  }
   // C: the comment mode, when focus is not in a text field
   const t = e.target
   if ((e.key === "c" || e.key === "C") && !e.ctrlKey && !e.metaKey && !e.altKey && !(t.closest && t.closest("input, textarea, select, [contenteditable]"))) {
@@ -2234,13 +2491,11 @@ $("main").addEventListener("load", (e) => {
 
 $("left").addEventListener("click", (e) => {
   if (document.querySelector(".body.railed")) {
-    if (isMock(findRun(sel.project, sel.slug))) railOpen = true
-    else railFold = false
+    railFold = false
     return render()
   }
   if (e.target.closest("[data-fold-rail]")) {
-    if (isMock(findRun(sel.project, sel.slug))) railOpen = false
-    else railFold = true
+    railFold = true
     return render()
   }
   const q = e.target.closest("[data-sumq]")
@@ -2249,15 +2504,33 @@ $("left").addEventListener("click", (e) => {
     if (!openQ.delete(id)) openQ.add(id)
     return render()
   }
+  const g = e.target.closest("[data-stg]")
+  if (g) {
+    stgOpen.set(`${sel.project}/${sel.slug}|${g.dataset.stg}`, g.getAttribute("aria-expanded") !== "true")
+    return render()
+  }
   const a = e.target.closest(".art[data-key]")
   if (!a) return
   sel.key = a.dataset.key
   sel.view = null
-  railOpen = false
   render()
 })
 
 $("main").addEventListener("click", (e) => {
+  const tx = e.target.closest("[data-etabx]")
+  if (tx) return closeTab(findRun(sel.project, sel.slug), tx.dataset.etabx)
+  const tb = e.target.closest("[data-etab]")
+  if (tb) {
+    if (tb.dataset.etab === sel.key) return
+    sel.key = tb.dataset.etab
+    sel.view = null
+    return render()
+  }
+  if (e.target.closest("[data-cpt]")) {
+    cpOff = !cpOff
+    lsSet("rein.cpoff", cpOff ? "1" : "0")
+    return render()
+  }
   const v = e.target.closest("[data-view]")
   if (v) {
     sel.view = v.dataset.view || null
@@ -2315,6 +2588,8 @@ $("main").addEventListener("change", async (e) => {
   const parts = doc.src.split(/(\r?\n)/)
   const r = doc.run
   cb.disabled = true
+  const d = cb.closest(".doc")
+  countChecklist(d)
   try {
     const res = await fetch("/api/checklist", {
       method: "POST",
@@ -2326,6 +2601,7 @@ $("main").addEventListener("change", async (e) => {
     doc.src = parts.join("")
   } catch {
     cb.checked = !cb.checked
+    countChecklist(d)
     if (shown) shown.sig = ""
     load()
   } finally {
