@@ -340,6 +340,25 @@ node eval/run.ts order-total --runs 1 --parallel 1 # case 하나, 한 번
 case를 더할 때 인수 테스트는 `createServer()`로 서버를 띄워 HTTP 응답만 봅니다.
 모델이 새로 만들 함수 이름에 기대면 맞게 고친 run도 실패합니다.
 
+### 회고 eval
+
+eval run은 작아서 회고가 긴 run의 중간을 놓치는지(이슈 #8)는 볼 수 없습니다.
+`eval/retro.ts`는 긴 run을 지어내 회고만 돌립니다.
+
+```sh
+node eval/retro.ts                  # 한 번
+node eval/retro.ts --runs 3 --parallel 3
+node eval/retro.ts --build <폴더>   # run만 만들어 봄 (<폴더>를 홈으로)
+```
+
+| | |
+|---|---|
+| run | 닫힌 run 하나를 매번 똑같이 만듦: trace 10개(각 3MB, 대부분 통과 줄), `e2e.md` 약 1.1MB, `fails.md` 약 370KB, 대화 기록 약 13MB(사용자 메시지 100여 개) |
+| 심은 일 | 원인 6개를 앞·중간·끝에 흩어 둠: 같은 거부 반복(첫날과 넷째 날 두 곳, 같은 원인), qa 재실행에 「왜」, review 실패와 사용자가 말한 룰, e2e 라운드 반복 실패와 사용자가 설명한 데이터, 배치 확인 불평, 포트 충돌과 사용자가 알려 준 포트 |
+| 실행 | 훅이 run을 닫을 때 하는 말 그대로 `/rein:retro`를 부름. 사용자 선택 질문은 닫음(후보는 `후보`로 남음) |
+| 판정 | Sonnet이 `retro.md`와 reader 메모를 읽고 원인마다 나왔는지 판정. 원인 6개가 모두 `retro.md`에 있고, 두 곳의 같은 거부가 한 항목으로 합쳐지면 통과. 메모에 없는 원인은 「메모 없음」으로 따로 표시해 reader와 회고 가운데 어디서 빠졌는지 가름 |
+| 결과 | `eval/results/retro-<시각>/summary.md`와 run마다 트랜스크립트, `retro.md`, `notes.md`(reader 메모), `verdicts.json` |
+
 ## 남은 일
 
 GitHub Issues에서 관리합니다.
