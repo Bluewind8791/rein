@@ -87,7 +87,7 @@ run 폴더 바로 아래에는 사람이 읽거나 쓰는 파일만 둡니다. �
 | review | | `review.md`, `review-groups.md`, `review-<n>.md` |
 | qa | `5-checklist.md` | `qa.md`, `qa-output.log`, `e2e.md`, `evidence/`(e2e 확인별 스크린샷·증거) |
 | land | `6-land.md`(커밋 메시지, 저장소별 파일 목록) | `requirements/<도메인>/<화면 id>.md`(화면 문서 갱신본, run이 닫히면 `~/.rein/<project>/requirements/`로 복사) |
-| retro | | `retro.md` |
+| retro | | `retro.md`, `retro-read/`(reader가 읽은 몫과 메모) |
 
 `agent/`가 생기기 전에 만든 run은 재개할 때 옛 파일을 `agent/`로 복사합니다. 옛 파일은 지우지 않고, 이미 찍은 스크린샷은 원래 자리에 둡니다.
 

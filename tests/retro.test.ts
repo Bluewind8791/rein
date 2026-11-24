@@ -46,6 +46,8 @@ describe("retro", () => {
     expect(await check($, "Write", { file_path: `${REIN}/knowledge/../rules/web/auth.md`, content: "x" })).toEqual(ask)
     expect(await check($, "Write", { file_path: `${DONE}/agent/retro.md`, content: "x" })).toEqual(allow)
     expect(await check($, "Edit", { file_path: `${DONE}/agent/retro.md`, old_string: "a", new_string: "b" })).toEqual(allow)
+    expect(await check($, "Write", { file_path: `${DONE}/agent/retro-read/3.md`, content: "x" })).toEqual(allow)
+    expect(await check($, "Write", { file_path: `${DONE}/agent/retro-read/../review.md`, content: "x" })).toEqual(ask)
     // nothing else: another session's transcript, the folder's other files, a climb.
     expect(await check($, "Read", { file_path: `${PROJECTS}/E--proj/s9.jsonl` })).toEqual(ask)
     expect(await check($, "Write", { file_path: `${DONE}/1-spec.md`, content: "x" })).toEqual(ask)

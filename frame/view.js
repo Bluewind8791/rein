@@ -796,4 +796,4 @@ function makeView({ root, readOnly = false, recordOf = null, debounceMs = DEBOUN
   return { root: ROOT, clients, runOf, snapshot, anyActive, handle, watch, broadcast }
 }
 
-module.exports = { makeView, send, json, streamFile, readJson, listDir, STATES, parseSpec, parseDoc }
+module.exports = { makeView, send, json, streamFile, readJson, listDir, STATES, parseSpec, parseDoc, traceFiles }

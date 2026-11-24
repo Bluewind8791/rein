@@ -34,7 +34,8 @@
 | `rein:e2e-runner` | qa-integration | aside로 e2e 항목 하나 실행 | haiku |
 | `rein:ego-driver` | qa-integration | ego 브라우저로 e2e 항목 하나 실행, 증거 기록. `데이터 조건`이 있으면 MCP 도구로 데이터를 조회해 맞는 데이터를 찾거나 화면에서 만듦 | sonnet |
 | `rein:ego-judge` | qa-integration | 증거만 보고 e2e 항목 판정. `데이터 조건`이 있으면 쓴 데이터가 조건에 맞는지 먼저 판정 | sonnet |
-| `rein:retro` | run 종료 후 | 도메인 지식은 카탈로그 사본에 바로 넣고, 하네스 문제·도메인 룰 후보 → `retro.md` | sonnet |
+| `rein:retro-reader` | run 종료 후 | trace(통과한 도구 호출 제외), `e2e.md`, `fails.md`, 사용자 발언 가운데 약 300KB 한 몫을 끝까지 읽고, 순탄하지 않았던 일을 시각·위치와 함께 → `agent/retro-read/<n>.md`. 몫마다 하나씩 동시에 | sonnet |
+| `rein:retro` | run 종료 후 | reader 메모를 모두 보고, 같은 원인은 하나로 합쳐 도메인 지식은 카탈로그 사본에 바로 넣고, 하네스 문제·도메인 룰 후보 → `retro.md` | sonnet |
 
 "상속"은 frontmatter에 `model:`이 없어 메인 세션 모델을 씁니다.
 

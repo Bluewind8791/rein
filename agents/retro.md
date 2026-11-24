@@ -13,16 +13,20 @@ The main session's prompt gives you:
 2. the main session's transcripts, `.jsonl` files, or that none was found
 3. today's date
 
+Anything else in the prompt is not evidence: find the run's trouble in its records, not in what the main session remembers of it.
+
 The project folder is the run folder's grandparent. Its `rules/<domain>/` and `knowledge/<domain>/` hold the domain rules and knowledge this project took from the domain catalog, one folder per domain.
 
 ## What to read
 
-- **The run's files**: `1-spec.md`, `2-plan.md`, `5-checklist.md`, `6-land.md`, and the agents' files in its `agent/` (`grade.md`, `test-plan.md`, `dev-items.md`, `fails.md`, `deviation.md`, `review.md`, `qa.md`, `e2e.md`), whichever exist.
-- **`agent/trace.jsonl`**, then `agent/trace-2.jsonl`, `agent/trace-3.jsonl`, … when it grew past 3 MiB: the hook's decisions, one JSON object per line. Look at `"decision":"deny"` lines (what the hook refused, and the `rule`), `"ev":"exit"` lines with `"result":"fail"` or `"pass":false`, `"ev":"stage"` lines that go back (`to` an earlier stage) and why, `halt`, `deviation`, `park` and the `answer` and `said` fields (the user's words).
-- **The transcripts**: one JSON object per line, and a line can be very long. Never Read a whole transcript. Use Grep with `-o` and a pattern that stops after a bounded piece:
-  - the user's typed messages: `"role":"user","content":"[^"]{0,600}`
-  - the questions put to the user and their answers: Grep `AskUserQuestion` and the tool results that follow it
-  - where the user corrected an agent: words like `아니`, `그게 아니라`, `다시`, `왜`, `말고` near the user's messages
+- **The readers' notes**: `agent/retro-read/1.md`, `2.md`, … in the run folder, every one, whole. Readers went through the trace, `agent/e2e.md`, `agent/fails.md` and what the user said in the transcripts (`agent/retro-read/user.md`) to the end, a part each, and wrote down every episode that went other than plainly forward, with its time and `<file>:<line>`. They are your map of the whole run, its first days as much as its last: go through every episode in them. Each either goes into an item or is left out by the rules below.
+- **The run's files**: `1-spec.md`, `5-checklist.md`, `6-land.md`, and the agents' files in its `agent/` (`grade.md`, `dev-items.md`, `deviation.md`, `review.md`, `review-<n>.md`, `qa.md`), whichever exist. `2-plan.md`, `agent/test-plan.md` and `agent/dev-diff.md` can be large: read the part an episode points to.
+- **The records themselves**, for the detail of an episode a note points to: go to its line, never read them whole. When `agent/retro-read/` holds no notes (the readers could not run), Grep them yourself, every trace file and every transcript, without a `head_limit`:
+  - **`agent/trace.jsonl`**, then `agent/trace-2.jsonl`, `agent/trace-3.jsonl`, … when it grew past 3 MiB: the hook's decisions, one JSON object per line. Look at `"decision":"deny"` lines (what the hook refused, and the `rule`), `"ev":"exit"` lines with `"result":"fail"` or `"pass":false`, `"ev":"stage"` lines that go back (`to` an earlier stage) and why, `halt`, `deviation`, `park` and the `answer` and `said` fields (the user's words).
+  - **The transcripts**: one JSON object per line, and a line can be very long. Never Read a whole transcript. Use Grep with `-o` and a pattern that stops after a bounded piece:
+    - the user's typed messages: `"role":"user","content":"[^"]{0,600}`
+    - the questions put to the user and their answers: Grep `AskUserQuestion` and the tool results that follow it
+    - where the user corrected an agent: words like `아니`, `그게 아니라`, `다시`, `왜`, `말고` near the user's messages
 - **The domain rules and knowledge**: their file names and `description:` lines, so you do not propose or add what is already there. Read a file when a candidate may duplicate it, and the file you add a domain fact to.
 
 Read nothing outside these. Do not open the repository's code: what you write must stand on what the run shows.
@@ -34,6 +38,7 @@ Read nothing outside these. Do not open the repository's code: what you write mu
 - a stage gone back by `fail`, a halt or a `goto` that a clearer instruction or check would have avoided
 - the user correcting how an agent followed a Rein step, or doing a step by hand that Rein should do
 - a question to the user that the run did not need, or a missing one
+- the user asking why (`왜`) an agent judged or did something. When a fact the next run needs came out of it, add that 도메인 지식 too.
 
 Write what happened and what it cost, not how to fix it: you have not seen the plugin's code, and the `learn` skill plans the fix against it. When the project's part is worth keeping too, make it a separate 도메인 지식 or 도메인 룰.
 
@@ -47,7 +52,8 @@ Leave out:
 - domain knowledge the run's agents found at once: the trace's `"ev":"tool"` lines for `Grep`, `Glob` and `Read` show no long search for it, and no user answer or failed review or qa was needed. The next agent finds it in the code as easily. Grep those lines with a bounded pattern such as `"tool":"(Grep|Glob|Read)","input":\{[^}]{0,300}`
 - what the domain rules or knowledge already say
 - guesses: every candidate cites what the run shows
-- more than five in all, domain facts included; keep the five that would save the most
+
+Episodes with one cause are one item, however many there are and however far apart: its `근거:` lists each of them. There is no limit on the number of items.
 
 ## Add the domain facts
 
