@@ -596,6 +596,7 @@ a.th:hover { text-decoration: none; border-color: var(--now); }
 .ckb > * { margin: 0; padding: 10px 14px; }
 .ckb > * + * { border-top: 1px solid var(--line); }
 .ckb > .ul:not(.cks), .cks > li:not(.ck) { font-size: 12.5px; color: var(--mute); }
+.ckb > .ul:not(.cks) { padding-left: 32px; }
 .ckb > .ul.cks { list-style: none; padding: 0; gap: 0; }
 .cks > li.ck { padding: 12px 14px; color: var(--ink2); }
 .cks > li.ck + li.ck { border-top: 1px solid var(--line); }
