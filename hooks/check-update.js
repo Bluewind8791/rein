@@ -86,7 +86,17 @@ function main() {
   }
   if (typeof latest !== "string" || compare(latest, version) <= 0) return
 
-  const systemMessage = `[${name}] 업데이트 있음: 설치 ${version} → 최신 ${latest} - /${name}:update 로 적용(그 뒤 /reload-plugins)`
+  let systemMessage = `[${name}] 업데이트 있음: 설치 ${version} → 최신 ${latest} - /${name}:update 로 적용(그 뒤 /reload-plugins)`
+  // The same two commands /rein:update runs, for a terminal outside the session.
+  let install
+  try {
+    install = require("./plugin-update.js").pick(name)
+  } catch {
+    install = undefined
+  }
+  if (install) {
+    systemMessage += `, 터미널에서는 claude plugin marketplace update ${install.marketplace} 후 claude plugin update ${install.id}`
+  }
   process.stdout.write(JSON.stringify({ systemMessage }) + "\n")
 }
 

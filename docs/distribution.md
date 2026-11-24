@@ -66,6 +66,12 @@ node scripts/import-rein-runs.js --remote <원격 URL> --root <폴더> [--dry-ru
 
 - 세션 시작 시 `hooks/check-update.js`가 설치본 version과 원격의 `rein--v<버전>` 태그를 비교해 알립니다.
 - `/rein:update`로 적용하고 `/reload-plugins`를 실행합니다.
+- 세션 밖 터미널에서는 알림이 함께 보여 주는 두 명령을 차례로 실행합니다. `/rein:update`가 안에서 실행하는 명령과 같습니다.
+  ```
+  claude plugin marketplace update <마켓플레이스>
+  claude plugin update rein@<마켓플레이스>
+  ```
+  설치 scope는 `claude plugin update`가 스스로 찾습니다. 이미 열린 세션은 `/reload-plugins` 전까지 옛 버전을 씁니다.
 - private 저장소의 백그라운드 업데이트는 credential helper가 필요합니다 (`gh auth setup-git` 등).
 
 ## 제거

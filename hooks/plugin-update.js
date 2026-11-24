@@ -80,4 +80,6 @@ function restartFrame(name) {
   console.log(r.status === 0 ? "The Rein frame now runs the new version." : `The Rein frame was not restarted: ${(r.stderr || r.stdout || "").trim().split(/\r?\n/).pop() || r.error?.message}`)
 }
 
+module.exports = { pick }
+
 if (require.main === module) main().catch(e => console.log(`Update failed: ${e && e.message ? e.message : e}`))
