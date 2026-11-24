@@ -49,6 +49,16 @@ describe("2-plan.md's `## 배치 대조`", () => {
     expect((parseLayouts("## 배치 대조\n\n### a\n- 페이지: x\n") as { reason: string }).reason).toContain("a needs exactly one non-empty line of `- 경로:`, `- 볼 곳:`")
   })
 
+  test("parseLayouts takes an optional `- 저장:` line; 있음 saves, 없음 or no line does not", () => {
+    const item = (extra: string) => `## 배치 대조\n\n### order0101\n- 페이지: a\n- 경로: b > 저장 > 되돌림\n- 볼 곳: c\n${extra}`
+    const plain = { anchor: "order0101", page: "a", route: "b > 저장 > 되돌림", look: "c" }
+    expect(parseLayouts(item("- 저장: 있음\n"))).toEqual({ layouts: [{ ...plain, saves: true }] })
+    expect(parseLayouts(item("- 저장: 없음\n"))).toEqual({ layouts: [plain] })
+    expect(parseLayouts(item(""))).toEqual({ layouts: [plain] })
+    expect((parseLayouts(item("- 저장: 예\n")) as { reason: string }).reason).toContain("order0101 needs at most one `- 저장:` line, 있음 or 없음")
+    expect((parseLayouts(item("- 저장: 있음\n- 저장: 있음\n")) as { reason: string }).reason).toContain("order0101 needs at most one `- 저장:` line, 있음 or 없음")
+  })
+
   test("with a to-be in 1-mockup.html each to-be screen needs its item, and no other; then the plan passes and keeps them", async ($, on) => {
     const files: Record<string, string> = { ...REPO(), [HTML]: DRAWN }
     world(on, files, undefined, { stage: "plan", runId: "login-fix" })

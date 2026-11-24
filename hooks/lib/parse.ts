@@ -239,11 +239,13 @@ function evidenceOf(value: string): Evidence | undefined {
 
 // one screen of 2-plan.md's `## 배치 대조`: the `.screen` id of its to-be
 // in 1-mockup.html, the page and the menus that reach it, and what in it to
-// compare. The person compares it by hand in integration qa.
-export type Layout = { anchor: string; page: string; route: string; look: string }
+// compare. The person compares it by hand in integration qa. saves, when
+// the to-be shows only with saved data: 경로 makes that data and puts it back.
+export type Layout = { anchor: string; page: string; route: string; look: string; saves?: true }
 
 // the `## 배치 대조` section: `### <anchor>` items, each with one line of
-// `- 페이지:`, `- 경로:` and `- 볼 곳:`; or the line `없음` alone. undefined
+// `- 페이지:`, `- 경로:` and `- 볼 곳:`, and optionally `- 저장: 있음|없음`
+// (no line is 없음); or the line `없음` alone. undefined
 // when the section is absent.
 export function parseLayouts(text: string): { layouts: Layout[] } | { reason: string } | undefined {
   const lines = unfenced(text)
@@ -258,11 +260,11 @@ export function parseLayouts(text: string): { layouts: Layout[] } | { reason: st
       items.push({ anchor: head[1]!.replace(/`/g, "").replace(/^#/, "").trim(), fields: {} })
       continue
     }
-    const field = /^\s*[-*]\s+(페이지|경로|볼 곳)\s*:\s*(.*?)\s*$/.exec(line)
+    const field = /^\s*[-*]\s+(페이지|경로|볼 곳|저장)\s*:\s*(.*?)\s*$/.exec(line)
     if (field && items.length > 0) (items.at(-1)!.fields[field[1]!] ??= []).push(field[2]!)
     else if (items.length === 0 && /^없음(?:\s|[.—–-]|$)/.test(line.trim())) none = true
   }
-  const form = "Each screen is `### <its .screen id in 1-mockup.html>` with one line each of `- 페이지: <the page>`, `- 경로: <the menus that reach it, as A > B > C>` and `- 볼 곳: <what of its layout to compare>`. With no to-be screen in 1-mockup.html, the section holds only the line `없음`, or is left out."
+  const form = "Each screen is `### <its .screen id in 1-mockup.html>` with one line each of `- 페이지: <the page>`, `- 경로: <the menus that reach it, as A > B > C>` and `- 볼 곳: <what of its layout to compare>`, and `- 저장: 있음` when the to-be shows only with saved data (경로 then saves it and puts it back). With no to-be screen in 1-mockup.html, the section holds only the line `없음`, or is left out."
   if (items.length === 0) return none ? { layouts: [] } : { reason: `\`## 배치 대조\` has no \`### <anchor>\` screen and no line \`없음\`. ${form}` }
   const twice = items.map(i => i.anchor).filter((a, i, all) => all.indexOf(a) !== i)
   if (twice.length > 0) return { reason: `these screens appear more than once in \`## 배치 대조\`: ${[...new Set(twice)].join(", ")}.` }
@@ -272,7 +274,9 @@ export function parseLayouts(text: string): { layouts: Layout[] } | { reason: st
     const one = (key: string) => (fields[key]?.length === 1 && fields[key]![0] !== "" ? fields[key]![0] : undefined)
     const missing = ["페이지", "경로", "볼 곳"].filter(k => one(k) === undefined)
     if (missing.length > 0) wrong.push(`${anchor} needs exactly one non-empty line of ${missing.map(k => `\`- ${k}:\``).join(", ")}`)
-    layouts.push({ anchor, page: one("페이지") ?? "", route: one("경로") ?? "", look: one("볼 곳") ?? "" })
+    const saves = one("저장")
+    if (fields["저장"] !== undefined && saves !== "있음" && saves !== "없음") wrong.push(`${anchor} needs at most one \`- 저장:\` line, 있음 or 없음`)
+    layouts.push({ anchor, page: one("페이지") ?? "", route: one("경로") ?? "", look: one("볼 곳") ?? "", ...(saves === "있음" ? { saves: true as const } : {}) })
   }
   if (wrong.length > 0) return { reason: `in \`## 배치 대조\`: ${wrong.join("; ")}. ${form}` }
   return { layouts }

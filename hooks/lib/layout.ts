@@ -133,16 +133,20 @@ export const layoutIdOf = (name: string) => name.slice(LAYOUT_PREFIX.length)
 export const LAYOUT_FAILS = "agent/layout-fails.md"
 
 // the ego check of screen l, in app `app`; from the MEASURE_AT-th try on,
-// its driver also measures the regions to compare.
+// its driver also measures the regions to compare. A screen that saves
+// makes its state by 경로, shoots it and puts it back, and so runs alone.
 export function layoutCheck(l: Layout, app: string, measure: boolean): Check {
+  const shoot = "데이터가 다 그려질 때까지 기다린 뒤, 화면 전체를 스크린샷으로 찍는다 (fullPage)."
   return {
     name: `${LAYOUT_PREFIX}${l.anchor}`,
     app,
     page: l.page,
     route: l.route,
-    todo: `${l.page} 화면을 연다 (경로: ${l.route}). 데이터가 다 그려질 때까지 기다린 뒤, 화면 전체를 스크린샷으로 찍는다 (fullPage).`,
+    todo: l.saves
+      ? `경로의 단계대로 ${l.page} 화면의 상태를 만든다 (경로: ${l.route}). 저장할 때마다 완료 알림이 뜰 때까지 기다린다. ${shoot} 그런 뒤 경로의 되돌리기 단계대로 저장한 것을 되돌린다.`
+      : `${l.page} 화면을 연다 (경로: ${l.route}). ${shoot}`,
     expect: `배치가 1-mockup.html#${l.anchor}의 to-be와 같다: ${l.look}`,
-    saves: false,
+    saves: l.saves === true,
     ...(measure ? { evidence: [{ kind: "측정" as const, text: `${l.look}의 영역마다 위치와 크기 (getBoundingClientRect)` }] } : {}),
   }
 }

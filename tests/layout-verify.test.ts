@@ -22,6 +22,7 @@ const TO_BE = (source = "<!-- to-be source: brief/기획서.pdf (3쪽) -->") =>
   `<section class="screen" id="dash0101"><h2>대시보드</h2><div class="compare"><div class="before">지금</div><div class="after">${source}<div class="changed">도넛</div></div></div></section>\n<section class="screen" id="flow"><div class="after">흐름</div></section>`
 const record = () => store.get("runs:proj/login-fix") as Run
 const context = (r: unknown) => (r as { context?: string[] }).context?.join("\n") ?? ""
+const status = async ($: { tool: { call: (e: never) => Promise<unknown> } }) => ((await $.tool.call({ tool: "mcp__rein__status" } as never)) as { result: string }).result
 const refused = (text: string) => expect.objectContaining({ deny: expect.stringContaining(text) })
 const spawnAs = async ($: { agent: { spawn: (e: never) => Promise<unknown> } }, type: string, description = "go") =>
   ((await $.agent.spawn({ tool_use_id: "s", prompt: "the user said a lot", description, subagentType: type } as never)) as { agentId?: string; deny?: string })
@@ -275,6 +276,30 @@ describe("integration qa's layout check", () => {
     expect(layoutCheck(LAYOUT, "admin", false)).toEqual(expect.objectContaining({ name: "배치-dash0101", app: "admin", page: "대시보드", route: "홈 > 대시보드", saves: false }))
     expect(layoutCheck(LAYOUT, "admin", false).evidence).toBeUndefined()
     expect(layoutCheck(LAYOUT, "admin", true).evidence?.[0]?.kind).toBe("측정")
+    expect(layoutCheck(LAYOUT, "admin", false).todo).toBe("대시보드 화면을 연다 (경로: 홈 > 대시보드). 데이터가 다 그려질 때까지 기다린 뒤, 화면 전체를 스크린샷으로 찍는다 (fullPage).")
+  })
+
+  test("layoutCheck of a screen that saves makes its state by 경로, shoots it and puts it back", () => {
+    const saving = layoutCheck({ ...LAYOUT, route: "홈 > 대시보드 > 주문 저장 > 주문 삭제", saves: true }, "admin", false)
+    expect(saving.saves).toBe(true)
+    expect(saving.todo).toBe("경로의 단계대로 대시보드 화면의 상태를 만든다 (경로: 홈 > 대시보드 > 주문 저장 > 주문 삭제). 저장할 때마다 완료 알림이 뜰 때까지 기다린다. 데이터가 다 그려질 때까지 기다린 뒤, 화면 전체를 스크린샷으로 찍는다 (fullPage). 그런 뒤 경로의 되돌리기 단계대로 저장한 것을 되돌린다.")
+  })
+
+  test("a layout check that saves runs alone: its driver waits until the other check's driver is done", async ($, on) => {
+    const fs = files()
+    world(on, fs, () => undefined, { ...RUN, layouts: [{ ...LAYOUT, saves: true }] }, ego(fs))
+    await toEgo($)
+    expect(record().layoutChecks?.[0]).toEqual(expect.objectContaining({ name: "배치-dash0101", saves: true }))
+    expect(await status($)).toContain("e2e drivers to spawn now: 1 rein:ego-driver")
+    await passDetail($)
+    expect(await status($)).toContain("e2e drivers to spawn now: 1 rein:ego-driver")
+  })
+
+  test("a layout check that does not save runs beside the other check", async ($, on) => {
+    const fs = files()
+    world(on, fs, () => undefined, RUN, ego(fs))
+    await toEgo($)
+    expect(await status($)).toContain("e2e drivers to spawn now: 2 rein:ego-driver")
   })
 
   test("each to-be screen is an ego check judged by rein:layout-verifier; a match checks its box", async ($, on) => {

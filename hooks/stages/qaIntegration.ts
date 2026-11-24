@@ -259,7 +259,7 @@ export function checklist(title: string, checks: Check[], apps: Record<string, A
     return `${head}${check.join("\n")}${body.slice(block.index + block[0].length)}`
   }
   const text = CHECKLIST_TEMPLATE.replace(blockOf("page"), (_, body: string) => [...pages.values()].map(group => page(body, group)).join("\n"))
-    .replace(blockOf("layouts"), (_, body: string) => (layouts.length === 0 ? "" : body.replace(blockOf("layout"), (__, item: string) => layouts.map(l => fill(item, { ...l })).join("\n"))))
+    .replace(blockOf("layouts"), (_, body: string) => (layouts.length === 0 ? "" : body.replace(blockOf("layout"), (__, item: string) => layouts.map(l => fill(item, { anchor: l.anchor, page: l.page, route: l.route, look: l.look })).join("\n"))))
   const e2e = checks.length > 0 ? "- aside에 맡기려면: `/rein:e2e` — 기대 칸을 모두 체크한 항목은 건너뛰고, 통과한 항목은 훅이 체크합니다" : ""
   return tidy(fill(text, { title, e2e }))
 }
