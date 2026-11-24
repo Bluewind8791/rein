@@ -250,9 +250,9 @@ function scopedTask(run: Run, dir: string, s: Scope): string {
     "",
     "원인: 구현",
     "",
-    "(only when a verdict above is 실패: 구현 or 설계, then why; for 설계, the design item, or the round of fails.md that quotes the same failure)",
+    "(only when a verdict above is 실패: 구현 or 설계, then why on the lines below; for 설계, the design item, or the round of fails.md that quotes the same failure)",
     "",
-    "Each verdict is exactly 통과 or 실패. `## 룰 체크` has one line per listed rule file and no others; with no rules listed it holds only `적용 대상 없음`. With a 실패, `## 실패 원인` has exactly one line `원인: 구현` or `원인: 설계`. What you write on a failure is all dev or plan gets to fix it, so be specific. When the hook accepts the file, answer with the outcome in one line and stop.",
+    "Each verdict is exactly 통과 or 실패. `## 룰 체크` has one line per listed rule file and no others; with no rules listed it holds only `적용 대상 없음`. With a 실패, `## 실패 원인` has `원인: 구현` or `원인: 설계` on a line of its own. What you write on a failure is all dev or plan gets to fix it, so be specific. When the hook accepts the file, answer with the outcome in one line and stop.",
   ].join("\n")
 }
 
@@ -351,11 +351,8 @@ export const review: StageSpec = {
     const name = n === undefined ? "agent/review.md" : groupFile(n)
     if (n === undefined && !same(path, `${c.dir}/agent/review.md`)) return undefined
     if (tool !== "Write") return `D116: write the whole ${name} with Write.`
-    const rules = (n === undefined ? reviewRules(c.run, c.root) : groupRules(c.run, n, c.root)).map(r => r.file)
-    const parsed = parseReview(content, rules)
-    if (parsed.ok) return undefined
-    const list = rules.length > 0 ? rules.join(", ") : "none (write `적용 대상 없음`)"
-    return `D116: ${parsed.reason} The hook's rule list: ${list}.`
+    const parsed = parseReview(content)
+    return parsed.ok ? undefined : `D116: ${parsed.reason}`
   },
 
   bash: (command, c) => readOnly(command, c.run.repos ?? [], c.root),

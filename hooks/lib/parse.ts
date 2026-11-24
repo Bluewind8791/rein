@@ -503,26 +503,26 @@ export type ReviewParse = { ok: true; pass: true } | { ok: true; pass: false; ca
 // reviewer or the triage judged it.
 export type Cause = "구현" | "설계"
 
-// a failure file's (review.md, qa.md) `## 실패 원인` section: exactly one
-// line `원인: 구현` or `원인: 설계`; the other lines there are the reason.
-// Lines in a fence do not count.
+// a failure file's (review.md, qa.md) `## 실패 원인` section: its lines
+// that start `원인: 구현` or `원인: 설계` name one cause; anything after it on
+// that line, and the other lines there, are the reason. Lines in a fence do
+// not count.
 export function parseCause(text: string): { ok: true; cause: Cause } | { ok: false; reason: string } {
   const lines = unfenced(text)
   const at = lines.findIndex(l => /^##\s+실패 원인\s*$/.test(l))
   const end = at < 0 ? -1 : lines.findIndex((l, i) => i > at && /^##?\s/.test(l))
-  const said = at < 0 ? [] : lines.slice(at + 1, end < 0 ? undefined : end).filter(l => /^\s*(?:[-*]\s+)?원인/.test(l))
-  const cause = said.length === 1 ? /^\s*(?:[-*]\s+)?원인:\s*(구현|설계)\s*$/.exec(said[0]!)?.[1] : undefined
-  if (cause === undefined) return { ok: false, reason: "a failure needs a `## 실패 원인` section with exactly one line `원인: 구현` or `원인: 설계`, and no other line there starting with 원인." }
-  return { ok: true, cause: cause as Cause }
+  const body = at < 0 ? [] : lines.slice(at + 1, end < 0 ? undefined : end)
+  const said = new Set(body.flatMap(l => /^\s*(?:[-*]\s+)?원인\s*:\s*(구현|설계)(?![가-힣A-Za-z0-9])/.exec(l)?.[1] ?? []))
+  if (said.size !== 1) return { ok: false, reason: "a failure needs a `## 실패 원인` section with the line `원인: 구현` or `원인: 설계`, naming one cause." }
+  return { ok: true, cause: [...said][0] as Cause }
 }
 
 // review.md has `## 설계 대조` and `## 정확성`, each with one `판정:`
-// line, and `## 룰 체크` with one "- `<rule file>` — 판정: …" line per rule
-// the hook listed, or only the line `적용 대상 없음` when it listed none.
-// Verdicts are exactly 통과 or 실패, and any line that looks like a verdict (starts with 판정, or
-// a rule line mentioning it) must be one exactly. Each section heading
-// appears once. pass is true when every verdict is 통과.
-export function parseReview(text: string, rules: string[]): ReviewParse {
+// line that is exactly 통과 or 실패, and `## 룰 체크`. Each section heading
+// appears once. The hook reads `## 룰 체크` only for a failed rule (a line
+// with 판정 실패); its rule list and line form are the reviewer's task. pass is
+// true when no verdict is 실패.
+export function parseReview(text: string): ReviewParse {
   const lines = unfenced(text)
   const heads = lines.map(l => /^##\s+(.+?)\s*$/.exec(l)?.[1]).filter((h): h is string => h !== undefined)
   const twice = heads.find((h, i) => heads.indexOf(h) !== i)
@@ -547,24 +547,7 @@ export function parseReview(text: string, rules: string[]): ReviewParse {
     verdicts.push(verdict)
   }
 
-  if (rules.length === 0) {
-    const said = check.map(l => l.trim()).filter(l => l !== "")
-    if (said.length !== 1 || said[0] !== "적용 대상 없음") {
-      return { ok: false, reason: "no rule applies, so `## 룰 체크` holds only the line `적용 대상 없음`." }
-    }
-  } else {
-    const named: string[] = []
-    for (const line of check.filter(l => verdictish(l) || (/^\s*[-*]\s/.test(l) && l.includes("판정")))) {
-      const m = /^\s*[-*]\s+(?:`([^`]+)`|([^`\s]+))\s*[—–-]+\s*판정:\s*(통과|실패)\s*$/.exec(line)
-      if (!m) return { ok: false, reason: `this \`## 룰 체크\` line is not "- <rule file> — 판정: 통과" or "… 판정: 실패": ${line.trim()}` }
-      named.push((m[1] ?? m[2])!)
-      verdicts.push(m[3]!)
-    }
-    const sorted = (list: string[]) => [...list].sort().join(", ")
-    if (sorted(named) !== sorted(rules) || new Set(named).size !== named.length) {
-      return { ok: false, reason: `\`## 룰 체크\` must have one line for each of these rule files and no others: ${rules.join(", ")}.` }
-    }
-  }
+  if (check.some(l => /판정\s*:?\s*실패/.test(l))) verdicts.push("실패")
   if (verdicts.every(v => v === "통과")) return { ok: true, pass: true }
   const cause = parseCause(text)
   return cause.ok ? { ok: true, pass: false, cause: cause.cause } : { ok: false, reason: `review.md: ${cause.reason}` }

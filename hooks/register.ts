@@ -27,7 +27,7 @@ import { outside, parsePlanVerdict, PLAN_REVIEW, PLAN_REVIEWS, planEntry, planRe
 import { filesOf, landFiles, nameStatus, numstat, stagedPaths, stagingProblem, statusEntries, statusPaths } from "./stages/land.ts"
 import { backendsHint, commandReport, failedRun, failureOf, OUTPUT_FILE, outputLog, rerunQuestion, rewrote, type CommandResult } from "./stages/qa.ts"
 import { driverRow, egoSection, folderOf as checkFolder, judgeOf, judgeRow, NO_DATA_WORDS, settleEgo, asideSection, progressSection, allChecked, carriedPass, carriedTick, asideTick, egoTick, checklist, doubtful, IMPACT_DIFF, IMPACT_FILE, impactRow, impactTask, parseImpact, completionLine, completionTask, E2E_MANUAL, E2E_NONE, E2E_SKIPPED, e2eSection, entryOutcome, handChecked, judgeIntegration, keptPasses, openLayouts, parseResult, qaIntegration, remember, resultOf, runnerCheck, runnerRow, sameE2e, settleAside, tick, unchecked, UNSHOT, withHistory } from "./stages/qaIntegration.ts"
-import { GROUPS_FILE, groupFile, groupItems, groupRules, groupsCover, groupTask, joinedReview, parseGroups, pendingGroups, review, reviewEntry, reviewLists, reviewNext, reviewRules, reviewTask, splits, splitterTask } from "./stages/review.ts"
+import { GROUPS_FILE, groupFile, groupItems, groupsCover, groupTask, joinedReview, parseGroups, pendingGroups, review, reviewEntry, reviewLists, reviewNext, reviewTask, splits, splitterTask } from "./stages/review.ts"
 import { asIsTask, asIsWanted, DIMENSIONS, EVERY, gradeLine, graderTask, gradeSummary, openQuestions, passes, scoreGrade, screenRows, sketcherTask, spec, specProblem, specType, TYPES } from "./stages/spec.ts"
 import { unbuilt } from "./stages/unbuilt.ts"
 
@@ -3404,7 +3404,7 @@ async function deviationExit($: EngineInterface, c: Ctx, result: ToolCallResult)
 // for the main session. Either way the reviewer is spent.
 async function reviewExit($: EngineInterface, c: Ctx, result: ToolCallResult): Promise<ToolCallResult> {
   const file = `${c.dir}/agent/review.md`
-  const parsed = parseReview(await $.fs.read(file), reviewRules(c.run, c.root).map(r => r.file))
+  const parsed = parseReview(await $.fs.read(file))
   if (!parsed.ok) return withContext(result, `D116: ${parsed.reason} The run stays in review.`)
   let context = ""
   const moved = await mutate($, r => {
@@ -3442,7 +3442,7 @@ async function groupsExit($: EngineInterface, c: Ctx, result: ToolCallResult): P
 // the run for the main session), as one review.
 async function groupExit($: EngineInterface, c: Ctx, n: number, result: ToolCallResult): Promise<ToolCallResult> {
   const name = groupFile(n)
-  const parsed = parseReview(await $.fs.read(`${c.dir}/${name}`), groupRules(c.run, n, c.root).map(r => r.file))
+  const parsed = parseReview(await $.fs.read(`${c.dir}/${name}`))
   if (!parsed.ok) return withContext(result, `D116: ${parsed.reason} The run stays in review.`)
   const file = `${c.dir}/agent/review.md`
   let context = ""

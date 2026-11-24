@@ -110,7 +110,6 @@ describe("split review", () => {
     await $.agent.spawn(spawn("rein:reviewer", "묶음 2"))
     expect(spawned.at(-1)!.prompt).toContain("leave `## 변경 전 실패` out")
     expect(await $.tool.call(write(`${DIR}/agent/review-2.md`, md("통과", ["web.md", "all.md"]), R1))).toEqual(refused("only the rein:reviewer spawned for group 2"))
-    expect(await $.tool.call(write(`${DIR}/agent/review-1.md`, md("통과", ["web.md", "all.md"]), R1))).toEqual(refused("The hook's rule list: api.md, all.md."))
     expect(await status($)).toContain(`review group 2 (화면, 5 files): rein:reviewer ${R2} on it`)
   })
 

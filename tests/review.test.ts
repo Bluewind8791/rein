@@ -17,7 +17,6 @@ const FILES = ["E:/proj/src/login.ts"]
 const REVIEW_RUN = { v: 2, stage: "review", runId: "login-fix", rules: RULES, planFiles: FILES, repos: ["E:/proj"], writes: FILES, retries: 0 }
 const REVIEW = `${DIR}/agent/review.md`
 const REVIEWER = "agent-rein:reviewer"
-const LIST = "The hook's rule list: api.md, all.md."
 
 const md = (design: string, rules: string, correct = "판정: 통과") => `## 설계 대조\n\n판정: ${design}\n\n## 룰 체크\n\n${rules}\n\n## 정확성\n\n${correct}\n`
 const GOOD = md("통과", "- `api.md` — 판정: 통과\n- `all.md` — 판정: 통과")
@@ -63,41 +62,35 @@ describe("review writes", () => {
     expect(await $.tool.call(edit)).toEqual(refused("D116: write the whole agent/review.md"))
   })
 
-  test("a malformed review.md is refused with the hook's list", async ($, on) => {
+  test("a review.md without a section or a verdict line is refused", async ($, on) => {
     const files: Record<string, string> = {}
     world(on, files, undefined, REVIEW_RUN)
     await $.agent.spawn(spawn)
-    for (const bad of [
-      GOOD.replace("## 룰 체크", "## 룰"),
-      GOOD.replace("판정: 통과\n\n## 룰", "판정: 통과함\n\n## 룰"),
-      GOOD.replace("`api.md` — 판정: 통과", "`api.md` — 판정: 괜찮음"),
-    ]) {
-      const r = await $.tool.call(write(REVIEW, bad, REVIEWER))
-      expect(r).toEqual(refused("D116"))
-      expect(r).toEqual(refused(LIST))
+    for (const bad of [GOOD.replace("## 룰 체크", "## 룰"), GOOD.replace("판정: 통과\n\n## 룰", "판정: 통과함\n\n## 룰")]) {
+      expect(await $.tool.call(write(REVIEW, bad, REVIEWER))).toEqual(refused("D116"))
     }
     expect(files[REVIEW]).toBeUndefined()
   })
 
-  test("wrong, missing or repeated rule names are refused with the list", async ($, on) => {
-    world(on, {}, undefined, REVIEW_RUN)
-    await $.agent.spawn(spawn)
-    const lists = [
+  // the hook reads `## 룰 체크` only for a 실패: the rule list and the
+  // form of its lines are the reviewer's instructions, not a gate.
+  test("the rule check counts only a 실패; names, form and notes there are not checked", () => {
+    for (const rules of [
       "- `api.md` — 판정: 통과\n- `web.md` — 판정: 통과",
       "- `api.md` — 판정: 통과",
-      "- `api.md` — 판정: 통과\n- `api.md` — 판정: 통과\n- `all.md` — 판정: 통과",
       "적용 대상 없음",
-    ]
-    for (const rules of lists) {
-      expect(await $.tool.call(write(REVIEW, md("통과", rules), REVIEWER))).toEqual(refused("must have one line for each of these rule files and no others: api.md, all.md"))
+      "- `api.md` — 판정: 통과\n  - 새로 정의한 것: findOrder. 판정 쿼리는 결정 사항에 있다\n- `all.md` — 판정: 통과",
+    ]) {
+      expect(parseReview(md("통과", rules))).toEqual({ ok: true, pass: true })
     }
+    expect(parseReview(md("통과", "- `api.md` — 판정 실패\n- `all.md` — 판정: 통과") + CAUSE("구현"))).toEqual({ ok: true, pass: false, cause: "구현" })
+    expect(parseReview(md("통과", "- `api.md` — 판정: 실패"))).toEqual({ ok: false, reason: expect.stringContaining("a failure needs a `## 실패 원인` section") })
   })
 
-  test("with no applicable rule only 적용 대상 없음 passes", async ($, on) => {
+  test("with no applicable rule 적용 대상 없음 passes", async ($, on) => {
     world(on, {}, undefined, { ...REVIEW_RUN, rules: [RULES[1]] })
     await $.agent.spawn(spawn)
     expect(await status($)).toContain("Rules to check (D115): none.")
-    expect(await $.tool.call(write(REVIEW, md("통과", "- `web.md` — 판정: 통과"), REVIEWER))).toEqual(refused("`적용 대상 없음`"))
     const r = await $.tool.call(write(REVIEW, md("통과", "적용 대상 없음"), REVIEWER))
     expect(context(r)).toContain("The run is now in the qa stage.")
   })
@@ -320,11 +313,11 @@ describe("review hardening", () => {
   })
 
   test("parseReview: names with spaces, duplicate sections, near-miss verdicts", () => {
-    expect(parseReview("## 설계 대조\n판정: 통과\n## 룰 체크\n- `my rule.md` — 판정: 통과\n## 정확성\n판정: 통과\n", ["my rule.md"])).toEqual({ ok: true, pass: true })
-    expect(parseReview("## 설계 대조\n판정: 통과\n## 룰 체크\n적용 대상 없음\n## 설계 대조\n판정: 실패\n", [])).toEqual(expect.objectContaining({ ok: false }))
-    expect(parseReview("## 설계 대조\n판정: 통과\n판정 : 실패\n## 룰 체크\n적용 대상 없음\n", [])).toEqual(expect.objectContaining({ ok: false }))
-    expect(parseReview("## 설계 대조\n판정: 통과\n## 룰 체크\n- `api.md` — 판정: 통과\n- `api.md` — 판정 실패\n", ["api.md"])).toEqual(expect.objectContaining({ ok: false }))
-    expect(parseReview("## 설계 대조\n판정: 통과\n완료 판정 문장은 보지 않았다.\n## 룰 체크\n적용 대상 없음\n## 정확성\n판정: 통과\n", [])).toEqual({ ok: true, pass: true })
+    expect(parseReview("## 설계 대조\n판정: 통과\n## 룰 체크\n- `my rule.md` — 판정: 통과\n## 정확성\n판정: 통과\n")).toEqual({ ok: true, pass: true })
+    expect(parseReview("## 설계 대조\n판정: 통과\n## 룰 체크\n적용 대상 없음\n## 설계 대조\n판정: 실패\n")).toEqual(expect.objectContaining({ ok: false }))
+    expect(parseReview("## 설계 대조\n판정: 통과\n판정 : 실패\n## 룰 체크\n적용 대상 없음\n")).toEqual(expect.objectContaining({ ok: false }))
+    expect(parseReview("## 설계 대조\n판정: 통과\n## 룰 체크\n- `api.md` — 판정: 통과\n- `api.md` — 판정 실패\n")).toEqual(expect.objectContaining({ ok: false }))
+    expect(parseReview("## 설계 대조\n판정: 통과\n완료 판정 문장은 보지 않았다.\n## 룰 체크\n적용 대상 없음\n## 정확성\n판정: 통과\n")).toEqual({ ok: true, pass: true })
   })
 
   test("정확성: the reviewer looks for bugs it can trace from a caller; its verdict counts like the others", () => {
@@ -332,20 +325,22 @@ describe("review hardening", () => {
     expect(task).toContain("Flag one only when you can show it happens: trace from a caller as path:line")
     expect(task).toContain("## 정확성\n\n판정: 통과")
     const rules = "- `api.md` — 판정: 통과\n- `all.md` — 판정: 통과"
-    expect(parseReview(md("통과", rules, "판정: 실패\n\n- src/login.ts:3 — routes/login.ts:9 passes an empty name; name[0] throws") + CAUSE("구현"), ["api.md", "all.md"])).toEqual({ ok: true, pass: false, cause: "구현" })
-    expect(parseReview(md("통과", rules).replace("\n## 정확성\n\n판정: 통과\n", ""), ["api.md", "all.md"])).toEqual({ ok: false, reason: "review.md needs `## 설계 대조`, `## 룰 체크` and `## 정확성`." })
-    expect(parseReview(md("통과", rules, "판정: 통과\n판정: 실패"), ["api.md", "all.md"])).toEqual(expect.objectContaining({ ok: false, reason: expect.stringContaining("`## 정확성` needs exactly one line") }))
+    expect(parseReview(md("통과", rules, "판정: 실패\n\n- src/login.ts:3 — routes/login.ts:9 passes an empty name; name[0] throws") + CAUSE("구현"))).toEqual({ ok: true, pass: false, cause: "구현" })
+    expect(parseReview(md("통과", rules).replace("\n## 정확성\n\n판정: 통과\n", ""))).toEqual({ ok: false, reason: "review.md needs `## 설계 대조`, `## 룰 체크` and `## 정확성`." })
+    expect(parseReview(md("통과", rules, "판정: 통과\n판정: 실패"))).toEqual(expect.objectContaining({ ok: false, reason: expect.stringContaining("`## 정확성` needs exactly one line") }))
   })
 
   test("parseReview reads the cause of a failure and asks for one when it is missing", () => {
-    const rules = ["api.md", "all.md"]
-    expect(parseReview(FAIL, rules)).toEqual({ ok: true, pass: false, cause: "구현" })
-    expect(parseReview(FAIL_DESIGN, rules)).toEqual({ ok: true, pass: false, cause: "설계" })
-    expect(parseReview(FAIL_BODY, rules)).toEqual({ ok: false, reason: expect.stringContaining("a failure needs a `## 실패 원인` section") })
-    expect(parseReview(FAIL_BODY + CAUSE("환경"), rules)).toEqual(expect.objectContaining({ ok: false }))
-    expect(parseReview(FAIL_BODY + "\n## 실패 원인\n\n원인: 구현\n원인: 설계\n", rules)).toEqual(expect.objectContaining({ ok: false }))
-    expect(parseReview(FAIL_BODY + "\n```\n## 실패 원인\n\n원인: 구현\n```\n", rules)).toEqual(expect.objectContaining({ ok: false }))
-    expect(parseReview(GOOD, rules)).toEqual({ ok: true, pass: true })
+    expect(parseReview(FAIL)).toEqual({ ok: true, pass: false, cause: "구현" })
+    expect(parseReview(FAIL_DESIGN)).toEqual({ ok: true, pass: false, cause: "설계" })
+    expect(parseReview(FAIL_BODY)).toEqual({ ok: false, reason: expect.stringContaining("a failure needs a `## 실패 원인` section") })
+    expect(parseReview(FAIL_BODY + CAUSE("환경"))).toEqual(expect.objectContaining({ ok: false }))
+    expect(parseReview(FAIL_BODY + "\n## 실패 원인\n\n원인: 구현\n원인: 설계\n")).toEqual(expect.objectContaining({ ok: false }))
+    expect(parseReview(FAIL_BODY + "\n```\n## 실패 원인\n\n원인: 구현\n```\n")).toEqual(expect.objectContaining({ ok: false }))
+    expect(parseReview(FAIL_BODY + "\n## 실패 원인\n\n원인: 설계 — 2-plan.md가 잠그지 않는다\n")).toEqual({ ok: true, pass: false, cause: "설계" })
+    expect(parseReview(FAIL_BODY + "\n## 실패 원인\n\n원인: 구현\n\n원인은 src/login.ts:3 이 잠그지 않는 데 있다\n")).toEqual({ ok: true, pass: false, cause: "구현" })
+    expect(parseReview(FAIL_BODY + CAUSE("구현이 아니라 설계"))).toEqual(expect.objectContaining({ ok: false }))
+    expect(parseReview(GOOD)).toEqual({ ok: true, pass: true })
   })
 
   test("the reviewer is told to judge a failure from fails.md, or an older run's dev-diff.md, and to write 실패 원인", () => {
@@ -353,7 +348,7 @@ describe("review hardening", () => {
     expect(task).toContain(`${DIR}/agent/fails.md has a round`)
     expect(task).toContain(`each round of ${DIR}/agent/dev-diff.md quotes it under \`### 읽은 실패\``)
     expect(task).toContain("## 실패 원인\n\n원인: 구현")
-    expect(task).toContain("exactly one line `원인: 구현` or `원인: 설계`")
+    expect(task).toContain("`원인: 구현` or `원인: 설계` on a line of its own")
   })
 
   test("shared code: what the change newly defines is compared with what exists, and where the reviewer looked is said", () => {
@@ -370,8 +365,8 @@ describe("review hardening", () => {
     expect(task).toContain("`## 설계 대조` is 실패 with the line")
     expect(task).toContain("## 변경 전 실패\n\n- <test file> — <test case>:")
     const before = "\n## 변경 전 실패\n\n- src/login.test.ts — 세 번째 실패: src/login.ts:12 가 잠그지 않아 locked 단언이 실패\n"
-    expect(parseReview(GOOD + before, ["api.md", "all.md"])).toEqual({ ok: true, pass: true })
-    expect(parseReview(md("실패", "- `api.md` — 판정: 통과\n- `all.md` — 판정: 통과") + before + CAUSE("설계"), ["api.md", "all.md"])).toEqual({ ok: true, pass: false, cause: "설계" })
+    expect(parseReview(GOOD + before)).toEqual({ ok: true, pass: true })
+    expect(parseReview(md("실패", "- `api.md` — 판정: 통과\n- `all.md` — 판정: 통과") + before + CAUSE("설계"))).toEqual({ ok: true, pass: false, cause: "설계" })
     expect(parseCover(`${COVER}${before}`)).toEqual({ cover: [{ part: "잠긴다", by: "확인 불가", reason: "예시라 확인할 것이 없음" }] })
   })
 

@@ -80,7 +80,7 @@ Spawn `rein:reviewer` and wait for it. The hook replaces your prompt with the ta
 > 원인: 구현
 > ```
 >
-> with `원인: 구현` or `원인: 설계` as its one such line, then why.
+> with `원인: 구현` or `원인: 설계` on a line of its own, then why on the lines below.
 >
 > Each verdict is exactly `통과` or `실패`. `## 룰 체크` has one line per listed rule file, by file name, and no others. With no rules listed, it holds only the line `적용 대상 없음`. What you write on a failure is all dev or plan gets to fix it, so be specific.
 
