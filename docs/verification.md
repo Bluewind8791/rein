@@ -51,7 +51,7 @@ sequenceDiagram
 | `exit` | 종료 판정마다 | 단계, 규칙(`D39`·`D49`·`D56`·`D79`·`D95` 등), **조건별 참·거짓**, 결과(`pass`·`stay`·`fail`). `fail`은 `review`·`qa`·`qa-integration` 실패로 `stage`를 되돌림 — 판정(`## 실패 원인`)이나 결정대로 `dev` 또는 `plan`으로 (`D116`, `D62`), 판정자가 없거나 구현 실패가 반복되면 멈춤(`failure-route`) |
 | `stage` | 전이 | `from`, `to`. 되돌림(`D55`·`D116`)이면 사유 |
 | `capture` | 훅이 값을 붙잡을 때 | 러너의 aside 호출에서 세션 ID와 `판정:` 줄, 쓴 시간, 상한을 넘겨 멈춘 세션, `D95`의 `HEAD`와 `land` 저장소 집합(`D129`) |
-| `result` | 러너의 결과 파일을 받을 때 | 항목, 판정, 항목 폴더의 스크린샷(`shots`, `D177`) |
+| `result` | 러너의 결과 파일이나 ego judge의 `judge.md`를 받을 때 | 항목, 판정, 항목 폴더의 스크린샷(`shots`, `D177`). ego judge가 `데이터 없음`으로 판정했으면 `noData: true` |
 | `error` | 훅 자체의 예외 | 어느 훅, 메시지 |
 | `write` | `dev` 중 소스 쓰기를 기록할 때 | 경로. 쓰기가 안 들어가 기록을 되돌리면 `dropped` (`D49` ③) |
 | `spawn` | 판정 에이전트를 띄울 때 | 단계, 에이전트 종류, 기록한 `agentId` (`D116`, `D123`, `D130`, `D175`). 나눈 review의 reviewer는 `group` |

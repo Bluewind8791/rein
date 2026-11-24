@@ -3,6 +3,7 @@ import { readConfig } from "../hooks/lib/config.ts"
 import { closeScript, driverTask, egoStartable, judgeTask, MARK, parseJudge, PROBE_SCRIPT, resolveProfiles, roundCommand, roundOutcome, runSpaces, SHOT_PROBE_SCRIPT } from "../hooks/lib/ego.ts"
 import { harnessSource, importLine, REOPEN_MARK, TAKEOVER_MARK } from "../hooks/lib/egoHarness.ts"
 import { checkConfig, parseChecks, type Check } from "../hooks/lib/parse.ts"
+import { checklist } from "../hooks/stages/qaIntegration.ts"
 import type { CheckRun } from "../hooks/lib/state.ts"
 import { clock, DIR, gitSub, ran, relay, SPEC_TEXT, spawned, store, world, type Host, test } from "./world.ts"
 
@@ -447,5 +448,113 @@ describe("running checks in ego", () => {
     await $.tool.call(round(agentId!, folderOf("detail", 2), "01"))
     expect(context(await $.tool.call(runRound(agentId!, folderOf("detail", 2), "01")))).toContain("The round ran past its Bash timeout")
     expect(files[`${folderOf("detail", 2)}/${REOPEN_MARK}`]).toBe("")
+  })
+})
+
+// Other runs and people test on the same data: a check with `- 데이터 조건:`
+// says what its data must be, its driver checks that with the MCP tools it
+// has (each call recorded for the judge) and uses other data or makes it,
+// and its judge decides the data before the expectation.
+const DATA = "미출고 주문이 2건 이상\n회원 목록 조회에 보임"
+const DATA_RUN = { ...RUN, checks: [{ ...CHECKS[0]!, data: DATA }, CHECKS[1]!] }
+const dataJudge = (conditions: string[], used: string, lines: string[], verdict: string) => `## 데이터\n\n${conditions.join("\n")}${conditions.length > 0 ? "\n\n" : ""}데이터: ${used}\n\n${judgeMd(lines, verdict)}`
+
+describe("data conditions", () => {
+  test("a check may say what its data must be, one condition a line; the checklist shows them above its expectation", () => {
+    const one = "## e2e 확인\n\n### a\n- 제목: t\n- 구분: 변경\n- 앱: admin\n- 페이지: p\n- 경로: a > b\n- 할 일: x\n"
+    const rest = "- 기대: y\n- 저장: 없음\n"
+    const parsed = parseChecks(`${one}- 데이터 조건:\n  - 미출고 주문이 2건 이상\n  - 회원 목록 조회에 보임\n${rest}`) as { checks: Check[] }
+    expect(parsed.checks[0]!.data).toBe(DATA)
+    expect((parseChecks(`${one}${rest}`) as { checks: Check[] }).checks[0]!.data).toBeUndefined()
+    expect((parseChecks(`${one}- 데이터 조건:\n${rest}`) as { reason: string }).reason).toContain("a needs at most one `- 데이터 조건:` line, with its conditions")
+    const list = checklist("t", parsed.checks, APPS)
+    expect(list).toContain("  - 데이터 조건 (할 일의 데이터가 이와 맞지 않으면 맞는 데이터로 바꿔서 확인):\n    - 미출고 주문이 2건 이상\n    - 회원 목록 조회에 보임\n  - 기대:")
+    expect(checklist("t", [{ ...parsed.checks[0]!, data: undefined }], APPS)).not.toContain("데이터 조건")
+  })
+
+  test("its driver checks the data with MCP tools, read only, and may use other data or make it; without conditions it does not search elsewhere", () => {
+    const e2e = readConfig(JSON.stringify({ qa: ["t"], e2e: E2E })).e2e!
+    const k: CheckRun = { name: "detail", minutes: 30, spent: 0 }
+    const drive = driverTask(e2e, { ...CHECKS[0]!, data: DATA }, k, "f", undefined, 1000)
+    expect(drive).toContain("- Data conditions (what the task's data must be for the check to show what is expected): \n  - 미출고 주문이 2건 이상\n  - 회원 목록 조회에 보임\n")
+    expect(drive).toContain("Use MCP tools only to read")
+    expect(drive).toContain("in the evidence folder (mcp-NN.json)")
+    expect(drive).toContain("Never change the page, what is expected, whether the check changes the screen, or the account.")
+    expect(drive).toContain("make it through the app's own screens")
+    expect(drive).toContain("call done() with a summary that starts `데이터 없음:`")
+    expect(drive).toContain("- Saving: do not save, change or delete anything, except data you make as step 5 says when no data fits the conditions")
+    expect(drive).not.toContain("without searching elsewhere")
+    const plain = driverTask(e2e, CHECKS[0]!, k, "f", undefined, 1000)
+    expect(plain).toContain("without searching elsewhere")
+    expect(plain).not.toContain("Data conditions")
+    expect(plain).toContain("- Saving: do not save, change or delete anything\n")
+    const judge = judgeTask({ ...CHECKS[0]!, data: DATA }, k, "f", "f/judge.md", undefined)
+    expect(judge).toContain("- mcp-NN.json: each MCP call the driver made")
+    expect(judge).toContain("## 데이터")
+    expect(judge).toContain("판정: <통과 | 실패 | 증거 부족 | 데이터 없음>")
+    expect(judgeTask(CHECKS[0]!, k, "f", "f/judge.md", undefined)).not.toContain("## 데이터")
+  })
+
+  test("the judge decides the data first: a condition not met sends it back, 데이터: 없음 is 데이터 없음, a met condition cites a file", () => {
+    const has = (n: string) => ["round-01-shot-1.png", "mcp-01.json"].includes(n)
+    const met = ["- 미출고 주문이 2건 이상: 맞음 — mcp-01.json", "- 회원 목록 조회에 보임: 맞음 — round-01-shot-1.png"]
+    const parts = ["- 보인다: 통과 — round-01-shot-1.png"]
+    expect(parseJudge(dataJudge(met, "후보 그대로", parts, "통과"), has, true)).toEqual({ parts: ["보인다: 통과 — round-01-shot-1.png"], verdict: "통과", cited: ["round-01-shot-1.png", "mcp-01.json"], used: "후보 그대로" })
+    const unmet = [met[0]!, "- 회원 목록 조회에 보임: 안 맞음 — 목록에 없음"]
+    expect(parseJudge(dataJudge(unmet, "후보 그대로", parts, "증거 부족"), has, true)).toMatchObject({ verdict: "증거 부족", missing: "데이터 조건 「회원 목록 조회에 보임」 안 맞음: 목록에 없음" })
+    expect(parseJudge(dataJudge(unmet, "후보 그대로", parts, "통과"), has, true)).toEqual({ problem: expect.stringContaining("판정: 통과 does not follow from the data and the parts, which make it 증거 부족") })
+    expect(parseJudge(dataJudge(["- 미출고 주문이 2건 이상: 맞음 — 조회했다"], "후보 그대로", parts, "통과"), has, true)).toEqual({ problem: expect.stringContaining('"미출고 주문이 2건 이상" fits with no evidence file cited') })
+    expect(parseJudge("## 데이터\n\n데이터: 없음 — 조회 0건, 등록 화면 권한 없음\n\n## 기대 대조\n\n판정: 데이터 없음\n", has, true)).toEqual({ parts: [], verdict: "데이터 없음", cited: [], used: "없음 — 조회 0건, 등록 화면 권한 없음" })
+    expect(parseJudge(judgeMd(parts, "통과"), has, true)).toEqual({ problem: expect.stringContaining("judge.md needs `## 데이터`") })
+    expect(parseJudge("## 기대 대조\n\n판정: 데이터 없음\n", has)).toEqual({ problem: expect.stringContaining("judge.md needs `## 기대 대조`") })
+  })
+
+  test("a driver's MCP call is allowed and recorded in its check's folder; the pass ticks the checklist with the data it used", async ($, on) => {
+    const files = filesWith()
+    const rows = "[{\"member\":\"order0102\",\"open\":3}]"
+    world(on, files, () => undefined, DATA_RUN, host(files, [doneRound(files), doneRound(files)], { up: true }, { call: tool => (tool === "mcp__db__query" ? { result: "rows", text: rows } : undefined) }))
+    await toEgo($)
+    const { agentId } = await spawn($, DRIVER)
+    const folder = folderOf("detail")
+    expect(spawned.find(s => s.type === DRIVER)!.prompt).toContain("- Data conditions")
+    expect(await $.tool.call({ tool: "mcp__db__query", sql: "select member, open from orders", agentId } as never)).toMatchObject({ text: rows })
+    expect(JSON.parse(files[`${folder}/mcp-01.json`]!)).toEqual({ tool: "mcp__db__query", input: { sql: "select member, open from orders" }, isError: false, output: rows })
+    await $.tool.call({ tool: "mcp__db__query", sql: "select 1", agentId } as never)
+    expect(files[`${folder}/mcp-02.json`]).toContain("select 1")
+    expect(await $.tool.call({ tool: "PowerShell", command: "dir", agentId } as never)).toEqual(refused("D99"))
+    await $.tool.call(round(agentId!, folder, "01"))
+    await $.tool.call(runRound(agentId!, folder, "01"))
+    const judge = await spawn($, JUDGE)
+    expect(spawned.find(s => s.type === JUDGE)!.prompt).toContain("## 데이터")
+    // the judge of a check with data conditions writes its data section first.
+    expect(context(await $.tool.call({ tool: "Write", file_path: `${folder}/judge.md`, content: judgeMd(["- 우수회원만 체크되고 비활성: 통과 — round-01-shot-1.png"], "통과"), agentId: judge.agentId, extra: 1 } as never))).toContain("judge.md needs `## 데이터`")
+    const used = "회원 order0102 (후보 테스트회원A가 「미출고 주문이 2건 이상」에 맞지 않아 바꿈)"
+    const conditions = ["- 미출고 주문이 2건 이상: 맞음 — mcp-01.json", "- 회원 목록 조회에 보임: 맞음 — round-01-shot-1.png"]
+    const passed = await $.tool.call({ tool: "Write", file_path: `${folder}/judge.md`, content: dataJudge(conditions, used, ["- 우수회원만 체크되고 비활성: 통과 — round-01-shot-1.png", "- 레이아웃: 통과 — round-01-measure-1.json"], "통과"), agentId: judge.agentId } as never)
+    expect(context(passed)).toContain("check detail: 판정: 통과.")
+    expect(files[`${DIR}/5-checklist.md`]).toContain(`- **detail** ([ego 통과](agent/evidence/detail/1/judge.md) · 사용한 데이터: ${used})\n`)
+    expect(files[QAI]).toContain(`데이터: ${used}`)
+  })
+
+  test("데이터 없음 fails the check, and the D173 question marks it for the user to prepare data", async ($, on) => {
+    const files = filesWith()
+    const questions: string[] = []
+    world(on, files, q => (questions.push(q), "그대로 멈춤"), DATA_RUN, host(files, [doneRound(files), doneRound(files)]))
+    await toEgo($)
+    const { agentId } = await spawn($, DRIVER)
+    const folder = folderOf("detail")
+    await $.tool.call(round(agentId!, folder, "01"))
+    await $.tool.call(runRound(agentId!, folder, "01"))
+    const judge = await spawn($, JUDGE)
+    const none = "## 데이터\n\n데이터: 없음 — 미출고 주문 2건 이상인 회원 0건, 주문 등록 화면은 이 계정에 없음\n\n## 기대 대조\n\n판정: 데이터 없음\n"
+    expect(context(await $.tool.call({ tool: "Write", file_path: `${folder}/judge.md`, content: none, agentId: judge.agentId } as never))).toContain("check detail: 판정: 실패 (데이터 없음:")
+    await passCheck($, "staff")
+    const run = store.get("runs:proj/login-fix") as { halt?: { rule: string }; e2e: { checks: CheckRun[] } }
+    expect(run.halt?.rule).toBe("D173")
+    expect(run.e2e.checks.find(k => k.name === "detail")).toMatchObject({ verdict: "실패", noData: true })
+    expect(files[QAI]).toContain("- 결과: 실패 — 데이터 없음 (조건에 맞는 데이터를 찾지도 만들지도 못함)")
+    await relay($, ADVANCE)
+    expect(questions[0]).toContain("detail — 세션 rein-login-fix-detail-1 — 판정: 데이터 없음 (조건에 맞는 데이터를 찾지도 만들지도 못함)")
+    expect(questions[0]).toContain("데이터 없음인 항목은 코드 문제가 아닙니다")
   })
 })

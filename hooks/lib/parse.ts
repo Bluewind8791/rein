@@ -124,7 +124,10 @@ export function parseImpacts(text: string): Impacts | undefined {
 // its screen runs on, when it names them: a pass of the check stands while
 // none of them changes. evidence, the `- 증거:` lines: what a screenshot
 // cannot show, each with its kind, for the ego driver (and aside's prompt).
-export type Check = { name: string; title?: string; kind?: CheckKind; app: string; page?: string; route?: string; todo: string; expect: string; reference?: string; saves: boolean; minutes?: number; account?: string; files?: string[]; evidence?: Evidence[] }
+// data, the `- 데이터 조건:` lines (one item per line): what the data of
+// 할 일 must be for the check to show its 기대; the ego driver checks it
+// and finds or makes other data when it no longer holds.
+export type Check = { name: string; title?: string; kind?: CheckKind; app: string; page?: string; route?: string; todo: string; expect: string; data?: string; reference?: string; saves: boolean; minutes?: number; account?: string; files?: string[]; evidence?: Evidence[] }
 
 // what a check is for: 변경, its expectation differs from what the screen
 // shows with the code before the change; 대조, it looks the same before
@@ -153,7 +156,8 @@ const checkName = (name: string) => name.length <= 40 && /^[a-z0-9]+(-[a-z0-9]+)
 // characters), each with one line of `- 제목:`, `- 구분: 변경|대조`,
 // `- 앱:`, `- 페이지:`, `- 경로:`, `- 할 일:`, `- 기대:` (each of these two
 // with its value, or empty with indented `- ` or `1.` items under it) and
-// `- 저장: 없음|있음`, and optionally `- 참고: <why this data>`,
+// `- 저장: 없음|있음`, and optionally `- 데이터 조건:` (in the same two
+// forms), `- 참고: <why this data>`,
 // `- 시간: <minutes, 1 to 60>`,
 // `- 계정: <account>`, `- 파일: <file>[, <file>...]` (on one line or
 // more, the files as 2-plan.md names them) and `- 증거: <kind> — <what>` (on
@@ -165,8 +169,8 @@ export function parseChecks(text: string): { checks: Check[] } | { reason: strin
   const end = lines.findIndex((l, i) => i > start && /^##\s/.test(l))
   const items: { name: string; fields: Record<string, string[]>; lists: Record<string, string[]> }[] = []
   let none = false
-  // the items of the `- 할 일:` or `- 기대:` line just above, while its
-  // indented items go on.
+  // the items of the `- 할 일:`, `- 기대:` or `- 데이터 조건:` line just
+  // above, while its indented items go on.
   let open: string[] | undefined
   for (const line of lines.slice(start + 1, end < 0 ? undefined : end)) {
     const item = open && /^\s+(?:[-*]|\d+[.)])\s+(.*?)\s*$/.exec(line)
@@ -180,15 +184,15 @@ export function parseChecks(text: string): { checks: Check[] } | { reason: strin
       items.push({ name: head[1]!.replace(/`/g, "").trim(), fields: {}, lists: {} })
       continue
     }
-    const field = /^\s*[-*]\s+(제목|구분|앱|페이지|경로|할 일|기대|참고|저장|시간|계정|파일|증거)\s*:\s*(.*?)\s*$/.exec(line)
+    const field = /^\s*[-*]\s+(제목|구분|앱|페이지|경로|할 일|기대|데이터 조건|참고|저장|시간|계정|파일|증거)\s*:\s*(.*?)\s*$/.exec(line)
     if (field && items.length > 0) {
       const { fields, lists } = items.at(-1)!
       const key = field[1]!
       fields[key] = [...(fields[key] ?? []), field[2]!]
-      if ((key === "할 일" || key === "기대") && field[2] === "") open = lists[key] = []
+      if ((key === "할 일" || key === "기대" || key === "데이터 조건") && field[2] === "") open = lists[key] = []
     } else if (items.length === 0 && /^없음(?:\s|[.—–-]|$)/.test(line.trim())) none = true
   }
-  const form = `Each check is \`### <name>\` (lowercase letters, digits and single hyphens, at most 40 characters) with one line each of \`- 제목: <what it looks at, in a few words>\`, \`- 구분: 변경\` (its expectation differs from the screen before the change) or \`- 구분: 대조\` (it looks the same before and after), \`- 앱: <an app of config e2e.apps>\`, \`- 페이지: <the page it looks at>\`, \`- 경로: <the menus that reach it, as A > B > C>\`, \`- 할 일:\` (the steps, each on its own indented \`1.\` line under it), \`- 기대:\` (what must show, each part on its own indented \`- \` line under it) and \`- 저장: 없음\` or \`- 저장: 있음\`, and optionally \`- 참고: <why this data, what the screen does not show>\`, \`- 시간: <minutes, 1 to 60>\`, \`- 계정: <the account to log in as>\`, \`- 파일: <file>[, <file>...]\` (the design or handoff files the screen runs on) and \`- 증거: <kind> — <what to record>\` lines, the kind one of ${EVIDENCE_KINDS.join(", ")}. With no screen to check, the section holds only the line \`없음\`.`
+  const form = `Each check is \`### <name>\` (lowercase letters, digits and single hyphens, at most 40 characters) with one line each of \`- 제목: <what it looks at, in a few words>\`, \`- 구분: 변경\` (its expectation differs from the screen before the change) or \`- 구분: 대조\` (it looks the same before and after), \`- 앱: <an app of config e2e.apps>\`, \`- 페이지: <the page it looks at>\`, \`- 경로: <the menus that reach it, as A > B > C>\`, \`- 할 일:\` (the steps, each on its own indented \`1.\` line under it), \`- 기대:\` (what must show, each part on its own indented \`- \` line under it) and \`- 저장: 없음\` or \`- 저장: 있음\`, and optionally \`- 데이터 조건:\` (what the data of 할 일 must be for the check to show its 기대, each condition on its own indented \`- \` line under it), \`- 참고: <why this data, what the screen does not show>\`, \`- 시간: <minutes, 1 to 60>\`, \`- 계정: <the account to log in as>\`, \`- 파일: <file>[, <file>...]\` (the design or handoff files the screen runs on) and \`- 증거: <kind> — <what to record>\` lines, the kind one of ${EVIDENCE_KINDS.join(", ")}. With no screen to check, the section holds only the line \`없음\`.`
   if (items.length === 0) return none ? { checks: [] } : { reason: `\`## e2e 확인\` has no \`### <name>\` check and no line \`없음\`. ${form}` }
   const bad = items.filter(i => !checkName(i.name)).map(i => `\`### ${i.name}\``)
   if (bad.length > 0) return { reason: `these check names are not a slug: ${bad.join(", ")}. ${form}` }
@@ -197,13 +201,15 @@ export function parseChecks(text: string): { checks: Check[] } | { reason: strin
   const wrong: string[] = []
   const checks: Check[] = []
   for (const { name, fields, lists } of items) {
-    // a value on its line, or the items under an empty `- 할 일:` or
-    // `- 기대:`, one per line.
+    // a value on its line, or the items under an empty `- 할 일:`,
+    // `- 기대:` or `- 데이터 조건:`, one per line.
     const one = (key: string) => (fields[key]?.length !== 1 ? undefined : fields[key]![0] !== "" ? fields[key]![0] : lists[key]?.length ? lists[key]!.join("\n") : undefined)
     const missing = ["제목", "구분", "앱", "페이지", "경로", "할 일", "기대", "저장"].filter(k => one(k) === undefined)
     if (missing.length > 0) wrong.push(`${name} needs exactly one non-empty line of ${missing.map(k => `\`- ${k}:\``).join(", ")}`)
     const kind = one("구분")
     if (kind !== undefined && kind !== "변경" && kind !== "대조") wrong.push(`${name} says \`- 구분: ${kind}\`, not 변경 or 대조`)
+    const data = one("데이터 조건")
+    if (fields["데이터 조건"] !== undefined && data === undefined) wrong.push(`${name} needs at most one \`- 데이터 조건:\` line, with its conditions`)
     const reference = one("참고")
     if (fields["참고"] !== undefined && reference === undefined) wrong.push(`${name} needs at most one non-empty \`- 참고:\` line`)
     const saves = one("저장")
@@ -218,7 +224,7 @@ export function parseChecks(text: string): { checks: Check[] } | { reason: strin
     const evidence = fields["증거"]?.map(evidenceOf)
     for (const [i, e] of (evidence ?? []).entries()) if (e === undefined) wrong.push(`${name} has \`- 증거: ${fields["증거"]![i]}\`, not \`<kind> — <what>\` with a kind of ${EVIDENCE_KINDS.join(", ")}`)
     const named = evidence?.filter((e): e is Evidence => e !== undefined)
-    checks.push({ name, title: one("제목") ?? "", kind: kind === "대조" ? "대조" : "변경", app: one("앱") ?? "", page: one("페이지") ?? "", route: one("경로") ?? "", todo: one("할 일") ?? "", expect: one("기대") ?? "", ...(reference !== undefined ? { reference } : {}), saves: saves === "있음",...(minutes !== undefined ? { minutes } : {}), ...(account !== undefined ? { account } : {}), ...(files !== undefined ? { files } : {}), ...(named?.length ? { evidence: named } : {}) })
+    checks.push({ name, title: one("제목") ?? "", kind: kind === "대조" ? "대조" : "변경", app: one("앱") ?? "", page: one("페이지") ?? "", route: one("경로") ?? "", todo: one("할 일") ?? "", expect: one("기대") ?? "", ...(data !== undefined ? { data } : {}), ...(reference !== undefined ? { reference } : {}), saves: saves === "있음",...(minutes !== undefined ? { minutes } : {}), ...(account !== undefined ? { account } : {}), ...(files !== undefined ? { files } : {}), ...(named?.length ? { evidence: named } : {}) })
   }
   if (wrong.length > 0) return { reason: `in \`## e2e 확인\`: ${wrong.join("; ")}. ${form}` }
   return { checks }

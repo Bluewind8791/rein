@@ -32,8 +32,8 @@
 | `rein:triage` | qa | qa 명령 실패가 코드 탓인지 환경 탓인지 | sonnet |
 | `rein:impact` | qa | 이전에 통과한 e2e 항목이 그 뒤 바뀐 코드의 영향을 받는지 diff로 판정 → `impact.md` | sonnet |
 | `rein:e2e-runner` | qa-integration | aside로 e2e 항목 하나 실행 | haiku |
-| `rein:ego-driver` | qa-integration | ego 브라우저로 e2e 항목 하나 실행, 증거 기록 | sonnet |
-| `rein:ego-judge` | qa-integration | 증거만 보고 e2e 항목 판정 | sonnet |
+| `rein:ego-driver` | qa-integration | ego 브라우저로 e2e 항목 하나 실행, 증거 기록. `데이터 조건`이 있으면 MCP 도구로 데이터를 조회해 맞는 데이터를 찾거나 화면에서 만듦 | sonnet |
+| `rein:ego-judge` | qa-integration | 증거만 보고 e2e 항목 판정. `데이터 조건`이 있으면 쓴 데이터가 조건에 맞는지 먼저 판정 | sonnet |
 | `rein:retro` | run 종료 후 | 회고 후보 → `retro.md` | sonnet |
 
 "상속"은 frontmatter에 `model:`이 없어 메인 세션 모델을 씁니다.

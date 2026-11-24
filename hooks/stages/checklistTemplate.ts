@@ -38,6 +38,7 @@ export const CHECKLIST_TEMPLATE = `# 통합 테스트 체크리스트 — {{titl
 - {{head}}
 {{account}}
   - 할 일: {{todo}}
+{{data}}
   - 기대:
 {{expect}}
 {{saves}}

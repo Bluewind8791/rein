@@ -173,8 +173,11 @@ export type E2eState = {
 // so nothing ran it. exec and varied, only in a record from before
 // runners: the command the hook built, and a run in another form. ego, the
 // check's state on the ego path (runner is then its rein:ego-driver);
-// cited, the evidence files the judge's passed parts cite.
-export type CheckRun = { name: string; minutes: number; spent: number; exec?: string; todo?: string; expect?: string; account?: string; app?: string; saves?: true; runner?: string; running?: true; session?: string; observed?: string; verdict?: "통과" | "실패"; over?: true; person?: true; evidence?: string; shots?: string[]; unshot?: true; varied?: true; carried?: true; cleared?: true; checked?: true; cited?: string[]; ego?: EgoCheck }
+// cited, the evidence files the judge's passed parts cite; used, the
+// judge's `데이터:` line, the data the check ran on; noData, the judge
+// found no data that fits its 데이터 조건 and none could be made (it counts
+// as 실패, for the person to prepare data).
+export type CheckRun = { name: string; minutes: number; spent: number; exec?: string; todo?: string; expect?: string; account?: string; app?: string; saves?: true; runner?: string; running?: true; session?: string; observed?: string; verdict?: "통과" | "실패"; over?: true; person?: true; evidence?: string; shots?: string[]; unshot?: true; varied?: true; carried?: true; cleared?: true; checked?: true; cited?: string[]; used?: string; noData?: true; ego?: EgoCheck }
 
 // one check on the ego path. profile, the ego profile id it runs in;
 // space, its TaskSpace's name for this attempt; spentMs, the time it used

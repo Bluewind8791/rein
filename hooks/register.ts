@@ -26,7 +26,7 @@ import { afterDeviation, arbiterTask, d62Entry, dev, devCommand, devDiff, devEnt
 import { outside, parsePlanVerdict, PLAN_REVIEW, PLAN_REVIEWS, planEntry, planReviewer, planReviewTask, repoCandidates, revisitNote } from "./stages/plan.ts"
 import { filesOf, landFiles, nameStatus, numstat, stagedPaths, stagingProblem, statusEntries, statusPaths } from "./stages/land.ts"
 import { backendsHint, commandReport, failedRun, failureOf, OUTPUT_FILE, outputLog, rerunQuestion, rewrote, type CommandResult } from "./stages/qa.ts"
-import { driverRow, egoSection, folderOf as checkFolder, judgeOf, judgeRow, settleEgo, asideSection, progressSection, allChecked, carriedPass, carriedTick, asideTick, egoTick, checklist, doubtful, IMPACT_DIFF, IMPACT_FILE, impactRow, impactTask, parseImpact, completionLine, completionTask, E2E_MANUAL, E2E_NONE, E2E_SKIPPED, e2eSection, entryOutcome, handChecked, judgeIntegration, keptPasses, openLayouts, parseResult, qaIntegration, remember, resultOf, runnerCheck, runnerRow, sameE2e, settleAside, tick, unchecked, UNSHOT, withHistory } from "./stages/qaIntegration.ts"
+import { driverRow, egoSection, folderOf as checkFolder, judgeOf, judgeRow, NO_DATA_WORDS, settleEgo, asideSection, progressSection, allChecked, carriedPass, carriedTick, asideTick, egoTick, checklist, doubtful, IMPACT_DIFF, IMPACT_FILE, impactRow, impactTask, parseImpact, completionLine, completionTask, E2E_MANUAL, E2E_NONE, E2E_SKIPPED, e2eSection, entryOutcome, handChecked, judgeIntegration, keptPasses, openLayouts, parseResult, qaIntegration, remember, resultOf, runnerCheck, runnerRow, sameE2e, settleAside, tick, unchecked, UNSHOT, withHistory } from "./stages/qaIntegration.ts"
 import { GROUPS_FILE, groupFile, groupItems, groupRules, groupsCover, groupTask, joinedReview, parseGroups, pendingGroups, review, reviewEntry, reviewLists, reviewNext, reviewRules, reviewTask, splits, splitterTask } from "./stages/review.ts"
 import { asIsTask, asIsWanted, DIMENSIONS, EVERY, gradeLine, graderTask, gradeSummary, openQuestions, passes, scoreGrade, screenRows, sketcherTask, spec, specProblem, specType, TYPES } from "./stages/spec.ts"
 import { unbuilt } from "./stages/unbuilt.ts"
@@ -2381,7 +2381,7 @@ async function failGate($: EngineInterface, run: Run, answer: string | undefined
   if (c.run.busy) return { deny: "D79: the hook is already running the integration entry; wait for its result." }
   const file = `${c.dir}/agent/e2e.md`
   const failed = (run.e2e?.checks ?? []).filter(k => k.verdict === "실패")
-  const shown = failed.map(k => `${k.name} — 세션 ${k.session ?? "없음"} — 판정: 실패\n  관측: ${k.observed ?? "(없음)"}${k.unshot ? `\n  증거: ${UNSHOT}` : ""}`).join("\n")
+  const shown = failed.map(k => `${k.name} — 세션 ${k.session ?? "없음"} — 판정: ${k.noData ? NO_DATA_WORDS : "실패"}\n  관측: ${k.observed ?? "(없음)"}${k.unshot ? `\n  증거: ${UNSHOT}` : ""}`).join("\n")
   // the parts of the completion line only the failed checks cover: with
   // 기존 동작으로 진행 the completion check finds them not shown. A check
   // whose only failed part is 레이아웃 still shows its 기대.
@@ -2391,6 +2391,7 @@ async function failGate($: EngineInterface, run: Run, answer: string | undefined
   const unshown = new Set(failed.filter(k => !onlyLayoutFailed(k)).map(k => k.name))
   const lost = cover && "cover" in cover ? cover.cover.flatMap(p => (p.by === "e2e" && p.checks.length > 0 && p.checks.every(n => unshown.has(n)) ? [`"${p.part}" (${p.checks.join(", ")}로만 확인)`] : [])) : undefined
   const meaning = [
+    ...(failed.some(k => k.noData) ? [`데이터 없음인 항목은 코드 문제가 아닙니다. 2-plan.md의 데이터 조건에 맞는 데이터를 준비한 뒤 ${RERUN_FAILED}를 고르세요.`] : []),
     `${TO_DEV}: 코드 문제 — dev로 보냅니다.`,
     `${SEND_PLAN}: 설계 문제 — plan으로 보내 설계를 고칩니다. 고친 2-plan.md는 사용자가 승인합니다.`,
     `${RERUN_FAILED}: 환경이나 데이터를 고쳤음 — 통과한 항목은 두고 실패한 항목만 다시 돌립니다. 사용자가 실패한 항목을 직접 확인했다면 5-checklist.md에서 그 항목의 칸을 모두 체크한 뒤 이것을 고릅니다. 칸이 다 체크된 항목은 다시 돌지 않고 사용자 확인으로 통과합니다.`,
@@ -4794,6 +4795,22 @@ async function roundsIn($: EngineInterface, folder: string): Promise<{ rounds: s
 
 const lastRound = async ($: EngineInterface, folder: string) => (await roundsIn($, folder)).rounds.at(-1)
 
+// a call to another MCP server by the rein:ego-driver of an open check,
+// written as the next mcp-NN.json of the check's folder: the tool, its
+// input and what it returned. The judge reads it to decide the check's
+// data conditions; the driver cannot write it.
+async function recordMcp($: EngineInterface, run: Run, dir: string, agentId: string, tool: string, input: Record<string, unknown>, result: ToolCallResult): Promise<void> {
+  if (run.stage !== "qa-integration" || run.e2e?.path !== "ego") return
+  const k = run.e2e.checks?.find(x => x.runner === agentId && isOpen(x))
+  if (!k) return
+  const folder = `${dir}/${checkFolder(k)}`
+  const { names } = await roundsIn($, folder)
+  const taken = [...names].map(n => Number(/^mcp-(\d+)\.json$/.exec(n)?.[1] ?? 0))
+  const n = String(Math.max(0, ...taken) + 1).padStart(2, "0")
+  const output = result.text ?? (result.result === undefined ? undefined : JSON.stringify(result.result))
+  await $.fs.write(`${folder}/mcp-${n}.json`, `${JSON.stringify({ tool, input, isError: result.isError ?? false, output }, null, 2)}\n`)
+}
+
 // a driver's round as its call starts: its check must be its own and
 // driving (not handed to the user unanswered, not done), with time left and
 // no round running; the file the highest round of the folder, not ended
@@ -4943,16 +4960,20 @@ async function egoSettle($: EngineInterface): Promise<ReturnType<typeof settleEg
 // a passed part cites must be in the check's folder (else it writes it
 // again). 증거 부족
 // the first time sends the check back to its driver for what is missing;
-// the second time it is 실패. A pass closes the check's space; a failure
+// the second time it is 실패. 데이터 없음 (a check with data conditions
+// whose driver could neither find nor make data that fits) is 실패 too,
+// marked so the person prepares data. A pass closes the check's space; a failure
 // keeps it for the user to look at. Once no check is open, settleEgo.
 async function egoJudged($: EngineInterface, c: Ctx, k: CheckRun, result: ToolCallResult): Promise<ToolCallResult> {
   const file = `${c.dir}/${judgeOf(k)}`
   const { names } = await roundsIn($, `${c.dir}/${checkFolder(k)}`)
-  const judged = parseJudge(await $.fs.read(file), n => names.has(n))
+  const data = c.run.checks?.find(x => x.name === k.name)?.data !== undefined
+  const judged = parseJudge(await $.fs.read(file), n => names.has(n), data)
   if ("problem" in judged) return withContext(result, `${file} was saved, but ${judged.problem} Write it again.`)
   const back = judged.verdict === "증거 부족" && (k.ego?.returns ?? 0) === 0
   const verdict: "통과" | "실패" = judged.verdict === "통과" ? "통과" : "실패"
-  const observed = [...judged.parts, ...(judged.verdict === "증거 부족" ? ["(증거 부족이 두 번째라 실패로 봄)"] : [])].join(" / ")
+  const noData = judged.verdict === "데이터 없음"
+  const observed = [...(judged.used !== undefined ? [`데이터: ${judged.used}`] : []), ...judged.parts, ...(judged.verdict === "증거 부족" ? ["(증거 부족이 두 번째라 실패로 봄)"] : [])].join(" / ")
   const folder = checkFolder(k)
   let settled: ReturnType<typeof settleEgo>
   const moved = await mutate($, r => {
@@ -4963,7 +4984,7 @@ async function egoJudged($: EngineInterface, c: Ctx, k: CheckRun, result: ToolCa
       return { ...r, e2e: { ...r.e2e, checks: r.e2e.checks.map(x => (x.name === k.name ? { ...x, ego } : x)) } }
     }
     const cited = judged.cited.map(f => `${folder}/${f}`)
-    const next: CheckRun = { ...at, running: undefined, verdict, observed, session: at.ego.space, cited, shots: cited.filter(f => /\.png$/i.test(f)), ego: { ...at.ego, parts: judged.parts } }
+    const next: CheckRun = { ...at, running: undefined, verdict, observed, session: at.ego.space, cited, shots: cited.filter(f => /\.png$/i.test(f)), ...(judged.used !== undefined && !noData ? { used: judged.used } : {}), ...(noData ? { noData: true as const } : {}), ego: { ...at.ego, parts: judged.parts } }
     const checks = r.e2e.checks.map(x => (x.name === k.name ? next : x))
     settled = settleEgo(checks)
     // a layout check counts its screen's differences in a row.
@@ -4972,14 +4993,14 @@ async function egoJudged($: EngineInterface, c: Ctx, k: CheckRun, result: ToolCa
     return { ...settledRun(r, checks, settled), passed: remember(r, next), layoutFails }
   })
   if (!moved) return withContext(result, `check ${k.name} closed or the run moved on; this judgment is not used. Report to the main session and stop.`)
-  await trace($, c.run, { ev: "result", stage: "qa-integration", check: k.name, agentId: c.agentId, verdict: back ? "증거 부족" : verdict })
+  await trace($, c.run, { ev: "result", stage: "qa-integration", check: k.name, agentId: c.agentId, verdict: back ? "증거 부족" : verdict, ...(noData ? { noData: true } : {}) })
   if (back) return withContext(result, `check ${k.name}: 증거 부족, the first time, so it goes back to its driver ${k.runner} for what is missing. Report this to the main session and stop: it sends the driver what is missing with SendMessage (mcp__rein__status gives it).`)
   if (verdict === "통과") {
     if (isLayoutCheck(k.name)) await tickLayoutBox($, c.dir, layoutIdOf(k.name))
-    else await tickBox($, c.dir, k.name, egoTick(k))
+    else await tickBox($, c.dir, k.name, egoTick({ ...k, ...(judged.used !== undefined ? { used: judged.used } : {}) }))
     await egoRun($, closeScript(oneSpace(k.ego!.space)))
   }
-  const why = judged.verdict === "증거 부족" ? " (증거 부족 a second time counts as 실패)" : ""
+  const why = judged.verdict === "증거 부족" ? " (증거 부족 a second time counts as 실패)" : noData ? " (데이터 없음: no data fits its conditions and none could be made; the user prepares data)" : ""
   const toDevNote = await layoutsBack($, c.dir, moved, settled)
   return withContext(result, `check ${k.name}: 판정: ${verdict}${why}. ${toDevNote ?? (await egoSettledLine($, moved, settled))}`)
 }
@@ -6261,6 +6282,15 @@ export const register: Register = (on) => {
       textLength: result.text?.length,
       text: clip(result.text),
     })
+    // a driver's call to another MCP server (a database query for its
+    // check's data), recorded in the check's folder for its judge.
+    if (as !== undefined && result.deny === undefined && (tool as string).startsWith("mcp__") && !quietTool(tool)) {
+      try {
+        await recordMcp($, run, scope.c.dir, as, tool as string, input, result)
+      } catch (err) {
+        await trace($, run, { ev: "error", stage: run.stage, tool, error: String(err) })
+      }
+    }
     // a driver's round, errored or not.
     if (egoRound !== undefined) {
       const { check: name, round } = egoRound

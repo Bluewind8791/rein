@@ -86,7 +86,9 @@ export const judgeOf = (k: CheckRun) => `${folderOf(k)}/judge.md`
 // files of the check's folder, each starting with the harness import, and
 // Bash runs only `ego-browser nodejs < <folder>/round-NN.mjs`, in the
 // foreground. What the round may run on (its turn, the clock, the round
-// number) the hook checks against the run as the call starts.
+// number) the hook checks against the run as the call starts. Other MCP
+// servers' tools stay open, so it can check the data of a check with data
+// conditions (a database, say); the hook records each such call.
 export function driverRow(k: CheckRun): StageSpec {
   const folder = folderOf(k)
   return {
@@ -107,6 +109,7 @@ export function driverRow(k: CheckRun): StageSpec {
       return undefined
     },
     toolRule: "D99",
+    runnersOnly: true,
   }
 }
 
@@ -219,8 +222,8 @@ function tidy(text: string): string {
 // 5-checklist.md from 2-plan.md's checks, every box empty: one section
 // per page (with the menus that reach it, the app and its note), in the
 // order the pages first appear, each check under its page in plan order:
-// its title and kind, its steps numbered, a box per part of its
-// expectation, and why its data was chosen. The account is the check's
+// its title and kind, its steps numbered, its data conditions, a box per
+// part of its expectation, and why its data was chosen. The account is the check's
 // own, else the app's login says how, once for the page when its checks
 // share it; the login itself stays out, since it may hold a password. A
 // check from a plan before 페이지 and 경로 says so, one before 제목 shows its
@@ -248,6 +251,7 @@ export function checklist(title: string, checks: Check[], apps: Record<string, A
       head: k.title ? `**${k.title}** — ${k.kind === "대조" ? "대조군 (바뀌면 안 됨)" : "변경 확인"} · \`${k.name}\`` : `**${k.name}**`,
       account: shared ? "" : `  - 계정: ${account(k)}`,
       todo: listed(k.todo, true, "    "),
+      data: k.data ? `  - 데이터 조건 (할 일의 데이터가 이와 맞지 않으면 맞는 데이터로 바꿔서 확인): ${listed(k.data, false, "    ")}` : "",
       expect: itemsOf(k.expect).map(x => `    - [ ] ${x}`).join("\n"),
       saves: k.saves ? "  - 저장: 할 일대로 저장하고, 원래 값으로 되돌립니다" : "",
       reference: k.reference ? `  - 참고: ${k.reference}` : "",
@@ -325,7 +329,9 @@ const evidenceOf = (k: CheckRun): string | undefined => {
   if (k.ego !== undefined) return k.evidence === undefined ? undefined : linkTo(judgeOf(k))
   return k.runner !== undefined || k.session !== undefined ? linkTo("agent/e2e.md", k.name) : undefined
 }
-export const egoTick = (k: CheckRun): string => `[ego 통과](${linkTo(judgeOf(k))})`
+// An ego pass says the data it ran on, when the judge named it: the
+// person testing by hand may find the task's data changed.
+export const egoTick = (k: CheckRun): string => `[ego 통과](${linkTo(judgeOf(k))})${k.used ? ` · 사용한 데이터: ${k.used}` : ""}`
 export const asideTick = (k: CheckRun): string => `[aside 통과](${linkTo("agent/e2e.md", k.name)})`
 // a pass kept from an earlier visit links that pass's evidence: its judge.md
 // on the ego path, its section of e2e.md on the aside path; the plain words
@@ -510,10 +516,13 @@ export function e2eSection(): string {
 // the 증거 of a check aside passed with no screenshot.
 export const UNSHOT = "없음 — aside는 통과라 했지만 스크린샷이 없어 실패로 봄 (D177)"
 
+// what a check whose judge found no data came to, as a person reads it.
+export const NO_DATA_WORDS = "데이터 없음 (조건에 맞는 데이터를 찾지도 만들지도 못함)"
+
 // what a check came to, as a person reads it.
 function result(k: CheckRun): string {
   if (k.checked) return "통과 (사용자가 체크리스트로 확인)"
-  const verdict = k.unshot ? "실패 (aside는 통과라 했지만 스크린샷이 없음)" : k.ego?.human ? "없음 — 넘긴 화면을 사용자가 직접 확인하기로 함" : k.over ? "없음 — 판정 없이 닫힘 (시간 초과나 스페이스 유실)" : (k.verdict ?? "진행 중")
+  const verdict = k.unshot ? "실패 (aside는 통과라 했지만 스크린샷이 없음)" : k.noData ? `실패 — ${NO_DATA_WORDS}` : k.ego?.human ? "없음 — 넘긴 화면을 사용자가 직접 확인하기로 함" : k.over ? "없음 — 판정 없이 닫힘 (시간 초과나 스페이스 유실)" : (k.verdict ?? "진행 중")
   const person = k.person ? " → 사용자가 기존 동작으로 판단" : ""
   const varied = k.varied ? " (훅이 준 명령과 다르게 실행됨)" : ""
   const carried = k.carried ? ` (${carriedWhy(k)})` : ""
