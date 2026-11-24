@@ -52,7 +52,7 @@ Show the user the difference (`diff <hub copy> <local file>`) and ask with `AskU
 
 A catalog file's hub copy of `-` means the hub deleted it. A retro resolved `--keep-mine` reaches the hub at the next push.
 
-Read each file. A candidate is a `## <title>` section with its `종류:`, `상태:`, `근거:`, `제안:` and `대상:` lines; `근거:` and `제안:` may run on over the following lines.
+Read each file. A candidate is a `## <title>` section with its `종류:`, `상태:` and `근거:` lines, then either a `문제:` line (a 하네스 candidate: the trouble, with no fix; the reviewer works the fix out) or `제안:` and `대상:` lines (a domain candidate, and a 하네스 candidate from before `문제:`); `근거:`, `문제:` and `제안:` may run on over the following lines. A domain fact the retrospective added itself has `상태: 적용됨 <date>`, `대상:` and `내용:`.
 
 - `상태: 후보` and `상태: 채택` are the open candidates.
 - `기각`, `적용됨 …`, `중복 …` and `불필요 …` are closed. Read the `기각` ones only to judge duplicates in step 2; never ask about a closed one.

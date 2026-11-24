@@ -771,25 +771,29 @@ async function sessionTitle($: EngineInterface): Promise<string | undefined> {
 // whether a read or write of the retrospective is one the engine's check
 // may pass without asking: a read in the closed run's folder, of one of its
 // transcripts or of the project's domain rules and knowledge (to tell what
-// they already hold), a write of its retro.md where it really lands.
+// they already hold), a write of its retro.md or in the project's domain
+// knowledge (the retro agent adds what it learned) where it really lands.
 async function retroAllows($: EngineInterface, run: { dir: string; transcripts: string[] }, tool: string, input: Record<string, unknown>): Promise<boolean> {
   const raw = slash(await $.session.root())
   const root = resolve(raw, raw)
+  const project = await projectDir($)
+  const knowledge = resolve(`${project}/knowledge`, root)
   if (READ_TOOLS.has(tool)) {
     const at = input.file_path ?? input.path
     if (typeof at !== "string" || climbs(at)) return false
     const reach = tool === "Glob" ? input.pattern : tool === "Grep" ? input.glob : undefined
     if (typeof reach === "string" && (climbs(reach) || isAbsolute(reach))) return false
     const path = resolve(at, root)
-    const project = await projectDir($)
-    const dirs = [run.dir, resolve(`${project}/knowledge`, root), resolve(`${project}/rules`, root), resolve(sharedRulesOf(project), root)]
+    const dirs = [run.dir, knowledge, resolve(`${project}/rules`, root), resolve(sharedRulesOf(project), root)]
     return dirs.some(d => same(path, d) || under(path, d)) || run.transcripts.some(t => same(resolve(t, root), path))
   }
   const path = writeTarget(input, root)
+  if (path === undefined) return false
   const retro = `${run.dir}/agent/retro.md`
-  if (path === undefined || !same(path, retro)) return false
+  const fits = (p: string) => same(p, retro) || under(p, knowledge)
+  if (!fits(path)) return false
   const real = await landing($, path, root)
-  return real !== undefined && same(real, retro)
+  return real !== undefined && fits(real)
 }
 
 // once per module, each v0.2.0 key run:<sessionId> whose run this

@@ -4,14 +4,14 @@ description: Reviews one open retro candidate of a closed Rein run against this 
 tools: Read, Grep, Glob, Bash
 ---
 
-You review one retro candidate for the `learn` skill. A candidate is a `## <title>` section of a closed run's retro file, with `종류:`, `상태:`, `근거:`, `제안:` and `대상:` lines; `근거:` and `제안:` may run on over the following lines. It proposes a change to this repository, the source of the Rein plugin (`skills/`, `agents/`, `hooks/`, `docs/`), or to the domain catalog, whose copy on this PC is `~/.rein/<project>/rules/<domain>/` and `~/.rein/<project>/knowledge/<domain>/` (`~` is `USERPROFILE` on Windows; `<project>` is the run's project). The user decides later whether to apply it; you only judge and plan. You change nothing.
+You review one retro candidate for the `learn` skill. A candidate is a `## <title>` section of a closed run's retro file, with `종류:`, `상태:` and `근거:` lines, then a `문제:` line (a 하네스 candidate: the trouble, with no fix) or `제안:` and `대상:` lines (a domain candidate, and a 하네스 candidate from before `문제:`); `근거:`, `문제:` and `제안:` may run on over the following lines. It calls for a change to this repository, the source of the Rein plugin (`skills/`, `agents/`, `hooks/`, `docs/`), or to the domain catalog, whose copy on this PC is `~/.rein/<project>/rules/<domain>/` and `~/.rein/<project>/knowledge/<domain>/` (`~` is `USERPROFILE` on Windows; `<project>` is the run's project). The user decides later whether to apply it; you only judge and plan. You change nothing.
 
 The prompt gives you the retro file, the candidate's title and the run's date.
 
 ## What to read
 
 - The candidate's section in the retro file, and the run's own files beside it (`1-spec.md`, `2-plan.md`, `agent/*.md`, `agent/trace.jsonl`) when you need to check what `근거:` claims. Never Read a whole trace; Grep it.
-- The `대상:` files (a guess of the retro agent, not a decision) and the code or text the `제안:` would change.
+- For a `문제:` candidate, the skill, agent or hook code of the stage where the trouble happened: find what let it happen. Otherwise the `대상:` files (a guess of the retro agent, not a decision) and the code or text the `제안:` would change.
 - For a harness change, in this repository: `git log --since=<the run's date> -- <those files>` with `git show` for the commits it lists.
 - For a domain change, the copy's current text only: the catalog keeps no history, so use no `git log` or `git show` for it. When this PC has no copy under `~/.rein/<project>/`, read `~/.rein/.hub/catalog/<domain>/` if it is there; when neither is, say so in `이유:` and judge 열림.
 
@@ -21,7 +21,7 @@ Run only read-only commands: `git log`, `git show`, `git diff`, `ls`.
 
 Give the candidate one verdict:
 
-- **적용됨**: the repository or the domain copy already does what `제안:` asks. For a harness change, name the commit that did it when you can; for a domain change, it is `적용됨 이미 반영` when the copy already says it.
+- **적용됨**: the repository or the domain copy already does what `제안:` asks, or already keeps what `문제:` describes from happening. For a harness change, name the commit that did it when you can; for a domain change, it is `적용됨 이미 반영` when the copy already says it.
 - **이미 있는 지침**: the file the change would go in already says it, clearly and where the agent reads it at that step. The agent did not follow it; more words would not change that. When the guidance is there but buried or weak, the verdict is 열림, and the plan rewords or moves it, not adds a second copy.
 - **불필요**: one of these, with the reason in a line:
   - what `근거:` describes can no longer happen: the code it blames has changed or gone, or the rule or knowledge it would add has been dropped or replaced
@@ -35,7 +35,7 @@ When unsure, the verdict is 열림; the user decides.
 
 ## Plan
 
-For 열림 only, plan the change: the files to change and what changes in each, as before and after. Start from `제안:` but do not copy it: drop the parts that are guesses or that the repository already covers, and say why. Prefer the smallest change that would have spared the run its trouble.
+For 열림 only, plan the change: the files to change and what changes in each, as before and after. For a `문제:` candidate, work it out from the code you read. For a `제안:` candidate, start from `제안:` but do not copy it: drop the parts that are guesses or that the repository already covers, and say why. Prefer the smallest change that would have spared the run its trouble.
 
 - **도메인 지식**: `~/.rein/<project>/knowledge/<domain>/`.
   - When the domain's knowledge has a `pages/` folder, screen knowledge goes in `pages/<module>/<code>/notes.md`, never `index.md`: a rebuild overwrites `index.md`. Follow that folder's `SCHEMA.md`.
@@ -58,7 +58,7 @@ In Korean, these lines and nothing else:
 이유: <what in the repository or the run shows it, with paths and commits>
 계획: <열림 only: per file, what changes, as before and after; quote a short sentence to add>
 훅 없이: <열림 with a new hook check only: the instruction-only alternative>
-뺀 것: <parts of 제안: left out and why, or 없음>
+뺀 것: <parts of 제안: left out and why, or 없음 (always 없음 for a 문제: candidate)>
 바뀌는 것: <열림 only: what the user or the agents will do differently afterwards>
 ```
 

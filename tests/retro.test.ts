@@ -4,7 +4,8 @@ import { relay, DIR, REIN, SPEC_TEXT, world, test } from "./world.ts"
 // The retrospective after a run closes: the close names the rein:retro
 // skill with the run folder and the main session's transcripts, and until
 // a run opens the permission prompts for reading them and the domain rules
-// and knowledge, and for writing retro.md, are answered allow.
+// and knowledge, and for writing retro.md and the domain knowledge, are
+// answered allow.
 
 const PARK = { tool: "mcp__rein__park", reason: "사용자가 그만하자고 함" } as never
 const PROJECTS = "C:/Users/u/.claude/projects"
@@ -39,7 +40,10 @@ describe("retro", () => {
     expect(await check($, "Read", { file_path: EARLIER })).toEqual(allow)
     expect(await check($, "Grep", { pattern: "x", path: `${REIN}/knowledge` })).toEqual(allow)
     expect(await check($, "Read", { file_path: `${REIN}/rules/web/auth.md` })).toEqual(allow)
-    expect(await check($, "Write", { file_path: `${REIN}/knowledge/web/new.md`, content: "x" })).toEqual(ask)
+    expect(await check($, "Write", { file_path: `${REIN}/knowledge/web/new.md`, content: "x" })).toEqual(allow)
+    expect(await check($, "Edit", { file_path: `${REIN}/knowledge/web/pages/notes.md`, old_string: "a", new_string: "b" })).toEqual(allow)
+    expect(await check($, "Write", { file_path: `${REIN}/rules/web/auth.md`, content: "x" })).toEqual(ask)
+    expect(await check($, "Write", { file_path: `${REIN}/knowledge/../rules/web/auth.md`, content: "x" })).toEqual(ask)
     expect(await check($, "Write", { file_path: `${DONE}/agent/retro.md`, content: "x" })).toEqual(allow)
     expect(await check($, "Edit", { file_path: `${DONE}/agent/retro.md`, old_string: "a", new_string: "b" })).toEqual(allow)
     // nothing else: another session's transcript, the folder's other files, a climb.
