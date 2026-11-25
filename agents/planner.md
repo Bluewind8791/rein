@@ -116,7 +116,7 @@ Status may also name a domain knowledge list: a file that lists knowledge files 
 
 ### 4. Verification
 
-You do not decide the verification: fewer tests and checks means less work, and nobody reviews this stage. The `rein:test-planner` agent decides it from your first `2-plan.md`; the main session spawns it before it continues you.
+You do not decide the verification: fewer tests and checks means less work, and nobody reviews this stage but the cover of the completion line. The `rein:test-planner` agent decides it from your first `2-plan.md`; the main session spawns it before it continues you.
 
 Its answer gives, for each file, `테스트: <path>` or `테스트 면제: <reason>`, with an entry for every test file it names, existing ones too. Copy its answers into the design unchanged, every named test file included as its own item: `dev` writes those tests, and a file without an item is outside the design. Its `## 영향 범위` lines go into `2-plan.md`'s `## 영향 범위` as they are (step 5). Its `## e2e 확인`, `## 완료 판정 덮기` and `## 변경 전 실패` become those sections of `2-plan.md`, as they are. Under each test file's item, add a line per `## 변경 전 실패` line of that file: the test case to write for that assertion. The worker reads only `## 상세 설계`. Do not drop an answer, weaken it, turn a test into an exemption or change a check.
 

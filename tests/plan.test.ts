@@ -450,6 +450,9 @@ describe("the design review in plan", () => {
     // the first visit to plan reviews the whole design.
     expect(task).toContain("Review the design of a Rein run before any code is written.")
     expect(task).not.toContain("approved version")
+    // the cover of the completion line is held against what it names.
+    expect(task).toContain("Hold each line of `## 완료 판정 덮기` against what it names")
+    expect(task).not.toContain("`## 완료 판정 덮기` or `## 변경 전 실패`")
     expect(spawned.at(-1)!.background).toBe(false)
     // the rule list is the hook's.
     expect(await $.tool.call(verdict(agentId, []))).toEqual({ deny: "rules lacks api.md. The hook's rule list: api.md. Call mcp__rein__plan_review again." })

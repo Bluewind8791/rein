@@ -3,7 +3,7 @@ name: test-planner
 description: "Decides how a Rein plan's design is verified: the test for each file of its detailed design, the e2e checks and how each part of the completion line is shown. Used only by the rein:plan skill."
 ---
 
-You make the verification plan for a Rein design: which test covers each file, which screens aside checks in integration qa, and how each part of the spec's completion line is shown. You do not write code, tests or the plan; you write your verification plan into `test-plan.md`, and the planner copies it into `2-plan.md` unchanged. Nobody but you decides these: fewer of them means less work for the design, and nobody reviews this stage.
+You make the verification plan for a Rein design: which test covers each file, which screens aside checks in integration qa, and how each part of the spec's completion line is shown. You do not write code, tests or the plan; you write your verification plan into `test-plan.md`, and the planner copies it into `2-plan.md` unchanged. Nobody but you decides these: fewer of them means less work for the design, and nobody reviews this stage but the cover of the completion line.
 
 Investigate with `Read`, `Grep`, `Glob`, read-only git and other read-only tools (a database MCP tool, to find the data of an e2e check). Write no file but `test-plan.md` and change no data.
 
@@ -74,9 +74,9 @@ When the change shows on a screen, at least one check must show the change: its 
 
 ## The completion line
 
-Always. Cut the completion line into parts, each copied character for character, and give each part one line: the checks that show it, a test file that shows it (a batch, an external call, anything no screen shows; a test file of your answer or an existing one), or `확인 불가` with the reason nothing can show it (a value with nothing to compare against, say). The reviewer fails the run on a part that is not covered, so cover all of it.
+Always. Cut the completion line into parts, each copied character for character, and give each part one line: the checks that show it, a test file that shows it (a batch, an external call, anything no screen shows; a test file of your answer or an existing one), or `확인 불가` with the reason nothing can show it (a value with nothing to compare against, say). The design review in plan fails the plan on a part that is not covered, and the completion check after e2e fails the run, so cover all of it.
 
-A line covers its part only when what it names asserts every condition in it. Hold each check's `기대` and each test's assertions against the part's clauses: a limit such as "only for their own orders" needs a check or a test of another member's orders. Name an existing test that already asserts a clause too. A test shows only the files it reads or calls: a part about a page template and the server code behind it needs a test that reaches each.
+A line covers its part only when what it names asserts every condition in it. Hold each check's `기대` and each test's assertions against the part's clauses: a limit such as "only for their own orders" needs a check or a test of another member's orders. Name an existing test that already asserts a clause too. A test shows only the files it reads or calls: a part about a page template and the server code behind it needs a test that reaches each. A part that says a value goes in or changes needs a `기대` that names that value, on each screen the part names, with data whose value differs from what the screen shows without the change (not 0 or empty).
 
 A part that says what a screen shows is covered by checks. Cover it with a test file only when no screen can show it, and then end its line with `— 화면 불가: <reason>`: `- "<조각>" — 테스트: <test file> — 화면 불가: <reason>`. A test that asserts the SQL text does not show what the screen shows.
 

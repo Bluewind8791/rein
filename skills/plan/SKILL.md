@@ -61,7 +61,7 @@ config 없음: <repository roots> | 없음
 
 ### 3. Verification
 
-Spawn the `rein:test-planner` agent once the configs of step 2 are written: it reads them for the e2e checks. Nobody but it decides the tests, the e2e checks and how the completion line is covered: fewer of them means less work for the design, and nobody reviews this stage. In its prompt give it:
+Spawn the `rein:test-planner` agent once the configs of step 2 are written: it reads them for the e2e checks. Nobody but it decides the tests, the e2e checks and how the completion line is covered: fewer of them means less work for the design, and nobody reviews this stage but the cover of the completion line, which the design review holds against the checks and tests it names. In its prompt give it:
 
 1. the path of `2-plan.md`: the file list with what to do in each file is under its `## 상세 설계`
 2. the completion check line, under `## 완료 판정` of `1-spec.md` (give the path)
