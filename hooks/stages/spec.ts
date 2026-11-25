@@ -145,7 +145,7 @@ export const DIMENSIONS: Dimension[] = [
     },
   },
   {
-    name: "경계 조건", fact: false, asks: "which edge cases (empty or missing input, boundary values, failure paths, concurrent use, behaviour that must stay) must hold when the work is done: named in the completion line, or plainly outside the request",
+    name: "경계 조건", fact: false, asks: "which edge cases (empty or missing input, boundary values, failure paths, concurrent use, behaviour that must stay, what a new action that saves or links data needs before it runs and does when its value is empty or 0) must hold when the work is done: named in the completion line, or plainly outside the request",
     weight: { feature: 0.2, bugfix: 0.15, improvement: 0.15 },
     anchors: {
       ...same3(["no edge case named or ruled out", "some edge cases named, but the failure paths or the behaviour that must stay are not settled", "every edge case that matters is named in the completion line or plainly outside the request"]),

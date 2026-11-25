@@ -1,6 +1,6 @@
 import { describe, expect } from "claude-code/testing"
 import { parseGrade } from "../hooks/lib/parse.ts"
-import { DIMENSIONS, frontValue, openQuestions, passes, referenced, scopeGaps, scoreGrade, specType, steady } from "../hooks/stages/spec.ts"
+import { DIMENSIONS, frontValue, graderTask, openQuestions, passes, referenced, scopeGaps, scoreGrade, specType, steady } from "../hooks/stages/spec.ts"
 import { relay, DIR, grade, gradeMd, SCOPE, SPEC_TEXT, spawned, store, world, test } from "./world.ts"
 
 // a grader that sees only 1-spec.md scores it; the hook works out the
@@ -89,6 +89,10 @@ describe("grade.md (D175)", () => {
     expect(steady([0.48, 0.45, 0.42].map(at))).toBe(false)
     expect(steady([0.6, 0.5, 0.48, 0.46, 0.44].map(at))).toBe(true)
     expect(steady([0.6, 0.5, 0.45, 0.4].map(at))).toBe(false)
+  })
+
+  test("경계 조건 asks what a new saving or linking action needs and does on an empty or 0 value", () => {
+    expect(graderTask("d", "feature")).toContain("what a new action that saves or links data needs before it runs and does when its value is empty or 0")
   })
 })
 
