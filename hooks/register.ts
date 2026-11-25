@@ -51,7 +51,7 @@ import { unbuilt } from "./stages/unbuilt.ts"
 
 // The version in trace and run records; the release skill keeps it equal to
 // .claude-plugin/plugin.json.
-const VERSION = "0.81.0"
+const VERSION = "0.82.0"
 const TEXT_LIMIT = 2000
 const PROBE_MS = 8000
 const OPEN_RUN = "mcp__rein__open_run"
