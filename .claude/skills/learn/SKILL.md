@@ -5,7 +5,7 @@ description: 닫힌 Rein run의 회고 후보(이 PC와 허브 서버의 모든 
 
 # learn
 
-When a Rein run closes, the `rein:retro` skill writes `agent/retro.md` in its run folder (`retro.md` in the folder itself in the runs that closed before `agent/`, and `7-retro.md` before that), and the user marks each candidate `채택` or `기각`, or leaves it `후보`. This skill sorts the candidates of every run, asks about the rest one at a time, and takes the approved ones in. A harness or repository change goes into this repository, the source of the plugin, and users get it only after a release. A domain rule or knowledge change goes into this PC's copy of the domain catalog and to the hub server that `~/.rein/sync.json` names; it is not committed, and every PC gets it at its next session start.
+When a Rein run closes, the `rein:retro` skill writes `7-retro.md` in its run folder (`agent/retro.md` in the runs that closed while it lived in `agent/`, `retro.md` in the folder itself before that, and `7-retro.md` before that too), and the user marks each candidate `채택` or `기각`, or leaves it `후보`. This skill sorts the candidates of every run, asks about the rest one at a time, and takes the approved ones in. A harness or repository change goes into this repository, the source of the plugin, and users get it only after a release. A domain rule or knowledge change goes into this PC's copy of the domain catalog and to the hub server that `~/.rein/sync.json` names; it is not committed, and every PC gets it at its next session start.
 
 Run the steps in order.
 

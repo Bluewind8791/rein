@@ -79,7 +79,8 @@ const NAME_OK = s => s !== "" && s !== "." && s !== ".." && !/[\\/:\0]/.test(s)
 // a relative path with / separators whose every segment passes NAME_OK
 const safeRel = rel => typeof rel === "string" && rel.split("/").every(NAME_OK)
 
-// a run's retro file, in the order the runs wrote it over time
+// a run's retro file, under each name runs have written it; 7-retro.md is
+// the current name as well as the first
 const RETRO_NAMES = ["agent/retro.md", "retro.md", "7-retro.md"]
 
 // how many candidates of a retro are still open (상태: 후보 or 채택)

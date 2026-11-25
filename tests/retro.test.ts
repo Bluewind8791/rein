@@ -4,7 +4,7 @@ import { relay, DIR, REIN, SPEC_TEXT, world, test } from "./world.ts"
 // The retrospective after a run closes: the close names the rein:retro
 // skill with the run folder and the main session's transcripts, and until
 // a run opens the permission prompts for reading them and the domain rules
-// and knowledge, and for writing retro.md and the domain knowledge, are
+// and knowledge, and for writing 7-retro.md and the domain knowledge, are
 // answered allow.
 
 const PARK = { tool: "mcp__rein__park", reason: "사용자가 그만하자고 함" } as never
@@ -29,7 +29,7 @@ const files = (): Record<string, string> => ({
 })
 
 describe("retro", () => {
-  test("완료 names rein:retro with the folder and both sessions' transcripts; reads and retro.md are allowed", async ($, on) => {
+  test("완료 names rein:retro with the folder and both sessions' transcripts; reads and 7-retro.md are allowed", async ($, on) => {
     world(on, files(), () => "완료 (Rein 밖에서 반영함)", { stage: "review", runId: "login-fix" })
     const r = (await relay($, PARK)) as { result: string }
     expect(r.result).toContain(`invoke the rein:retro skill. Run folder: ${DONE}. The main session's transcripts: ${EARLIER}, ${NOW}.`)
@@ -44,8 +44,8 @@ describe("retro", () => {
     expect(await check($, "Edit", { file_path: `${REIN}/knowledge/web/pages/notes.md`, old_string: "a", new_string: "b" })).toEqual(allow)
     expect(await check($, "Write", { file_path: `${REIN}/rules/web/auth.md`, content: "x" })).toEqual(ask)
     expect(await check($, "Write", { file_path: `${REIN}/knowledge/../rules/web/auth.md`, content: "x" })).toEqual(ask)
-    expect(await check($, "Write", { file_path: `${DONE}/agent/retro.md`, content: "x" })).toEqual(allow)
-    expect(await check($, "Edit", { file_path: `${DONE}/agent/retro.md`, old_string: "a", new_string: "b" })).toEqual(allow)
+    expect(await check($, "Write", { file_path: `${DONE}/7-retro.md`, content: "x" })).toEqual(allow)
+    expect(await check($, "Edit", { file_path: `${DONE}/7-retro.md`, old_string: "a", new_string: "b" })).toEqual(allow)
     expect(await check($, "Write", { file_path: `${DONE}/agent/retro-read/3.md`, content: "x" })).toEqual(allow)
     expect(await check($, "Write", { file_path: `${DONE}/agent/retro-read/../review.md`, content: "x" })).toEqual(ask)
     // nothing else: another session's transcript, the folder's other files, a climb.
@@ -59,7 +59,7 @@ describe("retro", () => {
     world(on, files(), () => "폐기", { stage: "dev", runId: "login-fix" })
     const r = (await relay($, PARK)) as { result: string }
     expect(r.result).toContain(`invoke the rein:retro skill. Run folder: ${DROP}.`)
-    expect(await check($, "Write", { file_path: `${DROP}/agent/retro.md`, content: "x" })).toEqual(allow)
+    expect(await check($, "Write", { file_path: `${DROP}/7-retro.md`, content: "x" })).toEqual(allow)
   })
 
   test("보류 names no retrospective and allows nothing", async ($, on) => {
@@ -67,7 +67,7 @@ describe("retro", () => {
     const r = (await relay($, PARK)) as { result: string }
     expect(r.result).not.toContain("rein:retro")
     expect(await check($, "Read", { file_path: NOW })).toEqual(ask)
-    expect(await check($, "Write", { file_path: `${REIN}/defer/login-fix/retro.md`, content: "x" })).toEqual(ask)
+    expect(await check($, "Write", { file_path: `${REIN}/defer/login-fix/7-retro.md`, content: "x" })).toEqual(ask)
   })
 
   test("without a transcript found it says so", async ($, on) => {
@@ -84,6 +84,6 @@ describe("retro", () => {
     await $.tool.call({ tool: "mcp__rein__open_run", runId: "next-task" } as never)
     await relay($, { tool: "mcp__rein__park", reason: "나중에" } as never)
     expect(await check($, "Read", { file_path: NOW })).toEqual(ask)
-    expect(await check($, "Write", { file_path: `${DROP}/agent/retro.md`, content: "x" })).toEqual(ask)
+    expect(await check($, "Write", { file_path: `${DROP}/7-retro.md`, content: "x" })).toEqual(ask)
   })
 })

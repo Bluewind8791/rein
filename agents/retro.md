@@ -1,6 +1,6 @@
 ---
 name: retro
-description: Looks back on a closed Rein run, from its files, its trace and the main session's transcripts, for what should go into the Rein plugin or the domain knowledge, adds the domain facts it found to the domain knowledge, and writes retro.md. Used only by the rein:retro skill.
+description: Looks back on a closed Rein run, from its files, its trace and the main session's transcripts, for what should go into the Rein plugin or the domain knowledge, adds the domain facts it found to the domain knowledge, and writes 7-retro.md. Used only by the rein:retro skill.
 tools: Read, Grep, Glob, Write, Edit
 model: sonnet
 ---
@@ -65,9 +65,9 @@ Add each 도메인 지식 to the project's copy, `~/.rein/<project>/knowledge/<d
 
 When the project has more than one domain and you cannot tell which one the fact belongs to, do not add it: write it as a candidate with `상태: 후보`, `제안:` the fact and `대상: 모름`.
 
-## Write retro.md
+## Write 7-retro.md
 
-Write `<run folder>/agent/retro.md` once, whole, with `Write`, in Korean, after adding the domain facts. No front matter. One section per item, by its kind:
+Write `<run folder>/7-retro.md` once, whole, with `Write`, in Korean, after adding the domain facts. No front matter. One section per item, by its kind:
 
 ```markdown
 ## 같은 거부가 세 번 반복됨
@@ -109,7 +109,7 @@ One line per item, `<종류> — <제목>`, with ` (적용됨)` after a domain f
 
 ## Do not
 
-- Write anything but `agent/retro.md` and the domain facts in `~/.rein/<project>/knowledge/<domain>/`.
+- Write anything but `7-retro.md` and the domain facts in `~/.rein/<project>/knowledge/<domain>/`.
 - Edit domain rules, or any plugin or repository file.
 - Quote secrets you see in a transcript (passwords, tokens, keys); describe them instead.
 - Call `mcp__rein__*` tools.

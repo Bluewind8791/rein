@@ -195,7 +195,7 @@ let namedFor: string | undefined
 let renamed = false
 // the run this session closed last (complete or drop), for its
 // retrospective: reading its folder and the main session's transcripts and
-// writing its retro.md pass the engine's check. It goes when a run opens.
+// writing its 7-retro.md pass the engine's check. It goes when a run opens.
 let closed: { dir: string; transcripts: string[] } | undefined
 // every grader this module spawned. It reads 1-spec.md and writes
 // grade.md, nothing else, even once it is spent.
@@ -770,7 +770,7 @@ async function sessionTitle($: EngineInterface): Promise<string | undefined> {
 // whether a read or write of the retrospective is one the engine's check
 // may pass without asking: a read in the closed run's folder, of one of its
 // transcripts or of the project's domain rules and knowledge (to tell what
-// they already hold), a write of its retro.md, in its agent/retro-read/
+// they already hold), a write of its 7-retro.md, in its agent/retro-read/
 // (the readers' summaries) or in the project's domain knowledge (the retro
 // agent adds what it learned) where it really lands.
 async function retroAllows($: EngineInterface, run: { dir: string; transcripts: string[] }, tool: string, input: Record<string, unknown>): Promise<boolean> {
@@ -789,7 +789,7 @@ async function retroAllows($: EngineInterface, run: { dir: string; transcripts: 
   }
   const path = writeTarget(input, root)
   if (path === undefined) return false
-  const retro = `${run.dir}/agent/retro.md`
+  const retro = `${run.dir}/7-retro.md`
   const fits = (p: string) => same(p, retro) || under(p, `${run.dir}/agent/retro-read`) || under(p, knowledge)
   if (!fits(path)) return false
   const real = await landing($, path, root)

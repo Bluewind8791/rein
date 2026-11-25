@@ -7,7 +7,7 @@ description: The retrospective of a Rein run that just closed. Use when a Rein h
 
 The run is closed: finished in land, ended without a commit, or closed by park (`폐기` or `완료`). This looks back on it for what should go into the Rein plugin or the domain knowledge. The domain facts it finds go into the domain knowledge at once. The harness trouble and the domain rules are recorded as candidates for the user to pick; the `learn` skill of the Rein repository works out and applies the fix later.
 
-The hook's message gave the run folder and the main session's transcripts. Until a new run opens, the hook lets reading them and the project's domain rules and knowledge, writing `agent/retro.md` and the files in `agent/retro-read/` in the run folder, and writing the project's domain knowledge through without a permission prompt.
+The hook's message gave the run folder and the main session's transcripts. Until a new run opens, the hook lets reading them and the project's domain rules and knowledge, writing `7-retro.md` and the files in `agent/retro-read/` in the run folder, and writing the project's domain knowledge through without a permission prompt.
 
 A long run's trace, `e2e.md`, `fails.md` and transcripts are far more than one agent reads to the end. So readers read them first, each about 300 KB of them, and the retro agent works from their notes.
 
@@ -35,7 +35,7 @@ When a reader answers without having written its `out`, spawn it once more for t
 
 Spawn `rein:retro` and wait for it. Give it the run folder and the transcripts' paths exactly as the hook's message gave them, or say that none was found, and today's date. Nothing else.
 
-It adds the domain facts it found to `~/.rein/<project>/knowledge/<domain>/`, writes `<run folder>/agent/retro.md` and answers with one line per item, a domain fact it added marked `(적용됨)`, or `제안 없음`.
+It adds the domain facts it found to `~/.rein/<project>/knowledge/<domain>/`, writes `<run folder>/7-retro.md` and answers with one line per item, a domain fact it added marked `(적용됨)`, or `제안 없음`.
 
 ## 4. Send the domain facts
 
@@ -57,13 +57,13 @@ Then tell the user what went into the domain knowledge: per fact, its title, the
 
 The candidates are the items with `상태: 후보`. When there are none, skip to step 7; on `제안 없음`, tell the user the retrospective found nothing first.
 
-Otherwise read `retro.md` and show each candidate: its title, `종류:`, a short `근거:`, and for a 하네스 candidate its `문제:`, for the others its `제안:`. Give the path of `retro.md` too. Then ask with `AskUserQuestion` which are worth fixing, with `multiSelect`: one option per candidate, its title as the label and its `문제:` or `제안:` cut short as the description. With more than four candidates, number them in the text and ask the user to name the ones to keep instead.
+Otherwise read `7-retro.md` and show each candidate: its title, `종류:`, a short `근거:`, and for a 하네스 candidate its `문제:`, for the others its `제안:`. Give the path of `7-retro.md` too. Then ask with `AskUserQuestion` which are worth fixing, with `multiSelect`: one option per candidate, its title as the label and its `문제:` or `제안:` cut short as the description. With more than four candidates, number them in the text and ask the user to name the ones to keep instead.
 
 ## 6. Record the answer
 
-With `Edit`, set the `상태:` line of each candidate in `retro.md`: `채택` for one the user kept, `기각` for the rest. When the user changed a candidate while answering (its text, its 대상), change it in the file too.
+With `Edit`, set the `상태:` line of each candidate in `7-retro.md`: `채택` for one the user kept, `기각` for the rest. When the user changed a candidate while answering (its text, its 대상), change it in the file too.
 
-If the user dismisses the question, leave every `상태: 후보`. Tell them the candidates stay in `retro.md` undecided.
+If the user dismisses the question, leave every `상태: 후보`. Tell them the candidates stay in `7-retro.md` undecided.
 
 Tell the user how many were kept, and that the Rein repository's `learn` skill works out the fix for them and applies it.
 
@@ -75,5 +75,5 @@ End your answer with one line saying, in Korean, that the run is over, from what
 
 - Edit domain rules, or any plugin or repository file.
 - Edit domain knowledge, except a merge the user asked for in step 4.
-- Write anything in the run folder but `agent/retro.md`; `retro-parts.js` and the readers write `agent/retro-read/`.
+- Write anything in the run folder but `7-retro.md`; `retro-parts.js` and the readers write `agent/retro-read/`.
 - Mark a candidate `채택` that the user did not pick.

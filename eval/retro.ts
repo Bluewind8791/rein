@@ -292,7 +292,7 @@ async function runOne(n: number): Promise<Outcome> {
   }
 
   const agent = join(dir, "agent")
-  const retroPath = join(agent, "retro.md")
+  const retroPath = join(dir, "7-retro.md")
   const retro = existsSync(retroPath) ? readFileSync(retroPath, "utf8") : ""
   const readDir = join(agent, "retro-read")
   const noteFiles = existsSync(readDir) ? readdirSync(readDir).filter(f => /^\d+\.md$/.test(f)).sort((a, b) => parseInt(a) - parseInt(b)) : []
