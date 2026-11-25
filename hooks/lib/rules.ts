@@ -38,13 +38,29 @@ export function ruleFile(rule: Rule): string {
 // register.ts lists and reads the files, since only it may touch $. name is
 // the file's path relative to rules/.
 export async function freezeRule(name: string, path: string, base64: string): Promise<Rule> {
-  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+  const bytes = bytesOf(base64)
   return {
     name: name.replace(/\.md$/i, ""),
     path,
     hash: await sha256(bytes),
     paths: rulePaths(new TextDecoder().decode(bytes)),
   }
+}
+
+// a rule file's hash as freezeRule takes it, from its bytes as base64.
+export const ruleHash = (base64: string) => sha256(bytesOf(base64))
+
+const bytesOf = (base64: string) => Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+
+// the rule lines of a reviewer's task, each marked when its file is one of
+// changed, the rules whose text no longer hashes to what the run froze, and
+// with a marked one, what the reviewer says about it.
+export function ruleLines(rules: { file: string; path: string }[], changed: string[]): string[] {
+  const marked = rules.filter(r => changed.includes(r.file))
+  return [
+    ...rules.map(r => `- ${r.file}: ${r.path}${marked.includes(r) ? " (changed since the run opened)" : ""}`),
+    ...(marked.length > 0 ? ["A rule marked changed since the run opened: when a failure comes from its new text, say so in that rule's line, so the main session can ask the user whether this run takes the new text."] : []),
+  ]
 }
 
 // The `paths:` list in the front matter, as a block list, a flow list or one

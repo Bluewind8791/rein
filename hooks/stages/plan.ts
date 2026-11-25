@@ -1,5 +1,6 @@
 import { readOnly } from "../lib/bash.ts"
 import { same, under } from "../lib/paths.ts"
+import { ruleLines } from "../lib/rules.ts"
 import type { Run, StageSpec } from "../lib/state.ts"
 
 // the rules frozen at open_run, for the plan skill to pick the ones
@@ -44,7 +45,8 @@ export const PLAN_REVIEW = "mcp__rein__plan_review"
 // visit to plan after the design was approved, the lines of 2-plan.md that
 // differ from the approved one (diff.ts lineDiff); the review judges only
 // those and what they directly affect. Absent, the whole design.
-export function planReviewTask(dir: string, rules: { file: string; path: string }[], changed?: string[]): string {
+// changedRules: the rule files whose text changed since the run opened.
+export function planReviewTask(dir: string, rules: { file: string; path: string }[], changed?: string[], changedRules: string[] = []): string {
   const scope = changed === undefined ? [] : [
     "",
     "This design was approved before in this run, and dev built it; the run came back to plan to change it. Judge only what changed since the approved version, and what the change directly affects: a changed item still carries out the spec requirement it served, a removed item's requirement is still carried out by another, a changed `## 영향 범위` answer still holds, and the listed rules hold for what the change designs. A part that did not change passed before: do not fail the design for it, even where you would judge it otherwise now. Each part is 실패 only for a problem a changed line brings in.",
@@ -59,7 +61,7 @@ export function planReviewTask(dir: string, rules: { file: string; path: string 
     "",
     `Design: ${dir}/2-plan.md. Spec: ${dir}/1-spec.md.`,
     rules.length > 0 ? "Rules to check, by file name:" : "Rules to check: none. Give `rules` as [].",
-    ...rules.map(r => `- ${r.file}: ${r.path}`),
+    ...ruleLines(rules, changedRules),
     "",
     "Judge three parts:",
     "1. rules: for each listed rule, whether the design follows it: the files it changes, where things go, and the names and shapes it states. Read each rule file. A rule about code the design does not describe is 통과 here; dev and review hold the code to it. A rule that clashes with the design is 실패.",

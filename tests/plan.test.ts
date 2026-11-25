@@ -464,6 +464,15 @@ describe("the design review in plan", () => {
     expect(run().planVerdicts).toBeUndefined()
   })
 
+  test("a rule whose text changed since the run opened is marked in the design reviewer's task", async ($, on) => {
+    const files: Record<string, string> = { ...REPOS, [`${DIR}/2-plan.md`]: PLAN, [`${RULES}/api.md`]: "# API, edited" }
+    world(on, files, () => "승인", RULED)
+    await $.agent.spawn(REVIEWER)
+    const task = spawned.at(-1)!.prompt ?? ""
+    expect(task).toContain(`- api.md: ${RULES}/api.md (changed since the run opened)`)
+    expect(task).toContain("A rule marked changed since the run opened: when a failure comes from its new text, say so in that rule's line")
+  })
+
   test("a design that changed since the review began, or since it passed, is reviewed again", async ($, on) => {
     const files: Record<string, string> = { ...REPOS, [`${DIR}/2-plan.md`]: PLAN }
     world(on, files, () => "승인", PLAN_RUN)

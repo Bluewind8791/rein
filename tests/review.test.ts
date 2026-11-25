@@ -1,5 +1,6 @@
 import { describe, expect } from "claude-code/testing"
 import { readConfig, viewOf } from "../hooks/lib/config.ts"
+import { sha256Text } from "../hooks/lib/hash.ts"
 import { checkConfig, parseCover, parseReview } from "../hooks/lib/parse.ts"
 import { reviewTask } from "../hooks/stages/review.ts"
 import { relay, COVER, DIR, REIN, SPEC_TEXT, ran, spawned, store, world, reviewed, test } from "./world.ts"
@@ -94,6 +95,23 @@ describe("review writes", () => {
     expect(await status($)).toContain("Rules to check (D115): none.")
     const r = await $.tool.call(write(REVIEW, md("통과", "적용 대상 없음"), REVIEWER))
     expect(context(r)).toContain("The run is now in the qa stage.")
+  })
+
+  test("a rule whose text changed since the run opened is marked in the reviewer's task; an unchanged one is not", async ($, on) => {
+    const files = { [`${REIN}/rules/api.md`]: "# API, edited", [`${REIN}/rules/all.md`]: "# All" }
+    world(on, files, undefined, { ...REVIEW_RUN, rules: [RULES[0], RULES[1], { ...RULES[2], hash: await sha256Text("# All") }] })
+    await $.agent.spawn(spawn)
+    const task = spawned.at(-1)!.prompt ?? ""
+    expect(task).toContain(`- api.md: ${REIN}/rules/api.md (changed since the run opened)\n`)
+    expect(task).toContain(`- all.md: ${REIN}/rules/all.md\n`)
+    expect(task).toContain("A rule marked changed since the run opened: when a failure comes from its new text, say so in that rule's line, so the main session can ask the user whether this run takes the new text.")
+  })
+
+  test("with every rule as the run opened, no rule is marked changed", async ($, on) => {
+    const files = { [`${REIN}/rules/api.md`]: "# API", [`${REIN}/rules/all.md`]: "# All" }
+    world(on, files, undefined, { ...REVIEW_RUN, rules: [{ ...RULES[0], hash: await sha256Text("# API") }, RULES[1], { ...RULES[2], hash: await sha256Text("# All") }] })
+    await $.agent.spawn(spawn)
+    expect(spawned.at(-1)!.prompt ?? "").not.toContain("changed since the run opened")
   })
 })
 

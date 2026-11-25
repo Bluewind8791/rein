@@ -17,7 +17,7 @@ import { quoted } from "./lib/quote.ts"
 import { AS_IS, ASIS_FILE, asIsBlocks, joinMockup, TOBE_FILE } from "./lib/mockup.ts"
 import { COMMENTS_FILE, commentsJson, handOverText, markOne, parseComments, sendDrafts, unmarked, type Comment } from "./lib/comments.ts"
 import { ARBITER_USE, KNOWLEDGE_FILE, knowledgeDescription, knowledgeIndex, knowledgePointer, AS_IS_USE, PLAN_USE, STATUS_USE, WORKER_USE, type Knowledge } from "./lib/knowledge.ts"
-import { applicableRules, freezeRule, ruleFile, sharedRulesOf } from "./lib/rules.ts"
+import { applicableRules, freezeRule, ruleFile, ruleHash, sharedRulesOf } from "./lib/rules.ts"
 import { frameStatus, MAIN, type Activity, type End, type Land, type LandFile, type LandRepo, type LandResult } from "./lib/pane.ts"
 import { hasPrecheck, normalizeRun, precheckRepos, projectOf, renderRun, withContext, type CheckRun, type Ctx, type E2eState, type EgoCheck, type Rule, type Run, type Seal, type Stage, type StageSpec, type Tree } from "./lib/state.ts"
 import { inTree, landMessage, treeBranch, treeOwner, treePath, treeTable, WORKTREES } from "./lib/trees.ts"
@@ -1375,9 +1375,10 @@ function ruleOf(deny: string): string | undefined {
 
 // every ~/.rein/<project>/rules/*.md as it stands when the run opens,
 // and every rules/<domain>/*.md one folder down; then the shared rules of
-// ~/.rein/rules the same way, each named rules:<name>. The run uses only
-// these, so shrinking a rule mid-run cannot shrink what review checks. No
-// rules folder, no rules.
+// ~/.rein/rules the same way, each named rules:<name>. The run checks only
+// these files, so a rule added mid-run is not checked; their text is read as
+// it stands, and one whose hash no longer matches is marked changed for the
+// reviewer (changedRules). No rules folder, no rules.
 async function freezeRules($: EngineInterface): Promise<Rule[]> {
   const dir = `${await projectDir($)}/rules`
   const rules: Rule[] = []
@@ -1393,6 +1394,19 @@ async function freezeRules($: EngineInterface): Promise<Rule[]> {
     rules.push({ ...(await freezeRule(`rules:${name}`, path, base64)), shared: true })
   }
   return rules
+}
+
+// the file names (ruleFile) of the run's frozen rules whose bytes no longer
+// hash to what the run froze: a session start may have pulled a new text
+// from the hub. A rule file gone since is not read, so not marked.
+async function changedRules($: EngineInterface, run: Run): Promise<string[]> {
+  const out: string[] = []
+  for (const r of run.rules) {
+    if (!(await $.fs.exists(r.path))) continue
+    const { base64 } = await $.fs.read(r.path, { as: "bytes" })
+    if ((await ruleHash(base64)) !== r.hash) out.push(ruleFile(r))
+  }
+  return out
 }
 
 // the project folder of a repository outside the session root,
@@ -1818,7 +1832,7 @@ async function goTo($: EngineInterface, input: Record<string, unknown>): Promise
   const entry = to === "spec" ? "Invoke the rein:spec skill, skipping its step 0 (the run is open)."
     : to === "plan" ? planEntry(moved)
       : to === "dev" ? passedEntry(moved, moved.planFiles ?? [], c.dir)
-        : to === "review" ? reviewEntry(moved, c.root, c.dir)
+        : to === "review" ? reviewEntry(moved, c.root, c.dir, await changedRules($, moved))
           : to === "qa" ? QA_ENTRY
             : LAND_ENTRY
   return { result: head, context: [`${entry}${setupLine(planted.setup)}`] }
@@ -3311,7 +3325,7 @@ async function devExit($: EngineInterface, c: Ctx, result: ToolCallResult): Prom
   await trace($, c.run, { ev: "exit", stage: "dev", pass: true, writes: moved.writes })
   await trace($, c.run, { ev: "stage", from: "dev", to: "review" })
   await writeDevDiff($, moved, c.dir, c.run.failFile ? `${c.run.failFile.slice(c.run.failFile.lastIndexOf("/") + 1)} 이후` : undefined, c.run.failFile)
-  return withContext(result, `D49: dev-items.md passed. ${reviewEntry(moved, c.root, c.dir)}`)
+  return withContext(result, `D49: dev-items.md passed. ${reviewEntry(moved, c.root, c.dir, await changedRules($, moved))}`)
 }
 
 // G3, right after the arbiter's deviation.md went through. Its result goes to
@@ -5518,7 +5532,7 @@ async function askGate($: EngineInterface, run: Run, input: Record<string, unkno
 async function judgeTask($: EngineInterface, c: Ctx, prompt: string): Promise<string> {
   if (c.run.stage === "spec") return graderTask(c.dir, specType(await $.fs.read(`${c.dir}/1-spec.md`))!)
   if (c.run.stage === "dev") return arbiterTask(c.run, c.dir, prompt)
-  if (c.run.stage === "review") return reviewTask(c.run, c.root, c.dir)
+  if (c.run.stage === "review") return reviewTask(c.run, c.root, c.dir, await changedRules($, c.run))
   const completion = completionLine(await $.fs.read(`${c.dir}/1-spec.md`)) ?? "(1-spec.md has no line under ## 완료 판정)"
   return completionTask(c.run, c.dir, completion)
 }
@@ -5541,7 +5555,7 @@ async function spawnSplitReview($: EngineInterface, run: Run, e: AgentSpawnInput
     n = Number(/묶음\s*(\d+)/.exec(e.prompt ?? "")?.[1] ?? 0)
     if (!pendingGroups(run).includes(n)) return { deny: `name the group to review in the prompt, as \`묶음 <n>\`, one of those still to judge.${reviewNext(run, c.dir)}` }
   }
-  const prompt = splitter ? splitterTask(run, c.root, c.dir, plan) : groupTask(run, c.root, c.dir, n, plan)
+  const prompt = splitter ? splitterTask(run, c.root, c.dir, plan) : groupTask(run, c.root, c.dir, n, plan, await changedRules($, run))
   const result = await next({ ...e, prompt, background: false })
   if (result.deny !== undefined || result.agentId === undefined) return result
   const agentId = result.agentId
@@ -5590,7 +5604,7 @@ async function spawnPlanReviewer($: EngineInterface, run: Run, e: AgentSpawnInpu
   // back in plan after the design passed, on the spec it passed on: only
   // what changed since that approved 2-plan.md is reviewed.
   const approved = approvedPlan(run)
-  const result = await next({ ...e, prompt: planReviewTask(c.dir, rules, approved !== undefined ? lineDiff(approved, judged.plan) : undefined), background: false })
+  const result = await next({ ...e, prompt: planReviewTask(c.dir, rules, approved !== undefined ? lineDiff(approved, judged.plan) : undefined, await changedRules($, run)), background: false })
   if (result.deny !== undefined || result.agentId === undefined) return result
   const agentId = result.agentId
   reinAgents.add(agentId)
