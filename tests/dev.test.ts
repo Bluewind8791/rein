@@ -131,6 +131,27 @@ describe("the worker", () => {
   })
 })
 
+describe("a design changed after dev built it", () => {
+  const PLAN_FILES: Record<string, string> = { "E:/proj/.git/HEAD": "", "E:/proj/.rein/config.json": JSON.stringify({ qa: ["t"] }), [`${DIR}/1-spec.md`]: SPEC_TEXT }
+  const PLAN = "## 접근 방법\n\n세션에 센다.\n\n## 상세 설계\n\n### src/login.ts\n- 재시도 횟수를 센다\n- 테스트: tests/login.test.ts\n\n### tests/login.test.ts\n- 세 번째 실패에서 잠기는지 본다\n- 테스트: tests/login.test.ts\n" + COVER
+  const spawnWorker = { tool_use_id: "t", prompt: "go", description: "write it", subagentType: "rein:worker" } as never
+
+  test("the worker of a dev re-entered after the design changed gets the changed lines; the first visit gets none", async ($, on) => {
+    world(on, { ...PLAN_FILES }, undefined, { ...DEV_RUN, stage: "plan", worker: undefined })
+    expect(await planned($, PLAN)).toContain("now in the dev stage")
+    await $.agent.spawn(spawnWorker)
+    expect(spawned.at(-1)!.prompt).not.toContain("This design was built before")
+    await $.tool.call(write(`${DIR}/agent/dev-items.md`, DEV_MD))
+    expect(await status($)).toContain("stage: review")
+    await $.tool.call({ tool: "mcp__rein__goto", stage: "plan" } as never)
+    expect(await planned($, PLAN.replace("세 번째", "다섯 번째"))).toContain("now in the dev stage")
+    await $.agent.spawn(spawnWorker)
+    expect(spawned.at(-1)!.prompt).toContain(
+      "This design was built before in this run and the files hold that build. These lines of 2-plan.md changed since; change your files for each of them, and only for them:\n```diff\n- - 세 번째 실패에서 잠기는지 본다\n+ - 다섯 번째 실패에서 잠기는지 본다\n```",
+    )
+  })
+})
+
 describe("dev exit", () => {
   test("a full checklist within the design moves the run to review with files and rules", async ($, on) => {
     world(on, {}, undefined, DEV_RUN)

@@ -455,6 +455,8 @@ describe("the design review in plan", () => {
     // the cover of the completion line is held against what it names.
     expect(task).toContain("Hold each line of `## 완료 판정 덮기` against what it names")
     expect(task).not.toContain("`## 완료 판정 덮기` or `## 변경 전 실패`")
+    // dev runs nothing, so a design item that runs a program fails.
+    expect(task).toContain("An item of `## 상세 설계` that asks dev to run a command (a build, a generator, a script) is 실패: dev cannot run one.")
     expect(spawned.at(-1)!.background).toBe(false)
     // the rule list is the hook's.
     expect(await $.tool.call(verdict(agentId, []))).toEqual({ deny: "rules lacks api.md. The hook's rule list: api.md. Call mcp__rein__plan_review again." })

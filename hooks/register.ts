@@ -3312,7 +3312,7 @@ async function devExit($: EngineInterface, c: Ctx, result: ToolCallResult): Prom
     // holds has the change grouped anew; with no group left to review (no
     // file changed since every group passed), every group is reviewed again.
     const groups = r.reviewGroups?.map(g => (g.verdict?.pass ? g : { ...g, verdict: undefined }))
-    const next: Run = { ...r, stage: "review", failFile: undefined, arbiter: undefined, worker: undefined, prechecked: undefined, sealed, ...(groups ? { reviewGroups: groups } : {}) }
+    const next: Run = { ...r, stage: "review", failFile: undefined, arbiter: undefined, worker: undefined, prechecked: undefined, sealed, planBuilt: r.frozen?.plan, ...(groups ? { reviewGroups: groups } : {}) }
     if (!next.reviewGroups) return next
     if (!groupsCover(next, c.dir)) return { ...next, reviewGroups: undefined }
     return pendingGroups(next).length > 0 ? next : { ...next, reviewGroups: next.reviewGroups.map(g => ({ ...g, verdict: undefined })) }

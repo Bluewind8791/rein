@@ -76,6 +76,7 @@ export type Run = {
   finished?: true // land passed; only the move to complete/ is left
   frozen?: { spec?: string; plan?: string; planSpec?: string } // 1-spec.md as the person approved it and 2-plan.md as it passed; planSpec, 1-spec.md as approved when 2-plan.md passed: while it is still the approved one, a design review back in plan judges only what changed since 2-plan.md passed
   sealed?: Seal // the planned and handoff files as dev passed
+  planBuilt?: string // 2-plan.md as dev last passed on it (frozen.plan then); a dev entered on a design changed since gives the worker the lines that changed (dev.ts devTask)
   planReviewer?: string // agentId of the rein:reviewer spawned last in plan to judge 2-plan.md
   planReview?: { hash: string; rules: string[] } // what that reviewer judges: SHA-256 of 2-plan.md and the rule files, as at its spawn; gone once it gave its verdict
   planVerdicts?: PlanVerdict[] // this visit's design reviews of 2-plan.md, oldest first; gone when plan passes or goto moves the run

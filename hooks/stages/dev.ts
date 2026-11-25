@@ -1,4 +1,5 @@
 import { checkChain, readOnly, readOnlyGit } from "../lib/bash.ts"
+import { lineDiff } from "../lib/diff.ts"
 import { parseDeviation, type Cause } from "../lib/parse.ts"
 import { isAbsolute, resolve, same, under, unsure } from "../lib/paths.ts"
 import { projectOf, type Run, type StageSpec } from "../lib/state.ts"
@@ -214,6 +215,9 @@ export function devTask(run: Run, dir: string, root: string, shots: Record<strin
   // the to-be screens of 1-mockup.html (2-plan.md's `## 배치 대조`): the
   // target the screen as built is compared with in integration qa.
   const screens = (run.layouts ?? []).map(l => `- #${l.anchor} (${l.page}): ${dir}/1-mockup.html#${l.anchor}${shots[l.anchor] ? `, rendered as ${dir}/${shots[l.anchor]}` : ""}; compare: ${l.look}`)
+  // a design changed since dev last passed on it: the files hold that
+  // build, so the worker changes them for what changed.
+  const changed = run.planBuilt !== undefined && run.frozen?.plan !== undefined ? lineDiff(run.planBuilt, run.frozen.plan) : []
   return [
     "Write the code of a Rein run (D176). You write only what the design lists; the hook refuses anything else.",
     "",
@@ -221,6 +225,7 @@ export function devTask(run: Run, dir: string, root: string, shots: Record<strin
     "Your files:",
     ...items,
     ...(screens.length > 0 ? ["", "Screens to build as drawn. The to-be of each in 1-mockup.html is the target: build the screen so that it looks like it, region by region (their order, their sizes next to each other, the columns of each table, where each chart, tab and button sits). Open the rendered picture with Read; the notes in 1-mockup.html are rules of 1-spec.md. Integration qa compares the screen as built with this to-be.", ...screens] : []),
+    ...(changed.length > 0 ? ["", `This design was built before in this run and the files hold that build. These lines of 2-plan.md changed since; change your files for each of them, and only for them:\n\`\`\`diff\n${changed.join("\n")}\n\`\`\``] : []),
     ...(run.failFile ? ["", `The run came back from a failure (D61): read ${run.failFile}, fix what it reports, then write dev-items.md again.`] : []),
     ...(run.handoff?.length ? ["", `Also write these handoff files, each whole, in ${dir}/handoff/, as 2-plan.md's \`## 넘길 것\` item for it says (D163): ${run.handoff.join(", ")}.`] : []),
     "",
