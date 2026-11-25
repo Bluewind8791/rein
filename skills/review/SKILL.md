@@ -22,7 +22,7 @@ Without a `precheck:` line, skip this step.
 
 Call `mcp__rein__status`. In review it shows:
 
-1. the changed files: what the hook recorded during dev, under `writes:` (`the same files as planFiles` when they are the files of `planFiles:`, else the differences from it)
+1. the changed files: what the hook recorded during dev, under `Changed files`
 2. the rules to check, by file name with their absolute paths, or none
 
 Use these lists as they are. Do not work out the rules yourself, and do not take the changed files from `git diff --name-only`: new files would be missing.

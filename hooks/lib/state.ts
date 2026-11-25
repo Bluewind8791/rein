@@ -238,7 +238,7 @@ export function renderRun(run: Run): string {
   const lines = [`runId: ${run.runId}`, `stage: ${run.stage}`]
   if (run.autopilot) lines.push("autopilot: on (where the hook's result says so, pass the answer yourself with said \"autopilot\")")
   if (run.failFile) lines.push(`failFile: ${run.failFile}`)
-  if (run.planFiles) lines.push(`planFiles:`, ...run.planFiles.map(f => `- ${f}`))
+  if (run.planFiles) lines.push(`planFiles: ${run.planFiles.length} file${run.planFiles.length === 1 ? "" : "s"} (2-plan.md lists them)`)
   if (run.repos) lines.push(`repos:`, ...run.repos.map(r => `- ${r}`))
   if (run.trees?.length) lines.push(`worktrees:`, ...run.trees.map(t => `- ${t.path} (${t.repo}, branch ${t.branch}, from ${t.start ?? "a detached HEAD"}${t.landed ? ", landed" : ""})`))
   if (run.handoff?.length) lines.push(`handoff (D163, in the run directory's handoff/):`, ...run.handoff.map(h => `- ${h}`))
@@ -285,7 +285,7 @@ export function renderRun(run: Run): string {
           : k.over ? `ran past its ${k.minutes} minutes and the hook stopped it${session}`
             : k.runner ? `rein:e2e-runner ${k.runner} on it${session}, ${k.spent} of ${k.minutes} minutes spent` : `waiting for a runner, limit ${k.minutes} minutes`
       lines.push(`e2e check ${k.name}: ${at}`)
-      if (k.observed !== undefined) lines.push(`  관측: ${k.observed}`)
+      if (k.observed !== undefined && k.verdict !== "통과") lines.push(`  관측: ${k.observed}`)
     }
     const start = run.halt || e2e.path !== "aside" ? 0 : startable(e2e.checks ?? []).length
     if (start > 0) lines.push(`e2e runners to spawn now: ${start} rein:e2e-runner, in the background, in one message`)

@@ -30,7 +30,7 @@ export function inTree(trees: Tree[], path: string): string {
 // main tree while the run writes them in its worktree; "" for none.
 export function treeTable(trees: Tree[]): string {
   if (trees.length === 0) return ""
-  return ` 2-plan.md names these repositories' files in their main working tree, but the run works in its own worktree of each, from its HEAD: read and write each file at its path in the worktree, which the file list above already gives (원래 경로 → 워크트리 경로): ${trees.map(t => `${t.repo} → ${t.path}`).join(", ")}.`
+  return ` 2-plan.md names these repositories' files in their main working tree, but the run works in its own worktree of each, from its HEAD: read and write each file at its path in the worktree (원래 경로 → 워크트리 경로): ${trees.map(t => `${t.repo} → ${t.path}`).join(", ")}.`
 }
 
 // the commit message of 6-land.md: the fenced block under

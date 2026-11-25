@@ -13,13 +13,12 @@ export function reviewRules(run: Run, root: string): { file: string; path: strin
 }
 
 // The changed files and rules, as the dev→review result and status show
-// them. In status the changed files are its `writes:` already. changedRules:
-// the rule files whose text changed since the run opened, marked in the list.
-export function reviewLists(run: Run, root: string, inStatus = false, changedRules: string[] = []): string {
+// them. changedRules: the rule files whose text changed since the run
+// opened, marked in the list.
+export function reviewLists(run: Run, root: string, changedRules: string[] = []): string {
   const rules = reviewRules(run, root)
   return [
-    ...(inStatus && run.writes.length > 0 ? ["Changed files (D49 ③): those of writes, above."]
-      : ["Changed files (D49 ③):", ...(run.writes.length > 0 ? run.writes.map(w => `- ${w}`) : ["- none"])]),
+    "Changed files (D49 ③):", ...(run.writes.length > 0 ? run.writes.map(w => `- ${w}`) : ["- none"]),
     rules.length > 0
       ? "Rules to check (D115), by file name:"
       : "Rules to check (D115): none. The rule check section says `적용 대상 없음`.",
@@ -154,7 +153,7 @@ export function reviewTask(run: Run, root: string, dir: string, changedRules: st
     handoff: (run.handoff ?? []).map(h => `${dir}/handoff/${h}`),
     rules: reviewRules(run, root),
     out: "agent/review.md",
-    intro: [reviewLists(run, root, false, changedRules)],
+    intro: [reviewLists(run, root, changedRules)],
     design: `Design: the \`## 상세 설계\` and \`## 영향 범위\` sections of ${dir}/2-plan.md.`,
     assertion: "2-plan.md's `## 변경 전 실패` names assertions that must fail on the code as it was before the change, one line each. For each line, find the test case that makes the assertion, and show from the code before the change (`git -C <root> show HEAD:<path>`) where it gives the old result, as path:line, so the assertion fails there. When no test case makes the assertion, or it would pass on the code before the change, `## 설계 대조` is 실패 with the line. Without the section, or with only `없음`, skip this.",
   })
@@ -258,7 +257,7 @@ function scopedTask(run: Run, dir: string, s: Scope): string {
 }
 
 export function reviewEntry(run: Run, root: string, dir: string, changedRules: string[] = []): string {
-  return `The run is now in the review stage. Invoke the rein:review skill.\n${reviewLists(run, root, false, changedRules)}${reviewNext(run, dir)}`
+  return `The run is now in the review stage. Invoke the rein:review skill.\n${reviewLists(run, root, changedRules)}${reviewNext(run, dir)}`
 }
 
 // the config's precheck commands (a compile, a typecheck) run before any

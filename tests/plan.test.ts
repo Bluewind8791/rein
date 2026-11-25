@@ -64,7 +64,8 @@ describe("plan", () => {
     expect(r).toEqual(expect.objectContaining({ result: "Approved. The run is now in the dev stage." }))
     const context = (r as { context?: string[] }).context?.join("\n") ?? ""
     expect(context).toContain("now in the dev stage. Invoke the rein:dev skill")
-    expect(context).toContain("E:/proj/src/login.ts, E:/proj/tests/login.test.ts, E:/proj/src/login.css")
+    expect(context).toContain("The design's files: 3, listed in 2-plan.md.")
+    expect((store.get("runs:proj/login-fix") as { planFiles: string[] }).planFiles).toEqual(["E:/proj/src/login.ts", "E:/proj/tests/login.test.ts", "E:/proj/src/login.css"])
     expect(files[`${DIR}/agent/trace.jsonl`]).toContain(`"repos":["E:/proj"]`)
     expect(files[`${DIR}/agent/trace.jsonl`]).toContain(`"ev":"stage","from":"plan","to":"dev"`)
     // 2-plan.md as it passed, put back if a command rewrites it.
@@ -231,7 +232,8 @@ describe("plan", () => {
     const bad = PLAN.replace("### src/login.css", "### src/login.css 스타일 수정")
     expect(await planned($, bad)).toContain("`### src/login.css 스타일 수정`")
     const good = PLAN.replace("### src/login.css", "### `src/my login.css` (새 파일)")
-    expect(await planned($, good)).toContain("E:/proj/src/my login.css")
+    expect(await planned($, good)).toContain("now in the dev stage")
+    expect((store.get("runs:proj/login-fix") as { planFiles: string[] }).planFiles).toContain("E:/proj/src/my login.css")
   })
 
   test("a fence closes only on its own marker, as long as the opener", async ($, on) => {

@@ -66,8 +66,7 @@ describe("status", () => {
         "runId: login-fix",
         "stage: dev",
         `failFile: ${DIR}/agent/review.md`,
-        "planFiles:",
-        "- E:/proj/src/a.ts",
+        "planFiles: 1 file (2-plan.md lists them)",
         "repos:",
         "- E:/proj",
         "writes: the same files as planFiles",
@@ -77,7 +76,6 @@ describe("status", () => {
         "halt: D100: production host",
         "e2e: aside",
         "e2e check detail: 판정: 통과, 세션 ZNI0dDsPUJp8A4rj",
-        "  관측: 우수회원만 체크",
         "e2e check stop: rein:e2e-runner agent-r1 on it, 세션 dAIZX30NAZGDxNXV, 10 of 40 minutes spent",
         "e2e check slow: ran past its 10 minutes and the hook stopped it, 세션 Qm3vX8sLr2NcTa0p",
         "e2e check grid: waiting for a runner, limit 30 minutes",
@@ -89,6 +87,15 @@ describe("status", () => {
     expect(((await $.tool.call(STATUS)) as { result: string }).result).toBe(text)
     expect(files[`${DIR}/agent/trace.jsonl`]).toContain(`"tool":"mcp__rein__status"`)
     expect(files[`${DIR}/agent/trace.jsonl`]).not.toContain(`"ev":"stage"`)
+  })
+
+  test("a check that did not pass still shows what was observed", async ($, on) => {
+    world(on, {}, undefined, {
+      v: 2, stage: "qa-integration", runId: "login-fix", rules: [], writes: [], retries: 0,
+      e2e: { path: "aside", checks: [{ name: "detail", minutes: 30, spent: 0, session: "ZNI0dDsPUJp8A4rj", observed: "전체 회원이 체크됨", verdict: "실패" }] },
+    })
+    const shown = ((await $.tool.call(STATUS)) as { result: string }).result
+    expect(shown).toContain("e2e check detail: 판정: 실패, 세션 ZNI0dDsPUJp8A4rj\n  관측: 전체 회원이 체크됨")
   })
 
   test("writes are shown against planFiles, only where they differ", async ($, on) => {
@@ -112,7 +119,7 @@ describe("status", () => {
     world(on, {}, undefined, { v: 2, stage: "review", runId: "login-fix", rules: [], planFiles: files, repos: ["E:/proj"], writes: files, retries: 0 })
     const text = ((await $.tool.call(STATUS)) as { result: string }).result
     expect(text).toContain("writes: the same files as planFiles\nrules: none frozen")
-    expect(text).toContain("Changed files (D49 ③): those of writes, above.\nRules to check (D115): none.")
+    expect(text).toContain("Changed files (D49 ③):\n- E:/proj/src/a.ts\n- E:/proj/src/b.ts\nRules to check (D115): none.")
     expect(text.split("- E:/proj/src/a.ts").length).toBe(2)
   })
 

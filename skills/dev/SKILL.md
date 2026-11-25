@@ -23,7 +23,7 @@ The user may type it in this session or in a new one, with the run's slug (its r
 
 ## First
 
-Call `mcp__rein__status`. It shows the design's files and, on a retry, `failFile`. If `failFile` is set, this is a retry: the hook tells the worker to read that file (`review.md`, `qa.md`, `e2e.md`, or `precheck.md` when the config's precheck commands failed before review) and fix what it reports.
+Call `mcp__rein__status`. It shows how many files the design has and, on a retry, `failFile`. If `failFile` is set, this is a retry: the hook tells the worker to read that file (`review.md`, `qa.md`, `e2e.md`, or `precheck.md` when the config's precheck commands failed before review) and fix what it reports.
 
 ## Do
 

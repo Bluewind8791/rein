@@ -2715,7 +2715,7 @@ async function status($: EngineInterface, input: Record<string, unknown>): Promi
   const shown = run.stage === "qa-integration" ? ((await getRun($)) ?? run) : run
   // in review the reviewer's lists too, as the dev→review result gave them.
   const c = await ctxOf($, run)
-  const extra = run.stage === "review" ? `\n${reviewLists(run, c.root, true)}${reviewNext(shown, c.dir)}` : ""
+  const extra = run.stage === "review" ? `\n${reviewLists(run, c.root)}${reviewNext(shown, c.dir)}` : ""
   // the knowledge index goes to a file, written when it changed; status names it.
   const known = await knowledge($, await outsideProjects($, run))
   const index = knowledgeIndex(known, STATUS_USE)
@@ -3263,7 +3263,7 @@ async function judgeChecks($: EngineInterface, plan: string, files: string[], ha
 
 // What the agent reads when plan passes.
 const passedEntry = (run: Run, files: string[], dir: string) =>
-  `${devEntry(run)} The design's files: ${files.join(", ")}.${treeTable(run.trees ?? [])}${handoffLine(run, dir)}`
+  `${devEntry(run)} The design's files: ${files.length}, listed in 2-plan.md.${treeTable(run.trees ?? [])}${handoffLine(run, dir)}`
 
 // what dev reads on entering it about the handoff files, "" for none.
 const handoffLine = (run: Run, dir: string) =>
@@ -5752,7 +5752,7 @@ export const register: Register = (on) => {
     await $.tool.register({
       name: "status",
       description:
-        "Shows the current Rein run: runId, stage, the design's files, frozen project rules and what later stages recorded. With no run open in this session, lists the runs of this project it can resume (deferred, or active in another session) and, when a hub server is set (~/.rein/sync.json), this project's runs on the hub with their links; with runId, it fetches that hub run's documents to a folder to read instead. It also shows whether the local frame server reaches the hub and what is not sent yet. Call it whenever you are unsure where the run stands.",
+        "Shows the current Rein run: runId, stage, how many files the design has, frozen project rules and what later stages recorded. With no run open in this session, lists the runs of this project it can resume (deferred, or active in another session) and, when a hub server is set (~/.rein/sync.json), this project's runs on the hub with their links; with runId, it fetches that hub run's documents to a folder to read instead. It also shows whether the local frame server reaches the hub and what is not sent yet. Call it whenever you are unsure where the run stands.",
       inputSchema: {
         type: "object",
         properties: {
