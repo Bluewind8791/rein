@@ -285,6 +285,22 @@ describe("land in worktrees", () => {
     expect(log).toContainEqual(["E:/proj", "cherry-pick", `c-${TREE}`])
   })
 
+  test("a commit made before that is no longer the worktree's HEAD (reset or rebased since) is made anew and the new one cherry-picked", async ($, on) => {
+    const files: Record<string, string> = { [LAND]: MESSAGE, [`${TREE}/.git`]: GITFILE }
+    const log: string[][] = []
+    const questions: string[] = []
+    const repos: Record<string, Git> = { "E:/proj": { branch: "main" }, [TREE]: { branch: BRANCH, changed: ["src/login.ts"], committed: ["src/old.ts"] } }
+    world(on, files, q => (questions.push(q), "커밋"), { ...LANDING, trees: [{ ...HOME, commit: "c-old" }] }, gitHost(files, repos, log))
+    expect(text(await relay($, ADVANCE))).toContain("The run is finished.")
+    expect(questions[0]).not.toContain("워크트리에 이미 커밋함")
+    expect(questions[0]).toContain("  커밋할 파일: src/login.ts")
+    expect(log.filter(l => ["add", "commit", "cherry-pick"].includes(l[1]!))).toEqual([
+      [TREE, "add", "-A", "--", "src/login.ts"],
+      [TREE, "commit", "-q", "-m", "[ISSUE-1] 로그인 잠금\n\n세 번 실패하면 잠근다."],
+      ["E:/proj", "cherry-pick", `c-${TREE}`],
+    ])
+  })
+
   test("land runs from the main tree: a session still in the worktree is told to leave it first", async ($, on) => {
     const files: Record<string, string> = { [LAND]: MESSAGE, [`${TREE}/.git`]: GITFILE }
     const log: string[][] = []

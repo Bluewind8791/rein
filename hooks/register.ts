@@ -4165,12 +4165,16 @@ async function landings($: EngineInterface, run: Run): Promise<{ landings: Landi
     const changed = [...new Set(statusPaths(status.stdout, root))]
     const ofPlan = (p: string) => planned.some(f => same(f, p))
     let files = changed.filter(ofPlan)
-    if (tree.commit !== undefined) {
-      const shown = await gitQuiet($, root, ["diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", tree.commit])
+    // a commit no longer the worktree's HEAD (reset or rebased since) is
+    // made anew: cherry-picking it, or an ancestor of HEAD, would miss the
+    // later changes.
+    const made = tree.commit !== undefined && (await headOf($, root)) === tree.commit ? tree.commit : undefined
+    if (made !== undefined) {
+      const shown = await gitQuiet($, root, ["diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", made])
       files = shown.stdout.split("\0").filter(p => p !== "").map(p => resolve(`${root}/${p}`, root))
     }
     if (files.length === 0) problems.push(`no planned file of ${root} is changed any more, so it has nothing to commit`)
-    else out.push({ tree, files, dropped: changed.filter(p => !ofPlan(p)), into })
+    else out.push({ tree: { ...tree, commit: made }, files, dropped: changed.filter(p => !ofPlan(p)), into })
   }
   return problems.length > 0 ? { problem: problems.join("; ") } : { landings: out }
 }
@@ -4181,8 +4185,10 @@ async function landings($: EngineInterface, run: Run): Promise<{ landings: Landi
 // repository's git hooks off), the commit is cherry-picked into the main
 // tree's branch, and the worktree and its branch go, with whatever else was
 // left in it. A cherry-pick git refuses or that conflicts is undone and land
-// stops there, the commit kept in the worktree; a repository already landed
-// is skipped when advance comes again.
+// stops there, the commit kept in the worktree; when advance comes again
+// that commit is reused while it is still the worktree's HEAD (a commit no
+// longer the worktree's HEAD, reset or rebased since, is made anew), and a
+// repository already landed is skipped.
 async function landTrees($: EngineInterface, run: Run, dir: string, text: string, answer: string | undefined): Promise<ToolCallResult> {
   const message = landMessage(text)
   if (message === undefined) return { deny: "6-land.md has no commit message: write it in a fenced block under `## 커밋 메시지`, as the rein:land skill says. Then call advance again." }
