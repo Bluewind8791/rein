@@ -568,7 +568,9 @@ function summary(run) {
   const md = (t) => Md.inline(t, { href: linkHref(run) })
   // the title heads the card, the repositories are listed under the stage
   // tree, the start in the status bar
+  // without a title the card is headed by the slug already
   const rows = []
+  if (s.title) rows.push(["slug", esc(run.slug), "slug"])
   if (s.ref) rows.push(["참조", md(s.ref), ""])
   let chip = ""
   if (s.questions.length) {

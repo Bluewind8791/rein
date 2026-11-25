@@ -164,6 +164,7 @@ a.hubst[href]:hover { text-decoration: underline; }
 .sum .sumrow { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 2px 8px; font-size: 12px; color: var(--ink2); }
 .sum .k { font: 11px var(--mono); color: var(--mute); padding-top: 1px; }
 .sum .ref { font-size: 11px; }
+.sum .slug { font: 11px var(--mono); padding-top: 1px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; font: 11.5px var(--mono); color: var(--ink2); background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
 .chip.q { align-self: flex-start; background: var(--workbg); border-color: var(--workln); color: var(--work-ink); }
 .sum .qbox { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--workbg); font-size: 12px; color: var(--work-ink); }
