@@ -57,14 +57,25 @@ let railFold = false
 let mockShow = "after" // "before" | "after" | "both"
 const isMock = (run) => !!run && sel.key === "1-mockup"
 
-// what this browser remembers: the theme, the open editor tabs of each run
-// and whether the comment panel is closed; storage may be blocked
+// what this browser remembers: the theme, the run tabs, the open editor tabs
+// of each run and whether the comment panel is closed; storage may be blocked
 const lsGet = (k) => { try { return localStorage.getItem(k) } catch { return null } }
 const lsSet = (k, v) => { try { localStorage.setItem(k, v) } catch {} }
 let theme = lsGet("rein.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
 document.documentElement.dataset.theme = theme
 // "<project>/<slug>" -> the artifact keys open as editor tabs, in order
 const etabs = (() => { try { return new Map(Object.entries(JSON.parse(lsGet("rein.etabs") || "{}"))) } catch { return new Map() } })()
+// the run tabs: open, the "<project>/<slug>" of the runs open as tabs, in
+// order; shut, the active runs whose tab the person closed, each with the
+// status it was last seen in, so that it opens again when the run starts
+// asking or halts
+const rtabs = (() => {
+  try {
+    const j = JSON.parse(lsGet("rein.rtabs") || "{}")
+    return { open: Array.isArray(j.open) ? j.open : [], shut: j.shut && typeof j.shut === "object" ? j.shut : {} }
+  } catch { return { open: [], shut: {} } }
+})()
+const saveRtabs = () => lsSet("rein.rtabs", JSON.stringify(rtabs))
 let cpOff = lsGet("rein.cpoff") === "1"
 // "<project>/<slug>|<stage>" -> whether the person unfolded (true) or folded (false) that stage in the explorer
 const stgOpen = new Map()
@@ -197,8 +208,63 @@ function decorate(project, r) {
 
 const allRuns = () => (data ? data.flatMap((p) => p.runs) : [])
 const findRun = (project, slug) => allRuns().find((r) => r.project === project && r.slug === slug)
-const tabRuns = () => allRuns().filter((r) => r.state === "active").sort((a, b) => (Date.parse(a.opened) || 0) - (Date.parse(b.opened) || 0))
+const activeRuns = () => allRuns().filter((r) => r.state === "active").sort((a, b) => (Date.parse(a.opened) || 0) - (Date.parse(b.opened) || 0))
 const newest = (rs) => rs.slice().sort((a, b) => b.touched - a.touched)[0]
+const runId = (r) => `${r.project}/${r.slug}`
+const runById = () => new Map(allRuns().map((r) => [runId(r), r]))
+const openRuns = () => {
+  const m = runById()
+  return rtabs.open.map((id) => m.get(id)).filter(Boolean)
+}
+
+// bring the run tabs up to date with the runs: a run gone from the list loses
+// its tab, an active run not seen before gets one, and a closed tab opens
+// again when its run starts asking or halts. A run that leaves active is
+// forgotten, so it gets a tab again when it is resumed.
+const WAITS = new Set(["ask", "halt"])
+function syncRtabs() {
+  const m = runById()
+  const open = rtabs.open.filter((id) => m.has(id))
+  const shut = {}
+  for (const r of activeRuns()) {
+    const id = runId(r)
+    if (open.includes(id)) continue
+    const was = rtabs.shut[id]
+    if (was === undefined || (WAITS.has(r.status) && !WAITS.has(was))) open.push(id)
+    else shut[id] = r.status
+  }
+  const next = { open, shut }
+  if (JSON.stringify(next) === JSON.stringify(rtabs)) return
+  rtabs.open = open
+  rtabs.shut = shut
+  saveRtabs()
+}
+
+// the run shown always has a tab
+function openRtab(run) {
+  const id = runId(run)
+  if (rtabs.open.includes(id)) return
+  rtabs.open.push(id)
+  delete rtabs.shut[id]
+  saveRtabs()
+}
+
+// close a run tab; when it is the run shown, its neighbor is shown instead,
+// and the all-runs page when no tab is left
+function closeRtab(id) {
+  const i = rtabs.open.indexOf(id)
+  if (i < 0) return
+  rtabs.open.splice(i, 1)
+  const r = runById().get(id)
+  if (r && r.state === "active") rtabs.shut[id] = r.status
+  saveRtabs()
+  if (sel.list || id !== `${sel.project}/${sel.slug}`) return renderTop(findRun(sel.project, sel.slug), openRuns())
+  const near = runById().get(rtabs.open[Math.min(i, rtabs.open.length - 1)])
+  if (near) return pick(near.project, near.slug)
+  lastRun = null
+  sel = { project: null, slug: null, key: null, view: null, side: null, list: true }
+  render()
+}
 
 function defaultKey(run) {
   const real = run.arts.filter((a) => !a.none && !a.sub)
@@ -215,7 +281,7 @@ function resolve() {
   if (!run) {
     const proj = data.find((p) => p.name === sel.project)
     const pool = proj ? proj.runs : allRuns()
-    run = tabRuns().find((r) => pool.includes(r)) || newest(pool) || tabRuns()[0] || newest(allRuns()) || null
+    run = openRuns().find((r) => pool.includes(r)) || newest(pool) || openRuns()[0] || newest(allRuns()) || null
     if (run && run.slug !== sel.slug) sel.key = sel.side = null
   }
   if (!run) {
@@ -252,11 +318,13 @@ function render() {
   const list = !!sel.list
   document.querySelector(".body").hidden = list
   $("runs").hidden = !list
+  syncRtabs()
   const run = list ? null : resolve()
-  const tabs = tabRuns()
-  fav = tabs.some((r) => r.status === "halt") ? "halt" : tabs.some((r) => r.status === "ask") ? "idle" : tabs.length ? "walk" : "done"
+  if (run) openRtab(run)
+  const active = activeRuns()
+  fav = active.some((r) => r.status === "halt") ? "halt" : active.some((r) => r.status === "ask") ? "idle" : active.length ? "walk" : "done"
   document.title = run ? `${run.slug} · Rein` : list ? "전체 run · Rein" : "Rein"
-  renderTop(run, tabs)
+  renderTop(run, openRuns())
   renderHub()
   renderStatus(run)
   if (list) {
@@ -299,20 +367,27 @@ const ICON = {
 }
 
 // the run tabs, the theme button and the icon rail: run | 전체 run
+let rtabOn = null // "<project>/<slug>" of the run tab last shown as on
 function renderTop(run, tabs) {
   document.querySelector(".brand").textContent = ro ? "HUB" : "REIN"
   const list = !!sel.list
   const btn = (attr, on, label, icon, count) => `<button type="button" ${attr} class="${on ? "on" : ""}" title="${label}" aria-label="${label}">${icon}${count ? `<span class="n">${count}</span>` : ""}</button>`
   setHTML($("arail"), btn(`data-mode="run"`, !list, "run", ICON.run, 0) +
     btn(`data-allruns`, list, `전체 run ${allRuns().length}`, ICON.all, allRuns().length))
-  // the open run stays a tab even when it is closed
-  const shown = run && !tabs.some((r) => r.project === run.project && r.slug === run.slug) ? [...tabs, run] : tabs
-  setHTML($("tabs"), shown.map((r) => {
+  setHTML($("tabs"), tabs.map((r) => {
     const on = run && r.project === run.project && r.slug === run.slug ? " on" : ""
     const label = r.state === "active" ? TAB_ST[r.status] || r.stageShort : STATUS[r.status]
     return `<div class="rtab${on}" data-p="${esc(r.project)}" data-s="${esc(r.slug)}" title="${esc(r.project)} / ${esc(r.slug)} · ${STATUS[r.status]}${r.pc ? ` · ${esc(r.pc)}` : ""}">` +
-      `<span class="d ${r.status}"></span><span>${esc(r.slug)}</span><span class="st ${r.status}">${r.pc ? `${esc(r.pc)} · ` : ""}${label}</span></div>`
+      `<span class="d ${r.status}"></span><span>${esc(r.slug)}</span><span class="st ${r.status}">${r.pc ? `${esc(r.pc)} · ` : ""}${label}</span>` +
+      `<button type="button" class="x" data-rtabx="${esc(runId(r))}" aria-label="${esc(r.slug)} 닫기">×</button></div>`
   }).join(""))
+  // the tab shown is scrolled into sight when it changes
+  const onId = run ? runId(run) : null
+  if (onId !== rtabOn) {
+    rtabOn = onId
+    const t = $("tabs").querySelector(".rtab.on")
+    if (t) t.scrollIntoView({ block: "nearest", inline: "nearest" })
+  }
   const dark = theme === "dark"
   setHTML($("theme"), `${dark ? ICON.sun : ICON.moon}${dark ? "라이트" : "다크"}`)
   $("theme").title = dark ? "라이트 모드로 전환" : "다크 모드로 전환"
@@ -338,7 +413,7 @@ function renderStatus(run) {
       parts.push(`<span>시작 ${fmtDate(opened)}${tail}</span>`)
     }
   } else if (sel.list) parts.push(`<span>전체 run ${allRuns().length}</span>`)
-  parts.push(`<span>진행 중 run ${tabRuns().length}</span>`)
+  parts.push(`<span>진행 중 run ${activeRuns().length}</span>`)
   setHTML($("sinfo"), parts.join(""))
 }
 
@@ -2126,7 +2201,9 @@ $("arail").addEventListener("click", (e) => {
     return render()
   }
   if (!e.target.closest("[data-mode]") || !sel.list) return
-  sel = lastRun ? { ...lastRun, list: false } : { project: null, slug: null, key: null, view: null, side: null, list: false }
+  // the run left for the all-runs page, unless its tab was closed since
+  const back = lastRun && rtabs.open.includes(`${lastRun.project}/${lastRun.slug}`)
+  sel = back ? { ...lastRun, list: false } : { project: null, slug: null, key: null, view: null, side: null, list: false }
   render()
 })
 
@@ -2138,15 +2215,25 @@ function pick(project, slug) {
 }
 
 $("tabs").addEventListener("click", (e) => {
+  const x = e.target.closest("[data-rtabx]")
+  if (x) return closeRtab(x.dataset.rtabx)
   const t = e.target.closest(".rtab")
   if (t) pick(t.dataset.p, t.dataset.s)
 })
+
+// the run tabs scroll sideways under a mouse wheel too
+$("tabs").addEventListener("wheel", (e) => {
+  const el = $("tabs")
+  if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return
+  el.scrollLeft += e.deltaY
+  e.preventDefault()
+}, { passive: false })
 
 $("theme").addEventListener("click", () => {
   theme = theme === "dark" ? "light" : "dark"
   document.documentElement.dataset.theme = theme
   lsSet("rein.theme", theme)
-  renderTop(findRun(sel.project, sel.slug), tabRuns())
+  renderTop(findRun(sel.project, sel.slug), openRuns())
 })
 
 $("runs").addEventListener("click", (e) => {
