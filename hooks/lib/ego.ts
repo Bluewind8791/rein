@@ -121,6 +121,8 @@ export const driving = (k: CheckRun) => isOpen(k) && k.runner !== undefined && !
 // the ones after it with it. A check whose driver is done holds its
 // profile's account until it is judged: the judge may send the driver back
 // to the same space, and another account's login there would be what it sees.
+// A check that saves holds the data until it is judged: the judge may send
+// its driver back to save again.
 export function egoStartable(checks: CheckRun[]): CheckRun[] {
   const group = checks.filter(driving)
   const held = checks.filter(k => isOpen(k) && k.runner !== undefined)
@@ -128,7 +130,8 @@ export function egoStartable(checks: CheckRun[]): CheckRun[] {
   for (const k of checks) {
     if (!isOpen(k) || k.runner !== undefined) continue
     const all = [...group, ...out]
-    const alone = all.length === 0 || (!k.saves && all.every(g => !g.saves))
+    const busy = [...group, ...held.filter(g => g.saves && !driving(g)), ...out]
+    const alone = busy.length === 0 || (!k.saves && busy.every(g => !g.saves))
     const shared = [...held, ...out].every(g => g.ego?.profile !== k.ego?.profile || g.account === k.account)
     if (all.length >= AT_ONCE || !alone || !shared) break
     out.push(k)
@@ -352,7 +355,7 @@ export function driverTask(e2e: E2e, check: Check, k: CheckRun, folder: string, 
 // the saving rule of a driver's task. A check with data conditions may
 // make the data it needs when none fits, and put it back.
 function savingRule(check: Check): string {
-  if (check.saves) return "save only what the task says to save, and change nothing else"
+  if (check.saves) return "save only what the task says to save, and change nothing else; after each save, wait for the app's sign that it is done (its notice, the save's response) and record it before you reopen or read what was saved; set an on/off value by reading it first and clicking only when it differs, never by a count of clicks"
   return check.data ? "do not save, change or delete anything, except data you make as step 5 says when no data fits the conditions" : "do not save, change or delete anything"
 }
 

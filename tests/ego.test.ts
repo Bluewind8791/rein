@@ -132,6 +132,14 @@ describe("the ego path's pieces", () => {
     expect(egoStartable([{ ...judging, verdict: "통과" }, k("b", "P1", { account: "x" })]).map(x => x.name)).toEqual(["b"])
   })
 
+  test("a saving check awaiting its judge keeps every other check from starting: its driver may save again", () => {
+    const k = (name: string, profile: string, more: Partial<CheckRun> = {}): CheckRun => ({ name, minutes: 30, spent: 0, ego: { profile, space: `s-${name}`, spentMs: 0 }, ...more })
+    const judging = k("a", "P1", { saves: true, runner: "d1", ego: { profile: "P1", space: "s-a", spentMs: 0, driven: "x" } })
+    expect(egoStartable([judging, k("b", "P2", { saves: true })]).map(x => x.name)).toEqual([])
+    expect(egoStartable([judging, k("b", "P2"), k("c", "P1")]).map(x => x.name)).toEqual([])
+    expect(egoStartable([{ ...judging, verdict: "통과" }, k("b", "P2", { saves: true })]).map(x => x.name)).toEqual(["b"])
+  })
+
   test("a round runs only as ego-browser nodejs < its folder's round file", () => {
     const f = "C:/r/evidence/a/1"
     expect(roundCommand(`ego-browser nodejs < ${f}/round-03.mjs`, f, "E:/proj")).toEqual({ file: `${f}/round-03.mjs`, round: "03" })
@@ -495,6 +503,7 @@ describe("data conditions", () => {
     expect(plain).toContain("without searching elsewhere")
     expect(plain).not.toContain("Data conditions")
     expect(plain).toContain("- Saving: do not save, change or delete anything\n")
+    expect(driverTask(e2e, { ...CHECKS[0]!, saves: true }, k, "f", undefined, 1000)).toContain("- Saving: save only what the task says to save, and change nothing else; after each save, wait for the app's sign that it is done (its notice, the save's response) and record it before you reopen or read what was saved; set an on/off value by reading it first and clicking only when it differs, never by a count of clicks")
     const judge = judgeTask({ ...CHECKS[0]!, data: DATA }, k, "f", "f/judge.md", undefined)
     expect(judge).toContain("- mcp-NN.json: each MCP call the driver made")
     expect(judge).toContain("## 데이터")
