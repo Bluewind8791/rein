@@ -4926,7 +4926,7 @@ async function egoJudged($: EngineInterface, c: Ctx, k: CheckRun, result: ToolCa
     const at = r?.stage === "qa-integration" ? r.e2e?.checks?.find(x => x.name === k.name && x.ego?.judge === c.agentId && isOpen(x)) : undefined
     if (!r?.e2e?.checks || !at?.ego) return undefined
     if (back) {
-      const ego: EgoCheck = { ...at.ego, driven: undefined, judge: undefined, returned: judged.missing ?? "", returns: 1 }
+      const ego: EgoCheck = { ...at.ego, driven: undefined, judge: undefined, returned: judged.missing ?? "", returns: 1, parts: judged.parts }
       return { ...r, e2e: { ...r.e2e, checks: r.e2e.checks.map(x => (x.name === k.name ? { ...x, ego } : x)) } }
     }
     const cited = judged.cited.map(f => `${folder}/${f}`)

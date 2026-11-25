@@ -186,6 +186,7 @@ describe("the ego path's pieces", () => {
     const drive = driverTask(e2e, CHECKS[0] as Check, { name: "detail", minutes: 30, spent: 0 }, "f", undefined, 1000)
     expect(drive).toContain("in the same round")
     expect(drive).toContain("a confirm counts as cancelled")
+    expect(drive).toContain("When a part says something does not happen (a window does not open, only an alert shows), do the action and, in the same round, wait a few seconds, then for each page pages() lists save a measure noted with what must not appear")
   })
 
   test("a check's account wins over an account the app's login names", () => {
@@ -366,7 +367,13 @@ describe("running checks in ego", () => {
     expect(await status($)).toContain(`e2e missing evidence: send rein:ego-driver ${agentId} of check detail with SendMessage what its judge found missing: 비활성: disabled를 재지 않음`)
     await $.tool.call(round(agentId!, folder, "02"))
     expect(context(await $.tool.call(runRound(agentId!, folder, "02")))).toContain("recorded done()")
+    const firstJudge = spawned.filter(s => s.type === JUDGE)[0]!.prompt!
+    expect(firstJudge).not.toContain("An earlier judge of this check")
     const j2 = await spawn($, JUDGE)
+    const secondJudge = spawned.filter(s => s.type === JUDGE)[1]!.prompt!
+    expect(secondJudge).toContain("An earlier judge of this check found evidence missing")
+    expect(secondJudge).toContain("\n- 우수회원만 체크: 통과 — round-01-shot-1.png\n- 비활성: 증거 부족 — disabled를 재지 않음\n")
+    expect(secondJudge).toContain("decide again only the parts it found 증거 부족")
     expect(context(await $.tool.call({ tool: "Write", file_path: `${folder}/judge.md`, content: short, agentId: j2.agentId } as never))).toContain("check detail: 판정: 실패 (증거 부족 a second time counts as 실패)")
     await passCheck($, "staff")
     const run = store.get("runs:proj/login-fix") as { halt?: { rule: string } }
