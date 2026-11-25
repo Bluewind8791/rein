@@ -13,6 +13,7 @@
 
 const fs = require("fs")
 const path = require("path")
+const { pipeline } = require("stream")
 const { spawn } = require("child_process")
 const { NAME_OK } = require("./text.js")
 
@@ -414,12 +415,14 @@ function serveDir(res, f, urlPath) {
 }
 
 // a file's bytes with headers; missing() answers when it cannot be opened
-// (gone since it was looked at). A read failing later cuts the answer.
+// (gone since it was looked at). A read failing later cuts the answer. A
+// client that drops the answer closes the file too: pipe() would leave it
+// open, and Windows then refuses to replace the file.
 function streamFile(res, full, headers, missing) {
   const s = fs.createReadStream(full)
   s.on("open", () => {
     res.writeHead(200, headers)
-    s.pipe(res)
+    pipeline(s, res, () => {})
   })
   s.on("error", () => {
     if (res.headersSent) res.destroy()

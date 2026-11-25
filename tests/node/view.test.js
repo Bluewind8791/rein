@@ -204,3 +204,36 @@ test("the page loads pdf.js from the plugin, not the internet", async t => {
     assert.ok((await res.text()).length > 100000)
   }
 })
+
+test("a download the client drops does not keep the file open", async t => {
+  const { streamFile } = require("../../frame/view.js")
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rein-stream-"))
+  const file = path.join(dir, "big.bin")
+  fs.writeFileSync(file, Buffer.alloc(32 * 1024 * 1024, 1))
+  let closed
+  const done = new Promise(r => (closed = r))
+  const server = http.createServer((req, res) => {
+    res.on("close", () => setTimeout(closed, 100))
+    streamFile(res, file, { "content-type": "application/octet-stream" }, () => res.end())
+  })
+  await new Promise(r => server.listen(0, "127.0.0.1", r))
+  t.after(() => {
+    server.close()
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+  await new Promise(resolve => {
+    const req = http.get({ host: "127.0.0.1", port: server.address().port, path: "/" }, res => {
+      res.once("data", () => {
+        req.destroy()
+        resolve()
+      })
+    })
+    req.on("error", () => {})
+  })
+  await done
+  // Windows refuses to replace a file another handle still holds open
+  const tmp = `${file}.new`
+  fs.writeFileSync(tmp, "y")
+  fs.renameSync(tmp, file)
+  assert.strictEqual(fs.readFileSync(file, "utf8"), "y")
+})
