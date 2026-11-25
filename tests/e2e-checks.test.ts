@@ -1133,4 +1133,47 @@ describe("a pass stands while the files its check names are unchanged", () => {
     expect(await relay($, ADVANCE)).toEqual({ result: "The user approved the current configs.", context: [expect.stringContaining("D50: the configs are frozen")] })
     expect(record().passed?.map(p => p.name)).toEqual(["detail", "mobile"])
   })
+
+  // a to-be screen of 1-mockup.html and its `## 배치 대조` item; its ego
+  // check passed before, resting on every sealed file.
+  const OTHER = "E:/proj/src/other.ts"
+  const LAYOUT = { anchor: "order0101", page: "주문 등록", route: "주문 > 주문관리 > 주문 등록", look: "검색 영역 아래 탭 2개" }
+  const MOCKUP = '<section class="screen" id="order0101"><h2>주문 등록</h2><div class="compare"><div class="before">지금</div><div class="after">탭</div></div></section>'
+  const LAID = (look = LAYOUT.look) => `\n## 배치 대조\n\n### ${LAYOUT.anchor}\n- 페이지: ${LAYOUT.page}\n- 경로: ${LAYOUT.route}\n- 볼 곳: ${look}\n`
+  const layoutPass = (files: Record<string, string>) => ({
+    name: "배치-order0101", minutes: 10, spent: 0, todo: "x", expect: "y", verdict: "통과", evidence: "agent/evidence/배치-order0101/1",
+    ego: { profile: "p1", space: "s", spentMs: 0 }, files,
+  })
+
+  test("back from dev, a layout check whose screen the change does not reach comes checked and does not run", async ($, on) => {
+    const files: Record<string, string> = { ...filesNow(), [OTHER]: "o2", [`${DIR}/1-mockup.html`]: MOCKUP }
+    const before = await retried("w1")
+    const was = { ...before.sealed, [OTHER]: await hashOf("o1") }
+    world(on, files, undefined, { ...before, planFiles: [SRC, VIEW, OTHER], writes: [SRC, VIEW, OTHER], layouts: [LAYOUT], sealed: { ...before.sealed, [OTHER]: await hashOf("o2") }, passed: [...before.passed, layoutPass(was)] }, host([]))
+    expect(context(await relay($, ADVANCE))).toContain("files they rest on changed since: 배치-order0101.")
+    expect(context(await judgeImpact($, { "배치-order0101": "영향 없음" }))).toContain("rein:impact found the change does not touch 배치-order0101")
+    expect(spawned.at(-1)!.prompt).toContain(`### 배치-order0101\n- 페이지: ${LAYOUT.page}\n- 볼 곳: ${LAYOUT.look}\n- 통과 뒤 바뀐 파일: ${OTHER}`)
+    expect(spawned.at(-1)!.prompt).toContain("For a `배치-` check, 영향 있음 when a changed line reaches the markup, styles or script of that screen.")
+    expect(files[LIST]).toMatch(/- \[x\] \*\*배치 order0101\*\*.*\(\[이전 통과 유지 — 코드가 바뀌었지만 영향 없다고 판정 \(agent\/impact\.md\)\]/)
+    expect(files[`${DIR}/agent/trace.jsonl`]).toContain(`"kept":["detail","mobile","배치-order0101"]`)
+    expect(ran.filter(x => x.argv[0] === "aside" || x.argv[0] === "ego-browser")).toHaveLength(0)
+  })
+
+  test("a design goto takes again keeps the pass of a layout check whose item and spec are as they were", async ($, on) => {
+    const run = await reviewed(await sha256Text(config()))
+    world(on, { ...filesNow(), "E:/proj/.git/HEAD": "", [PLAN]: planWith("a") + LAID(), [`${DIR}/1-mockup.html`]: MOCKUP }, undefined, { ...run, layouts: [LAYOUT], frozen: { ...run.frozen, plan: planWith("a") + LAID(), planSpec: SPEC_TEXT }, passed: [...run.passed, layoutPass(run.sealed)] }, host([]))
+    await $.tool.call({ tool: "Write", file_path: PLAN, content: planWith("b") + LAID() } as never)
+    await $.tool.call({ tool: "mcp__rein__goto", stage: "qa" } as never)
+    expect(record()).toMatchObject({ stage: "qa" })
+    expect(record().passed?.map(p => p.name)).toEqual(["detail", "배치-order0101"])
+  })
+
+  test("a design goto takes again drops the pass of a layout check whose item changed", async ($, on) => {
+    const run = await reviewed(await sha256Text(config()))
+    world(on, { ...filesNow(), "E:/proj/.git/HEAD": "", [PLAN]: planWith("a") + LAID(), [`${DIR}/1-mockup.html`]: MOCKUP }, undefined, { ...run, layouts: [LAYOUT], frozen: { ...run.frozen, plan: planWith("a") + LAID(), planSpec: SPEC_TEXT }, passed: [...run.passed, layoutPass(run.sealed)] }, host([]))
+    await $.tool.call({ tool: "Write", file_path: PLAN, content: planWith("b") + LAID("검색 영역 아래 탭 3개") } as never)
+    await $.tool.call({ tool: "mcp__rein__goto", stage: "qa" } as never)
+    expect(record()).toMatchObject({ stage: "qa" })
+    expect(record().passed?.map(p => p.name)).toEqual(["detail"])
+  })
 })

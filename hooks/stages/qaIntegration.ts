@@ -2,6 +2,7 @@ import { ASIDE_BASH_TIMEOUT, isOpen, runnerCommand } from "../lib/aside.ts"
 import { checkChain, readOnly } from "../lib/bash.ts"
 import { importsHarness, roundCommand } from "../lib/ego.ts"
 import { importLine } from "../lib/egoHarness.ts"
+import { isLayoutCheck, LAYOUT_PREFIX } from "../lib/layout.ts"
 import type { App, ConfigView } from "../lib/config.ts"
 import { itemsOf, listed, type Check, type Layout } from "../lib/parse.ts"
 import { same } from "../lib/paths.ts"
@@ -360,7 +361,7 @@ export function remember(run: Run, k: CheckRun): Passed[] | undefined {
 
 // check k's pass from an earlier visit and the files it rests on that
 // changed since, by the seal; undefined when it has none to carry.
-function changedSince(run: Run, k: Check): { pass: Passed; changed: string[] } | undefined {
+function changedSince(run: Run, k: Pick<Check, "name">): { pass: Passed; changed: string[] } | undefined {
   const pass = run.passed?.find(x => x.name === k.name)
   const seal = run.sealed
   if (!pass || !seal || Object.keys(pass.files).length === 0) return undefined
@@ -379,7 +380,7 @@ function verdictOf(run: Run, name: string): { affected: boolean; why: string } |
 
 // check k's pass from an earlier visit, when none of the files it rests on
 // changed since, or rein:impact found the change does not touch it.
-export function carriedPass(run: Run, k: Check): CheckRun | undefined {
+export function carriedPass(run: Run, k: Pick<Check, "name">): CheckRun | undefined {
   const since = changedSince(run, k)
   if (!since) return undefined
   const { files: _files, cleared: _cleared, ...held } = since.pass
@@ -389,9 +390,9 @@ export function carriedPass(run: Run, k: Check): CheckRun | undefined {
 
 // the checks whose earlier pass rests on files changed since, each with
 // those files and the seal value it passed on, that rein:impact has not
-// judged under the current seal.
+// judged under the current seal; a layout check (`배치-<id>`) too.
 export function doubtful(run: Run): { name: string; files: { path: string; was: string }[] }[] {
-  return (run.checks ?? []).flatMap(k => {
+  return [...(run.checks ?? []), ...(run.layouts ?? []).map(l => ({ name: `${LAYOUT_PREFIX}${l.anchor}` }))].flatMap(k => {
     const since = changedSince(run, k)
     if (!since || since.changed.length === 0 || verdictOf(run, k.name) !== undefined) return []
     return [{ name: k.name, files: since.changed.map(path => ({ path, was: since.pass.files[path]! })) }]
@@ -431,9 +432,12 @@ export function impactRow(): StageSpec {
 }
 
 // rein:impact's task: each check whose earlier pass is in question, as
-// 2-plan.md gives it, with the files changed since and where their diff is.
-export function impactTask(dir: string, checks: Check[], doubt: { name: string; files: { path: string }[] }[]): string {
+// 2-plan.md gives it, with the files changed since and where their diff is;
+// a layout check as its `## 배치 대조` item gives the screen.
+export function impactTask(dir: string, checks: Check[], doubt: { name: string; files: { path: string }[] }[], layouts: Layout[] = []): string {
   const item = (d: (typeof doubt)[number]) => {
+    const l = layouts.find(x => `${LAYOUT_PREFIX}${x.anchor}` === d.name)
+    if (l) return [`### ${d.name}`, `- 페이지: ${l.page}`, `- 볼 곳: ${l.look}`, `- 통과 뒤 바뀐 파일: ${d.files.map(f => f.path).join(", ")}`].join("\n")
     const k = checks.find(x => x.name === d.name)!
     return [
       `### ${k.name}`,
@@ -448,7 +452,7 @@ export function impactTask(dir: string, checks: Check[], doubt: { name: string; 
   return [
     "Judge whether a Rein run's code change since some e2e checks passed can change what those checks saw. Do not fix anything.",
     `Each check below passed in the browser on an earlier version of the code. Since then the files listed under it changed. The diff of each such file, from the version the check passed on to now, is in ${dir}/${IMPACT_DIFF}, one section per file and version. Read the diffs and, where you need it, the current files and the code they call, with Read, Grep and Glob.`,
-    "For each check decide: 영향 없음 when no changed line can change what its steps do or what its expectation says it sees (another tab's code, a popup it does not open, a comment, a rename the screen does not show); 영향 있음 when a changed line runs on its steps' path or feeds what it sees (a query its numbers come from, the markup or script of the screen or popup it opens, a shared function either calls), or when you cannot tell. A check judged 영향 없음 is not run again, so be sure.",
+    "For each check decide: 영향 없음 when no changed line can change what its steps do or what its expectation says it sees (another tab's code, a popup it does not open, a comment, a rename the screen does not show); 영향 있음 when a changed line runs on its steps' path or feeds what it sees (a query its numbers come from, the markup or script of the screen or popup it opens, a shared function either calls), or when you cannot tell. For a `배치-` check, 영향 있음 when a changed line reaches the markup, styles or script of that screen. A check judged 영향 없음 is not run again, so be sure.",
     `Write ${dir}/${IMPACT_FILE} once, whole, with Write, one section per check, in this form:`,
     "```markdown\n## 영향 판정\n\n### <check name>\n- 판정: 영향 없음\n- 이유: <the changed lines and why they do not reach this check, or what they change that it sees>\n```",
     "`- 판정:` is exactly `영향 없음` or `영향 있음`. A check with no such line is run again. Then answer in one line with the hook's result and stop.",
@@ -460,11 +464,20 @@ export function impactTask(dir: string, checks: Check[], doubt: { name: string; 
 // the passes kept as plan passes again with checks and configs: those
 // whose check the new design gives as it was (its app, route, steps,
 // expectation, saves, account and files), while no config's e2e changed
-// (sameE2e). Each still runs again at the next entry unless carriedPass
-// finds its files unchanged.
-export function keptPasses(run: Run, checks: Check[], hashes: Record<string, string>, views: Record<string, ConfigView>): Passed[] | undefined {
+// (sameE2e). A layout check's pass is kept when its `## 배치 대조` item is
+// as it was and 1-spec.md is the one the last plan passed on (the to-be is
+// drawn from it). Each still runs again at the next entry unless
+// carriedPass finds its files unchanged.
+export function keptPasses(run: Run, checks: Check[], hashes: Record<string, string>, views: Record<string, ConfigView>, layouts: Layout[] = []): Passed[] | undefined {
   if (!sameE2e(run, hashes, views)) return undefined
+  const sameSpec = run.frozen?.planSpec !== undefined && run.frozen.planSpec === run.frozen.spec
+  const laid = (list: Layout[] | undefined, name: string) => list?.find(l => `${LAYOUT_PREFIX}${l.anchor}` === name)
   const kept = (run.passed ?? []).filter(p => {
+    if (isLayoutCheck(p.name)) {
+      const was = laid(run.layouts, p.name)
+      const is = laid(layouts, p.name)
+      return sameSpec && was !== undefined && is !== undefined && sameLayout(was, is)
+    }
     const before = run.checks?.find(k => k.name === p.name)
     const now = checks.find(k => k.name === p.name)
     return before !== undefined && now !== undefined && sameCheck(before, now)
@@ -487,6 +500,8 @@ export function sameE2e(run: Run, hashes: Record<string, string>, views: Record<
     return seen !== undefined && now !== undefined ? JSON.stringify(seen.e2e) === JSON.stringify(now.e2e) : was[repo] === hashes[repo]
   })
 }
+
+const sameLayout = (a: Layout, b: Layout) => a.page === b.page && a.route === b.route && a.look === b.look && a.saves === b.saves
 
 const sameCheck = (a: Check, b: Check) => {
   const af = a.files ?? []

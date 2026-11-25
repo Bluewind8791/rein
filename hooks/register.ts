@@ -8,7 +8,7 @@ import { eol, lineDiff } from "./lib/diff.ts"
 import { checkConfig, judgeCover, judgeDev, parseCause, parseChecks, parseCover, parseDev, parseDeviation, parseGrade, parseLayouts, parsePlan, parseReview, toBeScreens, type Check, type Layout } from "./lib/parse.ts"
 import { climbs, isAbsolute, resolve, same, slash, under, worktreeMain, writeTarget } from "./lib/paths.ts"
 import { sha256Text } from "./lib/hash.ts"
-import { builtVerifierTask, GIVE_UP_AT, isLayoutCheck, LAYOUT_FAILS, LAYOUT_VERIFIER, layoutCheck, layoutFailsText, layoutIdOf, MEASURE_AT, MOCKUP_SHOTS, parseLayoutVerdict, redrawLines, SPEC_VERDICT, specVerifierTask, tickLayout, toBeSources } from "./lib/layout.ts"
+import { builtVerifierTask, GIVE_UP_AT, isLayoutCheck, LAYOUT_FAILS, LAYOUT_PREFIX, LAYOUT_VERIFIER, layoutCheck, layoutFailsText, layoutIdOf, MEASURE_AT, MOCKUP_SHOTS, parseLayoutVerdict, redrawLines, SPEC_VERDICT, specVerifierTask, tickLayout, toBeSources } from "./lib/layout.ts"
 import { pastedImages, pasteName } from "./lib/brief.ts"
 import { TRACE_LIMIT, traceFile, traceInput, utf8Bytes } from "./lib/trace.ts"
 import { parsePlanView, planViewData, planViewHtml } from "./lib/planView.ts"
@@ -3281,7 +3281,7 @@ function planPassed(run: Run, j: Extract<PlanJudgment, { ok: true }>): Run {
     frozen: { ...run.frozen, plan: j.plan, planSpec: run.frozen?.spec },
     failFile: undefined, arbiter: undefined, deviation: undefined, keepRetries: undefined, d62: undefined, back: undefined, splitter: undefined,
     planReviewer: undefined, planReview: undefined, planVerdicts: undefined,
-    halt: undefined, e2e: undefined, qaVisit: undefined, passed: keptPasses(run, j.checks, j.hashes, j.views),
+    halt: undefined, e2e: undefined, qaVisit: undefined, passed: keptPasses(run, j.checks, j.hashes, j.views, j.layouts),
   }
 }
 
@@ -3570,11 +3570,13 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
 
   // with checks to run, work qa stops here for the person: the hook
   // writes 5-checklist.md and nothing runs until they choose (waitGate).
-  // A check whose pass from an earlier visit stands comes checked; when
-  // every check's does, nothing is left to test and the entry goes on.
+  // A check whose pass from an earlier visit stands comes checked, and so
+  // does a layout box; when every check's does, nothing is left to test
+  // and the entry goes on.
   const carried = (run.checks ?? []).flatMap(k => carriedPass(run, k) ?? [])
+  const carriedLayouts = (run.layouts ?? []).flatMap(l => carriedPass(run, { name: `${LAYOUT_PREFIX}${l.anchor}` }) ?? [])
   const list = `${c.dir}/5-checklist.md`
-  const listed = async (checks: Check[]) => servedFrom(run, carried.reduce((t, k) => tick(t, k.name, carriedTick(k)), checklist(await titleOf($, "active", run.runId), checks, e2e?.apps ?? {}, run.layouts)))
+  const listed = async (checks: Check[]) => servedFrom(run, carriedLayouts.reduce((t, k) => tickLayout(t, layoutIdOf(k.name), carriedTick(k)), carried.reduce((t, k) => tick(t, k.name, carriedTick(k)), checklist(await titleOf($, "active", run.runId), checks, e2e?.apps ?? {}, run.layouts))))
   if (from === "qa" && e2e && (run.checks?.length ?? 0) > 0 && !noE2e && carried.length < run.checks!.length) {
     const moved = await enter({ e2e: { path: "wait" } })
     if (!moved) return `The run left ${from} before the e2e entry.`
@@ -5482,7 +5484,7 @@ async function spawnImpact($: EngineInterface, run: Run, e: AgentSpawnInput, nex
   if (run.stage !== "qa" || !impact || impact.verdicts || !run.qaVisit?.passed) return { deny: `${IMPACT} judges only while work qa waits for it (mcp__rein__status shows \`e2e impact:\`); the run is in ${run.stage}.` }
   const c = await ctxOf($, run)
   const doubt = doubtful(run).filter(d => impact.doubt.includes(d.name))
-  const result = await next({ ...e, prompt: impactTask(c.dir, run.checks ?? [], doubt), background: false })
+  const result = await next({ ...e, prompt: impactTask(c.dir, run.checks ?? [], doubt, run.layouts ?? []), background: false })
   if (result.deny !== undefined || result.agentId === undefined) return result
   const agentId = result.agentId
   reinAgents.add(agentId)
