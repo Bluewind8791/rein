@@ -502,14 +502,19 @@ describe("data conditions", () => {
     expect(judgeTask(CHECKS[0]!, k, "f", "f/judge.md", undefined)).not.toContain("## 데이터")
   })
 
-  test("the judge decides the data first: a condition not met sends it back, 데이터: 없음 is 데이터 없음, a met condition cites a file", () => {
+  test("the judge decides the data first: a condition not met sends back a check whose parts did not all pass, 데이터: 없음 is 데이터 없음, a met condition cites a file", () => {
     const has = (n: string) => ["round-01-shot-1.png", "mcp-01.json"].includes(n)
     const met = ["- 미출고 주문이 2건 이상: 맞음 — mcp-01.json", "- 회원 목록 조회에 보임: 맞음 — round-01-shot-1.png"]
     const parts = ["- 보인다: 통과 — round-01-shot-1.png"]
     expect(parseJudge(dataJudge(met, "후보 그대로", parts, "통과"), has, true)).toEqual({ parts: ["보인다: 통과 — round-01-shot-1.png"], verdict: "통과", cited: ["round-01-shot-1.png", "mcp-01.json"], used: "후보 그대로" })
     const unmet = [met[0]!, "- 회원 목록 조회에 보임: 안 맞음 — 목록에 없음"]
-    expect(parseJudge(dataJudge(unmet, "후보 그대로", parts, "증거 부족"), has, true)).toMatchObject({ verdict: "증거 부족", missing: "데이터 조건 「회원 목록 조회에 보임」 안 맞음: 목록에 없음" })
-    expect(parseJudge(dataJudge(unmet, "후보 그대로", parts, "통과"), has, true)).toEqual({ problem: expect.stringContaining("판정: 통과 does not follow from the data and the parts, which make it 증거 부족") })
+    expect(parseJudge(dataJudge(unmet, "후보 그대로", parts, "통과"), has, true)).toMatchObject({ verdict: "통과", parts: ["보인다: 통과 — round-01-shot-1.png"] })
+    expect(parseJudge(dataJudge(unmet, "후보 그대로", parts, "증거 부족"), has, true)).toEqual({ problem: expect.stringContaining("판정: 증거 부족 does not follow from the data and the parts, which make it 통과") })
+    const short = [...parts, "- 3건: 증거 부족 — 목록을 세지 않음"]
+    expect(parseJudge(dataJudge(unmet, "후보 그대로", short, "증거 부족"), has, true)).toMatchObject({ verdict: "증거 부족", missing: "데이터 조건 「회원 목록 조회에 보임」 안 맞음: 목록에 없음; 3건: 목록을 세지 않음" })
+    const failed = [...parts, "- 3건: 실패 — round-01-shot-1.png에 2건"]
+    expect(parseJudge(dataJudge(unmet, "후보 그대로", failed, "증거 부족"), has, true)).toMatchObject({ verdict: "증거 부족", missing: expect.stringContaining("데이터 조건 「회원 목록 조회에 보임」 안 맞음") })
+    expect(parseJudge(dataJudge(unmet, "후보 그대로", failed, "실패"), has, true)).toEqual({ problem: expect.stringContaining("which make it 증거 부족") })
     expect(parseJudge(dataJudge(["- 미출고 주문이 2건 이상: 맞음 — 조회했다"], "후보 그대로", parts, "통과"), has, true)).toEqual({ problem: expect.stringContaining('"미출고 주문이 2건 이상" fits with no evidence file cited') })
     expect(parseJudge("## 데이터\n\n데이터: 없음 — 조회 0건, 등록 화면 권한 없음\n\n## 기대 대조\n\n판정: 데이터 없음\n", has, true)).toEqual({ parts: [], verdict: "데이터 없음", cited: [], used: "없음 — 조회 0건, 등록 화면 권한 없음" })
     expect(parseJudge(judgeMd(parts, "통과"), has, true)).toEqual({ problem: expect.stringContaining("judge.md needs `## 데이터`") })

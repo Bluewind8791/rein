@@ -191,7 +191,8 @@ export const roundEnds = (round: string) => ({ handoff: handoffFile(round), done
 // with data conditions, `## 데이터` comes first: one line per condition,
 // `- <condition>: <맞음|안 맞음> — <citation or reason>`, then
 // `데이터: <the data the check ran on>` (used), and a 맞음 condition cites
-// files as a passed part does. A condition 안 맞음 makes it 증거 부족, that
+// files as a passed part does. When every part passed it is 통과 though a
+// condition is 안 맞음; otherwise a condition 안 맞음 makes it 증거 부족, that
 // condition being what is missing; `데이터: 없음 — <why>` alone, with no
 // condition or part lines, makes it 데이터 없음.
 export type Judged = { parts: string[]; verdict: "통과" | "실패" | "증거 부족" | "데이터 없음"; cited: string[]; missing?: string; used?: string }
@@ -240,8 +241,8 @@ export function parseJudge(text: string, inFolder: (name: string) => boolean, da
   const none = used !== undefined && /^없음(?:\s|[—–-]|$)/.test(used)
   if (none ? conditions.length > 0 || parts.length > 0 : parts.length === 0 || (data && conditions.length === 0)) return { problem: form }
   const unmet = conditions.filter(x => !x.fits)
-  const own = none ? "데이터 없음" : unmet.length > 0 ? "증거 부족" : parts.every(p => p.verdict === "통과") ? "통과" : parts.some(p => p.verdict === "실패") ? "실패" : "증거 부족"
-  const rule = `${data ? "데이터: 없음 is 데이터 없음, any condition 안 맞음 is 증거 부족, else " : ""}every part 통과 is 통과, any 실패 is 실패, else 증거 부족`
+  const own = none ? "데이터 없음" : parts.every(p => p.verdict === "통과") ? "통과" : unmet.length > 0 ? "증거 부족" : parts.some(p => p.verdict === "실패") ? "실패" : "증거 부족"
+  const rule = `${data ? "데이터: 없음 is 데이터 없음, else " : ""}every part 통과 is 통과, ${data ? "else any condition 안 맞음 is 증거 부족, " : ""}any 실패 is 실패, else 증거 부족`
   if (said !== own) return { problem: `판정: ${said} does not follow from ${data ? "the data and " : ""}the parts, which make it ${own}: ${rule}.` }
   const citedBy = (rest: string) => [...rest.matchAll(CITED)].map(m => m[0])
   const shown = [...parts.filter(p => p.verdict === "통과").map(p => ({ ...p, how: "passed" })), ...conditions.filter(x => x.fits).map(x => ({ ...x, how: "fits" }))]
@@ -267,7 +268,7 @@ export function parseJudge(text: string, inFolder: (name: string) => boolean, da
 function dataJudging(): string[] {
   return [
     "Before the expectation, decide the data the check ran on. Other runs and people test on the same data, so the driver may have used other data than the task names, or made it (marked `E2E` and a date and time).",
-    "- Find the data the task was done on, in the rounds and the mcp files. For each data condition, decide from them: 맞음 when a file shows that data meets it, 안 맞음 when the evidence shows otherwise or nothing shows it. Any condition 안 맞음 makes 판정 증거 부족: the driver goes back for data that fits, so say on its line what is missing.",
+    "- Find the data the task was done on, in the rounds and the mcp files. For each data condition, decide from them: 맞음 when a file shows that data meets it, 안 맞음 when the evidence shows otherwise or nothing shows it. A part of the expectation that rests on a condition 안 맞음 is 증거 부족 however its screen looks: without that data what shows may not mean the change works. Judge a part that does not rest on it as usual; when every part passes, 판정 is 통과 and the 안 맞음 line only records it. Otherwise the driver goes back for data that fits, so say on the condition's line what is missing.",
     "- Decide what is expected on that data only. Rows others added while the check ran (without its mark, when the driver made the data) are not this check's.",
     `- When the driver found no data that fits and could not make it (its summary starts \`${NO_DATA}\`), check that the mcp files and the rounds show it looked and tried. If they do, write no condition lines and no part lines, \`데이터: 없음 — <what it queried and why the data could not be made>\` and 판정: 데이터 없음. If they do not, it is 증거 부족, saying what it must still try.`,
   ]
@@ -411,7 +412,7 @@ export function judgeTask(check: Check, k: CheckRun, folder: string, file: strin
     "",
     `판정: <통과 | 실패 | 증거 부족${check.data ? " | 데이터 없음" : ""}>`,
     "",
-    `판정 is ${check.data ? "데이터 없음 when no data could be found or made, 증거 부족 when any data condition is 안 맞음, else " : ""}통과 when every part passed, 실패 when any part failed, else 증거 부족. Every 통과 part${check.data ? " and every 맞음 condition" : ""} must cite at least one file in the folder by name; the hook has you write it again otherwise.`,
+    `판정 is ${check.data ? "데이터 없음 when no data could be found or made, else " : ""}통과 when every part passed, ${check.data ? "else 증거 부족 when any data condition is 안 맞음, " : ""}실패 when any part failed, else 증거 부족. Every 통과 part${check.data ? " and every 맞음 condition" : ""} must cite at least one file in the folder by name; the hook has you write it again otherwise.`,
     "",
     "When the hook has judged the file, answer with its result in one line and stop.",
   ].join("\n")
