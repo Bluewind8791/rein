@@ -162,7 +162,7 @@ export function builtVerifierTask(id: string, look: string, mockup: string | und
     `The target: the to-be of screen #${id} in ${html}${mockup ? `, rendered as ${mockup}` : " (it could not be rendered: read the section with that id, the part with class `after`)"}. Where to look: ${look}.`,
     `The screen as built: the screenshots a driver saved, each to open with Read: ${shots.join(", ") || "(none)"}. The log of round NN is round-NN.log in the same folder and says what the driver did.`,
     "",
-    "Judge the layout and the design: the regions and their order, the columns of each table and their order, the order of the fields, the place and size of each chart, panel, tab and button relative to the others, and their look (colors, borders, font sizes, spacing). The data differs (the mockup's is a sample): that is not a difference. The mockup's notes are hidden from the rendering and are not part of the screen.",
+    "Judge the layout of the whole screen: the regions and their order, the columns of each table and their order, the order of the fields, and the place and size of each chart, panel, tab and button relative to the others. The to-be is a wireframe drawn in the look of the existing screens, not a pixel copy: a difference in colors, borders, fonts or exact spacing is not one, unless `Where to look` names that look. The data differs (the mockup's is a sample): that is not a difference. The mockup's notes are hidden from the rendering and are not part of the screen.",
     "",
     `Write ${file} with Write, once, whole, in exactly this form:`,
     "",
