@@ -37,8 +37,8 @@ type Git = { branch: string | null; changed?: string[]; committed?: string[]; fa
 
 function gitHost(files: Record<string, string>, repos: Record<string, Git>, log: string[][], more: Host = {}): Host {
   return {
-    run: (argv, cwd) => {
-      if (argv[0] !== "git") return more.run?.(argv, cwd) ?? { exitCode: 0 }
+    run: (argv, cwd, stdin, env) => {
+      if (argv[0] !== "git") return more.run?.(argv, cwd, stdin, env) ?? { exitCode: 0 }
       const sub = gitSub(argv)!
       const args = argv.slice(argv.indexOf(sub) + 1)
       log.push([cwd ?? "", sub, ...args])
@@ -346,13 +346,29 @@ describe("land in worktrees", () => {
     expect(await $.tool.call(write(LAND))).toEqual(expect.objectContaining({ result: "ok" }))
   })
 
-  test("a worktree folder a program holds is told as an empty folder to delete", async ($, on) => {
+  test("a worktree folder git cannot delete (a long path) is deleted by Node, and nothing is told", async ($, on) => {
+    const files: Record<string, string> = { [LAND]: MESSAGE, [`${TREE}/.git`]: GITFILE, [`${TREE}/node_modules/a/b/index.js`]: "x" }
+    const repos: Record<string, Git> = { "E:/proj": { branch: "main", fail: { "worktree remove": `error: failed to delete '${TREE}': Filename too long` } }, [TREE]: { branch: BRANCH, changed: ["src/login.ts"] } }
+    const node = (argv: string[], _cwd: string | undefined, _stdin?: string, env?: Record<string, string>) => {
+      if (argv[0] === "node" && env?.REIN_TO) for (const f of Object.keys(files)) if (f.startsWith(`${env.REIN_TO}/`)) delete files[f]
+      return { exitCode: 0 }
+    }
+    world(on, files, () => "커밋", LANDING, gitHost(files, repos, [], { run: node }))
+    const r = await relay($, ADVANCE)
+    expect(text(r)).toContain("The run is finished.")
+    expect(context(r)).not.toContain("Removing the worktrees did not finish")
+    const land = JSON.parse(files[`${REIN}/complete/login-fix/agent/land.json`] ?? "{}") as Land
+    expect(land.result).toEqual([{ repo: "E:/proj", branch: "main", commit: "c-E:/proj", removed: true }])
+  })
+
+  test("a worktree folder neither git nor Node can delete is told as a folder to delete once the program holding it is closed", async ($, on) => {
     const files: Record<string, string> = { [LAND]: MESSAGE, [`${TREE}/.git`]: GITFILE }
     const repos: Record<string, Git> = { "E:/proj": { branch: "main", fail: { "worktree remove": `error: failed to delete '${TREE}': Permission denied` } }, [TREE]: { branch: BRANCH, changed: ["src/login.ts"] } }
     world(on, files, () => "커밋", LANDING, gitHost(files, repos, []))
     const r = await relay($, ADVANCE)
     expect(text(r)).toContain("The run is finished.")
-    expect(context(r)).toContain(`Removing the worktrees did not finish: git deleted the worktree's files and dropped it, but could not delete the folder ${TREE} (error: failed to delete '${TREE}': Permission denied): a program holds it.`)
+    expect(context(r)).toContain(`Removing the worktrees did not finish: git dropped the worktree but could not delete the folder ${TREE} (error: failed to delete '${TREE}': Permission denied), and Node could not either: a program may hold it. The user deletes the folder once that program is closed`)
+    expect(context(r)).not.toContain("empty folder")
     const land = JSON.parse(files[`${REIN}/complete/login-fix/agent/land.json`] ?? "{}") as Land
     expect(land.result).toEqual([{ repo: "E:/proj", branch: "main", commit: "c-E:/proj", removed: false, folder: TREE }])
   })

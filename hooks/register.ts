@@ -4428,9 +4428,9 @@ const setupLine = (failed: string[]) =>
   failed.length === 0 ? "" : ` worktree.setup failed, so the worktree may lack what it needs (dependencies, say); the run goes on. Tell the user, and run the command again in the worktree once they have fixed the cause:\n${failed.join("\n")}`
 
 // the run's worktree and its branch gone; the problems, none when both went.
-// A folder a program holds (on Windows) fails the removal, but git has
-// deleted the files and dropped the worktree by then, so only the empty
-// folder is left to delete.
+// A folder git cannot delete fails the removal after git has dropped the
+// worktree: a path too long for git on Windows, or a program holding it.
+// Node, which deletes long paths, tries the folder once more.
 async function removeTree($: EngineInterface, t: Tree): Promise<string[]> {
   const problems: string[] = []
   const removed = await gitQuiet($, t.repo, ["worktree", "remove", "--force", t.path])
@@ -4438,9 +4438,11 @@ async function removeTree($: EngineInterface, t: Tree): Promise<string[]> {
   if (removed.exitCode !== 0) {
     const listed = await gitQuiet($, t.repo, ["worktree", "list", "--porcelain"])
     const kept = listed.exitCode !== 0 || listed.stdout.split(/\r?\n/).some(l => l.startsWith("worktree ") && same(resolve(l.slice(9).trim(), t.repo), t.path))
-    problems.push(kept
-      ? `\`git -C ${t.repo} worktree remove --force ${t.path}\` failed (${firstLine(removed)}); the user runs it again once no program holds the folder`
-      : `git deleted the worktree's files and dropped it, but could not delete the folder ${t.path} (${firstLine(removed)}): a program holds it. The user deletes the empty folder once that program is closed`)
+    if (kept) problems.push(`\`git -C ${t.repo} worktree remove --force ${t.path}\` failed (${firstLine(removed)}); the user runs it again once no program holds the folder`)
+    else {
+      if (await $.fs.exists(t.path)) await $.process.run(["node", "-e", REMOVE_JS], { env: { REIN_TO: t.path }, timeoutMs: 120_000 }).catch(() => {})
+      if (await $.fs.exists(t.path)) problems.push(`git dropped the worktree but could not delete the folder ${t.path} (${firstLine(removed)}), and Node could not either: a program may hold it. The user deletes the folder once that program is closed`)
+    }
   }
   const branch = await gitQuiet($, t.repo, ["branch", "-D", t.branch])
   if (branch.exitCode !== 0) problems.push(`\`git -C ${t.repo} branch -D ${t.branch}\`: ${firstLine(branch)}`)
