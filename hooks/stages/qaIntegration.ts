@@ -83,13 +83,19 @@ export function runnerRow(k: CheckRun): StageSpec {
 export const folderOf = (k: CheckRun) => k.evidence ?? `evidence/${k.name}/1`
 export const judgeOf = (k: CheckRun) => `${folderOf(k)}/judge.md`
 
+// whether a driver's Bash only reads: what the integration reviewer may
+// run (commands that read, read-only git in the run's repositories), so it
+// can look at its evidence folder and the app's code. Not a round.
+export const driverReads = (command: string, c: Ctx) => readOnly(command, c.run.repos ?? [], c.root) === undefined
+
 // a rein:ego-driver's row while its check is open: it writes only round
 // files of the check's folder, each starting with the harness import, and
 // Bash runs only `ego-browser nodejs < <folder>/round-NN.mjs`, in the
-// foreground. What the round may run on (its turn, the clock, the round
-// number) the hook checks against the run as the call starts. Other MCP
-// servers' tools stay open, so it can check the data of a check with data
-// conditions (a database, say); the hook records each such call.
+// foreground, or a read-only command (driverReads). What the round may run
+// on (its turn, the clock, the round number) the hook checks against the
+// run as the call starts. Other MCP servers' tools stay open, so it can
+// check the data of a check with data conditions (a database, say); the
+// hook records each such call.
 export function driverRow(k: CheckRun): StageSpec {
   const folder = folderOf(k)
   return {
@@ -104,6 +110,7 @@ export function driverRow(k: CheckRun): StageSpec {
       return importsHarness(String(input.content ?? ""), `${c.dir}/${folder}`) ? undefined : `a round's first line must be the harness import, exactly:\n${first}`
     },
     bash(command, c, input) {
+      if (driverReads(command, c)) return undefined
       const form = roundCommand(command, `${c.dir}/${folder}`, c.root)
       if ("deny" in form) return form.deny
       if (input.run_in_background === true) return "run the round in the foreground; the hook reads its output."

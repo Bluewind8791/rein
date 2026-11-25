@@ -160,7 +160,7 @@ export function roundCommand(command: string, folder: string, root: string): { f
   const form = `check rounds run only as \`ego-browser nodejs < ${folder}/round-NN.mjs\`, one command alone, with forward slashes`
   const m = /^\s*ego-browser\s+nodejs\s+<\s*(?:"([^"]+)"|'([^']+)'|([^\s"'`$;&|<>()\\]+))\s*$/.exec(command)
   const path = m?.[1] ?? m?.[2] ?? m?.[3]
-  if (path === undefined || /[\\`$]/.test(path)) return { deny: `${form}. Bash runs nothing else: to see the evidence folder, list it with Glob and open a file with Read.` }
+  if (path === undefined || /[\\`$]/.test(path)) return { deny: `${form}. Bash runs nothing else. To change a round, Write the next round-NN.mjs whole. To look in the evidence folder or other files, use Glob, Grep and Read, or a read-only command (cat, head, tail, grep, sed -n …). To keep a round's output short, print less in the round itself. A time or a wait goes in the round's code (\`new Date()\`, \`page.waitForTimeout(ms)\`).` }
   const file = resolve(path, root)
   const round = /\/round-(\d{2})\.mjs$/.exec(file)?.[1]
   if (round === undefined || !same(file, `${folder}/round-${round}.mjs`)) return { deny: `${form}; ${path} is not a round file of that folder.` }
@@ -173,10 +173,12 @@ export function importsHarness(text: string, folder: string): boolean {
 }
 
 // what a round's output says: the user holds the space (ego refused it,
-// exit 0, measured), the script failed (`ego's nodejs process exited with
-// code N`), or it ran.
-export function roundOutcome(output: string): { kind: "user" } | { kind: "error"; code: number } | { kind: "ok" } {
+// exit 0, measured), ego did not answer a CDP request (the harness's own
+// Network.enable as it opens the space, not the driver's code), the script
+// failed (`ego's nodejs process exited with code N`), or it ran.
+export function roundOutcome(output: string): { kind: "user" } | { kind: "ego" } | { kind: "error"; code: number } | { kind: "ok" } {
   if (/Control of this task space is with the user/.test(output)) return { kind: "user" }
+  if (/CdpRequestTimeoutError/.test(output)) return { kind: "ego" }
   const code = /ego's nodejs process exited with code (\d+)/.exec(output)?.[1]
   return code !== undefined ? { kind: "error", code: Number(code) } : { kind: "ok" }
 }
@@ -321,6 +323,7 @@ export function driverTask(e2e: E2e, check: Check, k: CheckRun, folder: string, 
     `1. Write each round as a new file ${folder}/round-NN.mjs (01, 02, ...), whole, with Write, and run it with Bash in the foreground, as this one command and nothing more:`,
     `   ego-browser nodejs < ${folder}/round-NN.mjs`,
     `   Give the call a Bash timeout of at most the milliseconds the hook last gave (now ${limitMs}). Every round starts a new process: variables do not carry over, the browser tab does.`,
+    "   Besides rounds, Bash runs only a read-only command (cat, head, tail, grep, sed -n …, alone or piped into each other) to look at files; Glob, Grep and Read do the same.",
     '   A snapshot ref such as @12 holds only for the snapshot it came from: never reuse one from an earlier round or after the page changed. Pick a target by CSS (`css:input[name="user_id"]`), `text=` or `loc=role:` instead, narrow enough to match one element. A `loc=role:` always takes a name, `[name="..."]` or `[name*="..."]`, and `>> nth=N` follows only a CSS, `text=` or href selector, never a `loc=role:`.',
     "   A dialog (alert, confirm, prompt) does not carry over: the next round starts by dismissing one left open, and a confirm counts as cancelled. So click what opens it, acceptDialog() or dismissDialog() and record what follows in the same round.",
     "   Handle a dialog at once in the window it opened in: while it is open, a command to another window (the page that opened a popup) times out after about 30 seconds. The harness records the dialog's type and text in the round's log when you accept or dismiss it; do not record them yourself with consoleLog or a string you write.",
@@ -344,7 +347,7 @@ export function driverTask(e2e: E2e, check: Check, k: CheckRun, folder: string, 
     ...(check.data ? dataSteps() : ["5. Open the app, log in as the check says (the account, when one is named), reach the page by its menus and do the task. Open only the screens the task names; when you cannot find a screen or the data by the path it gives, record what you saw and call done() saying so, without searching elsewhere."]),
     "   Record evidence for every part of what is expected: a shot for what the screen shows, and measure, appState, server, network, consoleLog, download or snapshot for what a screenshot cannot show. Collect every piece the plan asks for. When the screen disagrees with what is expected, record that state too: the judge decides, not you.",
     ...(changes(check) ? [`   This check changes the screen, so the judge also decides its layout. On each screen the expectation is about, once the task is done, save a shot of the whole screen and one measure noted \`${LAYOUT}\` that returns, for the selects, inputs and grids on it: each one's left, right, top and width (getBoundingClientRect); for a select, the width of its widest option's text in its own font; for a grid, its container's width and the sum of its columns' widths. Record what it returns, whatever it shows.`] : []),
-    "6. What a round's output means: `ego's nodejs process exited with code N` is an error in your script, not the app's failure; read it and write the next round. A notice that control of the task space is with the user means the user is using it: wait a minute, then run the same round file again. The hook's result after each round says what is next.",
+    "6. What a round's output means: `ego's nodejs process exited with code N` is an error in your script, not the app's failure; read it and write the next round. `CdpRequestTimeoutError` is ego not answering, not your script: the hook's result says what to do.A notice that control of the task space is with the user means the user is using it: wait a minute, then run the same round file again. The hook's result after each round says what is next.",
     "7. handOff(what) only for what only a person can do: log in when the login text does not get you in, a second factor, a captcha; or what you cannot handle: a file picker, a browser permission prompt. Never for an app error or a screen that differs from what is expected. Say in what exactly what the user must do. shot() hands off by itself when ego's window is closed or minimized. Then stop and answer `넘김: <what>`; the main session resumes you once the user is done, and your next round takes the space back.",
     "8. When the evidence for every part is saved, call done(summary) as the last line of your last round, then answer `완료: <summary>` and stop. A judge then reads the evidence. If the main session later sends you what the judge found missing, collect only that, in new rounds, and call done() again.",
     "",

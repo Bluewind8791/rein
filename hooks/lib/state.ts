@@ -203,6 +203,7 @@ export type EgoCheck = {
   returned?: string
   returns?: number
   lost?: number
+  cdp?: number // the round whose last run ego did not answer (CDP timeout)
   human?: true
   parts?: string[]
 }

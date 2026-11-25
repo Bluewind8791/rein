@@ -25,7 +25,7 @@ import { afterDeviation, arbiterTask, d62Entry, dev, devCommand, devDiff, devEnt
 import { outside, parsePlanVerdict, PLAN_REVIEW, PLAN_REVIEWS, planEntry, planReviewer, planReviewTask, repoCandidates, revisitNote } from "./stages/plan.ts"
 import { filesOf, landFiles, nameStatus, numstat, stagedPaths, stagingProblem, statusEntries, statusPaths } from "./stages/land.ts"
 import { backendsHint, commandReport, failedRun, failureOf, OUTPUT_FILE, outputLog, rerunQuestion, rewrote, type CommandResult } from "./stages/qa.ts"
-import { driverRow, egoSection, folderOf as checkFolder, judgeOf, judgeRow, NO_DATA_WORDS, settleEgo, asideSection, progressSection, allChecked, carriedPass, carriedTick, asideTick, egoTick, checklist, doubtful, IMPACT_DIFF, IMPACT_FILE, impactRow, impactTask, parseImpact, completionLine, completionTask, E2E_MANUAL, E2E_NONE, E2E_SKIPPED, e2eSection, entryOutcome, handChecked, judgeIntegration, keptPasses, openLayouts, parseResult, qaIntegration, remember, resultOf, runnerCheck, runnerRow, sameE2e, settleAside, tick, unchecked, UNSHOT, withHistory } from "./stages/qaIntegration.ts"
+import { driverReads, driverRow, egoSection, folderOf as checkFolder, judgeOf, judgeRow, NO_DATA_WORDS, settleEgo, asideSection, progressSection, allChecked, carriedPass, carriedTick, asideTick, egoTick, checklist, doubtful, IMPACT_DIFF, IMPACT_FILE, impactRow, impactTask, parseImpact, completionLine, completionTask, E2E_MANUAL, E2E_NONE, E2E_SKIPPED, e2eSection, entryOutcome, handChecked, judgeIntegration, keptPasses, openLayouts, parseResult, qaIntegration, remember, resultOf, runnerCheck, runnerRow, sameE2e, settleAside, tick, unchecked, UNSHOT, withHistory } from "./stages/qaIntegration.ts"
 import { GROUPS_FILE, groupFile, groupItems, groupsCover, groupTask, joinedReview, parseGroups, pendingGroups, PRECHECK_FILE, PRECHECK_FIRST, precheckPending, review, reviewEntry, reviewLists, reviewNext, reviewTask, splits, splitterTask } from "./stages/review.ts"
 import { asIsTask, asIsWanted, DIMENSIONS, EVERY, gradeLine, graderTask, gradeSummary, openQuestions, passes, scoreGrade, screenRows, sketcherTask, spec, specProblem, specType, TYPES } from "./stages/spec.ts"
 import { unbuilt } from "./stages/unbuilt.ts"
@@ -4798,7 +4798,8 @@ async function egoRoundStart($: EngineInterface, run: Run, c: Ctx, agentId: stri
 // next. A round past its Bash timeout leaves its script running inside ego
 // (measured), so the hook closes the space and the next round opens it
 // afresh. A lost space gets a new attempt once; a second loss closes the
-// check with no verdict, as a run past its time does.
+// check with no verdict, as a run past its time does. ego not answering the
+// same round twice in a row (CDP timeout) is a lost space too.
 async function egoCaptured($: EngineInterface, run: Run, name: string, round: string, agentId: string, result: ToolCallResult): Promise<ToolCallResult> {
   const record = (typeof result.result === "object" && result.result !== null ? result.result : {}) as Record<string, unknown>
   const output = await bashOutput($, result)
@@ -4813,18 +4814,22 @@ async function egoCaptured($: EngineInterface, run: Run, name: string, round: st
   const lost = names.has(ends.lost)
   const handoff = await read(ends.handoff).catch(() => ({ what: "(the harness wrote no reason)" }))
   const done = await read(ends.done).catch(() => ({ summary: "" }))
-  if (timedOut) {
-    await egoRun($, closeScript(oneSpace(k.ego.space)))
-    await $.fs.write(`${folder}/${REOPEN_MARK}`, "")
-  }
+  // ego not answering as the harness opens the space (a CDP timeout) is
+  // run again once; the same round twice in a row counts as a lost space,
+  // closed by the hook.
+  const unanswered = !timedOut && !lost && !handoff && !done && roundOutcome(output).kind === "ego"
+  const again = unanswered && k.ego.cdp === Number(round)
+  const gone = lost || again
+  if (timedOut || again) await egoRun($, closeScript(oneSpace(k.ego.space)))
+  if (timedOut) await $.fs.write(`${folder}/${REOPEN_MARK}`, "")
   const now = await $.clock.now()
   const stop = (ego: EgoCheck) => ({ ...ego, spentMs: usedMs({ ...k, ego }, now), since: undefined })
-  const next = lost && (k.ego.lost ?? 0) === 0 ? await shotFolder($, c.dir, name) : undefined
+  const next = gone && (k.ego.lost ?? 0) === 0 ? await shotFolder($, c.dir, name) : undefined
   let outcome = ""
   const moved = await mutate($, r => {
     const at = r?.stage === "qa-integration" ? r.e2e?.checks?.find(x => x.name === name && x.runner === agentId && isOpen(x)) : undefined
     if (!r?.e2e?.checks || !at?.ego) return undefined
-    let ego: EgoCheck = at.ego
+    let ego: EgoCheck = { ...at.ego, cdp: unanswered && !again ? Number(round) : undefined }
     let patch: Partial<CheckRun> = {}
     if (handoff) {
       ego = { ...stop(ego), handoff: String(handoff.what ?? "") }
@@ -4832,11 +4837,11 @@ async function egoCaptured($: EngineInterface, run: Run, name: string, round: st
     } else if (done) {
       ego = { ...stop(ego), driven: String(done.summary ?? "") }
       outcome = "done"
-    } else if (lost && next) {
+    } else if (gone && next) {
       ego = { ...ego, lost: (ego.lost ?? 0) + 1, space: spaceName(r.runId, name, next), round: undefined }
       patch = { evidence: next }
       outcome = "attempt"
-    } else if (lost) {
+    } else if (gone) {
       ego = { ...stop(ego), lost: (ego.lost ?? 0) + 1 }
       patch = { over: true }
       outcome = "lost"
@@ -4849,7 +4854,7 @@ async function egoCaptured($: EngineInterface, run: Run, name: string, round: st
   const after = moved.e2e?.checks?.find(x => x.name === name)!
   if (outcome === "lost") {
     const settled = await egoSettle($)
-    return withContext(result, `check ${name}'s ego space was lost a second time (the ego browser closed?), so the check is closed with no verdict, as an environment problem. Write nothing. ${await egoSettledLine($, moved, settled)}`)
+    return withContext(result, `check ${name}'s ego space was lost a second time (${again ? "ego did not answer the same round twice in a row: CDP timeout" : "the ego browser closed?"}), so the check is closed with no verdict, as an environment problem. Write nothing. ${await egoSettledLine($, moved, settled)}`)
   }
   if (outcome === "handoff") return withContext(result, `The hook recorded the hand-off of check ${name}; its time stops. Stop now and answer \`넘김: ${after.ego!.handoff}\`. The main session asks the user and resumes you when they are done.`)
   if (outcome === "done") return withContext(result, `The hook recorded done() for check ${name}; its time stops. Stop now and answer \`완료: ${after.ego!.driven}\`. A rein:ego-judge decides it from the evidence.`)
@@ -4859,7 +4864,8 @@ async function egoCaptured($: EngineInterface, run: Run, name: string, round: st
     const e2e = "problem" in frozen ? undefined : (moved.repos ?? []).map(r => frozen.configs[r]?.e2e).find(x => x !== undefined)
     const fresh = `${c.dir}/${checkFolder(after)}`
     if (e2e) await writeHarness($, fresh, after, e2e, plan)
-    return withContext(result, `check ${name}'s ego space is gone (the ego browser was closed?). The hook started attempt ${attemptOf(fresh)} in a new space: write round-01.mjs in ${fresh}, its first line now exactly:\n${importLine(fresh)}\nStart over from opening the app; the earlier folder's evidence does not count.`)
+    const why = again ? `ego did not answer check ${name}'s space twice in a row (CDP timeout), so the hook closed it.` : `check ${name}'s ego space is gone (the ego browser was closed?).`
+    return withContext(result, `${why} The hook started attempt ${attemptOf(fresh)} in a new space: write round-01.mjs in ${fresh}, its first line now exactly:\n${importLine(fresh)}\nStart over from opening the app; the earlier folder's evidence does not count.`)
   }
   const limit = roundLimitMs(after, now)
   if (usedMs(after, now) >= after.minutes * 60_000) return withContext(result, await egoOver($, moved, name, agentId, `ran past its ${after.minutes} minutes`))
@@ -4868,6 +4874,7 @@ async function egoCaptured($: EngineInterface, run: Run, name: string, round: st
     : (() => {
         const o = roundOutcome(output)
         return o.kind === "user" ? "The user holds the space now (ego refused the round). Wait a minute, then run the same round file again."
+          : o.kind === "ego" ? "ego did not answer as the harness opened the space (CDP timeout); this is not your code, so do not change it. Run the same round file again."
           : o.kind === "error" ? `The round's script failed (exit code ${o.code}): an error in your code, not the app's. Fix it in the next round.`
             : "The round ran. Write the next round, or end with done() once every part has its evidence."
       })()
@@ -6185,8 +6192,9 @@ export const register: Register = (on) => {
         }
         // a runner's aside call for its open check (runnerRow judged its
         // form), one at a time, marked before it starts.
-        // a driver's round, judged against the run as it starts.
-        if (run.stage === "qa-integration" && run.e2e?.path === "ego" && as !== undefined && run.e2e.checks?.some(k => k.runner === as && isOpen(k))) {
+        // a driver's round, judged against the run as it starts; a
+        // read-only command of its is no round.
+        if (run.stage === "qa-integration" && run.e2e?.path === "ego" && as !== undefined && run.e2e.checks?.some(k => k.runner === as && isOpen(k)) && !driverReads(command, base)) {
           const started = await egoRoundStart($, run, base, as, command, input)
           if ("deny" in started) {
             await trace($, run, { ev: "tool", stage: run.stage, tool, agentId, command, decision: "deny", deny: started.deny })

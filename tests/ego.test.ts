@@ -147,13 +147,16 @@ describe("the ego path's pieces", () => {
     expect(roundCommand(`ego-browser nodejs < ${f}/round-03.mjs; rm x`, f, "E:/proj")).toEqual(refused("check rounds run only as"))
     expect(roundCommand(`ego-browser nodejs < C:/r/evidence/b/1/round-03.mjs`, f, "E:/proj")).toEqual(refused("is not a round file of that folder"))
     expect(roundCommand(`ego-browser nodejs -e "x"`, f, "E:/proj")).toEqual(refused("check rounds run only as"))
-    expect(roundCommand(`ls ${f}`, f, "E:/proj")).toEqual(refused("list it with Glob and open a file with Read"))
+    const other = roundCommand(`cp ${f}/a ${f}/b`, f, "E:/proj")
+    expect(other).toEqual(refused("check rounds run only as"))
+    for (const said of ["Bash runs nothing else. To change a round, Write the next round-NN.mjs whole.", "use Glob, Grep and Read, or a read-only command (cat, head, tail, grep, sed -n", "print less in the round itself", "(`new Date()`, `page.waitForTimeout(ms)`)"]) expect(other).toEqual(refused(said))
   })
 
   test("a round's output: the user holds the space, a script error, or it ran", () => {
     expect(roundOutcome("Control of this task space is with the user ... takeOverTaskSpace(3)")).toEqual({ kind: "user" })
     expect(roundOutcome("TypeError: x\n\nego's nodejs process exited with code 1.")).toEqual({ kind: "error", code: 1 })
     expect(roundOutcome("[rein] saved round-01-shot-1.png")).toEqual({ kind: "ok" })
+    expect(roundOutcome("CdpRequestTimeoutError: CDP request timed out: Network.enable\n\nego's nodejs process exited with code 1.")).toEqual({ kind: "ego" })
   })
 
   test("the judge's parts make the verdict; a pass cites a file of the folder, or the judge writes it again", () => {
@@ -250,6 +253,8 @@ describe("running checks in ego", () => {
     expect(task.background).toBe(true)
     expect(task.prompt).toContain(importLine(folderOf("detail")))
     expect(task.prompt).toContain("- Evidence the plan asks for: 측정 — 회원유형 체크박스의 disabled 수")
+    expect(task.prompt).toContain("`CdpRequestTimeoutError` is ego not answering, not your script: the hook's result says what to do.")
+    expect(task.prompt).toContain("read-only command")
     expect(files[`${folderOf("detail")}/harness.mjs`]).toContain('"space":"rein-login-fix-detail-1","profile":"Profile 1"')
     expect(files[`${folderOf("detail")}/harness.mjs`]).toContain('"production":["app.example.com"]')
     // only round files, each starting with the harness import
@@ -463,6 +468,28 @@ describe("running checks in ego", () => {
     await $.tool.call(round(agentId!, folderOf("detail", 2), "01"))
     expect(context(await $.tool.call(runRound(agentId!, folderOf("detail", 2), "01")))).toContain("The round ran past its Bash timeout")
     expect(files[`${folderOf("detail", 2)}/${REOPEN_MARK}`]).toBe("")
+  })
+
+  test("a driver reads with read-only commands, nothing else; ego not answering (CDP timeout) reruns the same round once, then the space is lost", async ($, on) => {
+    const files = filesWith()
+    const said = "CdpRequestTimeoutError: CDP request timed out: Network.enable\n\nego's nodejs process exited with code 1."
+    world(on, files, () => undefined, RUN, host(files, [], { up: true }, { bash: c => (c.startsWith("ego-browser") ? { result: { stdout: said, stderr: "" }, text: said, isError: true } : undefined) }))
+    await toEgo($)
+    const { agentId } = await spawn($, DRIVER)
+    const folder = folderOf("detail")
+    await $.tool.call(round(agentId!, folder, "01"))
+    const bash = (command: string) => $.tool.call({ tool: "Bash", command, agentId } as never) as Promise<{ deny?: string }>
+    expect((await bash(`grep -n goto ${folder}/round-01.mjs`)).deny).toBeUndefined()
+    expect((await bash(`cat ${folder}/round-01.mjs | head -5`)).deny).toBeUndefined()
+    for (const command of [`cp ${folder}/round-01.mjs ${folder}/round-02.mjs`, "sleep 5", `echo x > ${folder}/x.txt`, `cd ${folder}`]) expect(await bash(command)).toEqual(refused("Bash runs nothing else. To change a round, Write the next round-NN.mjs whole."))
+    const first = context(await $.tool.call(runRound(agentId!, folder, "01")))
+    expect(first).toContain("ego did not answer as the harness opened the space (CDP timeout); this is not your code, so do not change it. Run the same round file again.")
+    expect(first).not.toContain("an error in your code")
+    const again = context(await $.tool.call(runRound(agentId!, folder, "01")))
+    expect(again).toContain(`The hook started attempt 2 in a new space: write round-01.mjs in ${folderOf("detail", 2)}`)
+    await $.tool.call(round(agentId!, folderOf("detail", 2), "01"))
+    expect(context(await $.tool.call(runRound(agentId!, folderOf("detail", 2), "01")))).toContain("Run the same round file again.")
+    expect(context(await $.tool.call(runRound(agentId!, folderOf("detail", 2), "01")))).toContain("so the check is closed with no verdict")
   })
 })
 
