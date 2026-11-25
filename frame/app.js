@@ -2017,8 +2017,9 @@ function drawLand(pane, d) {
 // ---------- 5-checklist.md: who ticked a check, and its evidence ----------
 
 // the mark the hook leaves at the end of a check's title line when it ticks
-// it: a link to the evidence, or plain words in older runs
-const TICK = /\s\((?:\[([^\]]+)\]\(([^)\s]+)\)|(ego 통과|aside 통과|이전 통과 유지 — .*|사용자가 기존 동작으로 판단))\)\s*$/
+// it: a link to the evidence (an ego one may be followed by " · 사용한 데이터:
+// …"), or plain words in older runs
+const TICK = /\s\((?:\[([^\]]+)\]\(([^)\s]+)\)(?: · (.*))?|(ego 통과|aside 통과|이전 통과 유지 — .*|사용자가 기존 동작으로 판단))\)\s*$/
 
 // Md item hook: a check's title line gets a badge of who passed it
 function checkItem(text, body) {
@@ -2026,7 +2027,7 @@ function checkItem(text, body) {
   const m = TICK.exec(text)
   let kind, why = "", link = null
   if (m) {
-    why = m[1] || m[3]
+    why = m[1] || m[4]
     link = m[1] ? m[2] : null
     kind = /^ego 통과/.test(why) ? "ego" : /^aside 통과/.test(why) ? "aside" : /^이전 통과 유지/.test(why) ? "keep" : /^사용자가 기존 동작/.test(why) ? "person" : null
     if (!kind) return null
@@ -2043,7 +2044,7 @@ function checkItem(text, body) {
   const title = t ? t[1] : text
   const name = n ? n[1] : title
   const label = kind === "keep" ? `유지 · ${/파일 변경 없음/.test(why) ? "파일 변경 없음" : "영향 없음 판정"}` : kind === "person" ? "사람" : kind
-  const attrs = `class="bdg ${kind}" title="${esc(why)}"`
+  const attrs = `class="bdg ${kind}" title="${esc(m && m[3] ? `${why} · ${m[3]}` : why)}"`
   const badge = link
     ? `<button type="button" ${attrs} data-ev="${esc(link)}" data-title="${esc(title)}" data-name="${esc(name)}">${esc(label)} ↗</button>`
     : `<span ${attrs}>${esc(label)}</span>`
