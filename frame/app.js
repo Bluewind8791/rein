@@ -22,6 +22,10 @@ const IMAGE = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp"])
 const OPENABLE = new Set(["xlsx", "xls", "csv", "sql", "docx", "pptx"])
 // run subfolders and the stage each belongs to
 const SUB_STAGE = { brief: "spec", handoff: "land" }
+// the location hash of the all-runs page
+const RUNS_HASH = "~runs"
+// cards a group of the all-runs page shows before 더 보기
+const LIST_MAX = 6
 
 const $ = (id) => document.getElementById(id)
 const esc = Md.esc
@@ -32,7 +36,11 @@ let data = null // [{ name, runs: [run] }]
 let skew = 0 // server clock minus ours
 let ro = false // the hub's page: read only, and each run names its PC
 let hub = null // a local page's uploader status (/api/runs hub); null without a server
-let sel = readHash() // { project, slug, key, view, side }
+// list: the all-runs page instead of a run
+let sel = readHash() // { project, slug, key, view, side, list }
+let lastRun = null // the run selection the all-runs page was opened from
+// the all-runs page: the state its cards are filtered to, and the groups shown whole
+const rv = { filter: null, more: new Set() }
 let sideAt = { page: null, req: null } // the PDF page and the 요구사항 row the right tab was opened for
 const sideOff = new Set() // "<project>/<slug>" of runs whose right tab the person closed
 let fav = "done"
@@ -62,17 +70,23 @@ let cpOff = lsGet("rein.cpoff") === "1"
 const stgOpen = new Map()
 
 // ---------- location hash: #<project>/<slug>/<artifact>[/md][&r=<artifact on the right>] ----------
+// the all-runs page: #~runs (RUNS_HASH)
 
 function readHash() {
   const de = (s) => {
     try { return decodeURIComponent(s) } catch { return "" }
   }
   const [main, r] = location.hash.slice(1).split("&r=")
+  if (main === RUNS_HASH) return { project: null, slug: null, key: null, view: null, side: null, list: true }
   const p = main.split("/").map(de)
-  return { project: p[0] || null, slug: p[1] || null, key: p[2] || null, view: p[3] === "md" || p[3] === "html" ? p[3] : null, side: r ? de(r) || null : null }
+  return { project: p[0] || null, slug: p[1] || null, key: p[2] || null, view: p[3] === "md" || p[3] === "html" ? p[3] : null, side: r ? de(r) || null : null, list: false }
 }
 
 function writeHash() {
+  if (sel.list) {
+    if (location.hash !== "#" + RUNS_HASH) history.replaceState(null, "", "#" + RUNS_HASH)
+    return
+  }
   if (!sel.project || !sel.slug) return
   const h = "#" + [sel.project, sel.slug, sel.key || ""].map(enc).join("/") + (sel.view ? "/" + sel.view : "") + (sel.side ? "&r=" + enc(sel.side) : "")
   if (location.hash !== h) history.replaceState(null, "", h)
@@ -235,13 +249,21 @@ const fileUrl = (run, name) => `/files/${[run.project, run.state, run.slug, ...n
 const fileAct = (name) => (!ro && OPENABLE.has(extOf(name)) ? ["data-open", "열기"] : ["download", "내려받기"])
 
 function render() {
-  const run = resolve()
+  const list = !!sel.list
+  document.querySelector(".body").hidden = list
+  $("runs").hidden = !list
+  const run = list ? null : resolve()
   const tabs = tabRuns()
   fav = tabs.some((r) => r.status === "halt") ? "halt" : tabs.some((r) => r.status === "ask") ? "idle" : tabs.length ? "walk" : "done"
-  document.title = run ? `${run.slug} · Rein` : "Rein"
+  document.title = run ? `${run.slug} · Rein` : list ? "전체 run · Rein" : "Rein"
   renderTop(run, tabs)
   renderHub()
   renderStatus(run)
+  if (list) {
+    renderRuns()
+    writeHash()
+    return tick()
+  }
   const mock = isMock(run)
   const key = mock ? `${run.project}/${run.slug}` : null
   if (cm.key !== key) {
@@ -279,10 +301,10 @@ const ICON = {
 // the run tabs, the theme button and the icon rail: run | 전체 run
 function renderTop(run, tabs) {
   document.querySelector(".brand").textContent = ro ? "HUB" : "REIN"
-  const menu = !$("menu").hidden
+  const list = !!sel.list
   const btn = (attr, on, label, icon, count) => `<button type="button" ${attr} class="${on ? "on" : ""}" title="${label}" aria-label="${label}">${icon}${count ? `<span class="n">${count}</span>` : ""}</button>`
-  setHTML($("arail"), btn(`data-mode="run"`, !menu, "run", ICON.run, 0) +
-    btn(`data-allruns`, menu, `전체 run ${allRuns().length}`, ICON.all, allRuns().length))
+  setHTML($("arail"), btn(`data-mode="run"`, !list, "run", ICON.run, 0) +
+    btn(`data-allruns`, list, `전체 run ${allRuns().length}`, ICON.all, allRuns().length))
   // the open run stays a tab even when it is closed
   const shown = run && !tabs.some((r) => r.project === run.project && r.slug === run.slug) ? [...tabs, run] : tabs
   setHTML($("tabs"), shown.map((r) => {
@@ -294,7 +316,6 @@ function renderTop(run, tabs) {
   const dark = theme === "dark"
   setHTML($("theme"), `${dark ? ICON.sun : ICON.moon}${dark ? "라이트" : "다크"}`)
   $("theme").title = dark ? "라이트 모드로 전환" : "다크 모드로 전환"
-  if (menu) renderMenu(run)
 }
 
 // the status bar: the open run's stage and time, its start, and how many runs are open
@@ -316,7 +337,7 @@ function renderStatus(run) {
       const tail = run.state === "active" ? ` · <span data-age="${opened}"></span>` : !isNaN(to) ? ` · 총 ${fmtSpan(to - opened)}` : ""
       parts.push(`<span>시작 ${fmtDate(opened)}${tail}</span>`)
     }
-  }
+  } else if (sel.list) parts.push(`<span>전체 run ${allRuns().length}</span>`)
   parts.push(`<span>진행 중 run ${tabRuns().length}</span>`)
   setHTML($("sinfo"), parts.join(""))
 }
@@ -344,25 +365,75 @@ function renderHub() {
   else b.removeAttribute("href")
 }
 
-// every project's runs; with more than one project each row names its own
-function renderMenu(run) {
+// the all-runs page: a card per run, grouped by state, saying what each run
+// was for; with more than one project (and on the hub) each card names its own
+function renderRuns() {
   const runs = allRuns()
-  const many = data.length > 1
-  setHTML($("menu"), GROUPS.map(([st, label]) => {
+  const many = ro || data.length > 1
+  const chip = (st, label, n) => `<button type="button" class="${rv.filter === st ? "on" : ""}" data-rf="${st || ""}">${label} <b>${n}</b></button>`
+  const chips = chip(null, "전체", runs.length) + GROUPS.map(([st, label]) => chip(st, label, runs.filter((r) => r.state === st).length)).join("")
+  const groups = GROUPS.filter(([st]) => !rv.filter || rv.filter === st).map(([st, label]) => {
     const rs = runs.filter((r) => r.state === st).sort((a, b) => b.touched - a.touched)
-    const head = `<button class="mhead" type="button" data-fold="${st}"><span class="tw">${folded[st] ? "▸" : "▾"}</span>${label}<span class="n">${rs.length}</span></button>`
-    if (folded[st]) return `<div class="mgroup">${head}</div>`
-    const rows = rs.length
-      ? rs.map((r) => {
-        const on = run && r.project === run.project && r.slug === run.slug ? " on" : ""
-        const meta = st === "active" ? TAB_ST[r.status] || r.stageShort : fmtDate(r.closed || r.touched)
-        const dot = st === "active" ? `<span class="d ${r.status}"></span>` : ""
-        const pj = many ? `<span class="pj">${esc(r.project)}</span>` : ""
-        return `<button class="mrow${on}" type="button" data-p="${esc(r.project)}" data-s="${esc(r.slug)}">${dot}<span class="s">${esc(r.slug)}</span>${pj}<span class="m">${r.pc ? `${esc(r.pc)} · ` : ""}${esc(meta)}</span></button>`
-      }).join("")
-      : `<div class="mempty">없음</div>`
-    return `<div class="mgroup">${head}${rows}</div>`
-  }).join(""))
+    // a group picked in the filter is shown open and whole
+    const only = rv.filter === st
+    const fold = folded[st] && !only
+    const head = `<button class="rghead" type="button" data-fold="${st}" aria-expanded="${!fold}"><span class="tw">${fold ? "▸" : "▾"}</span>${label}<span class="n">${rs.length}</span></button>`
+    if (fold) return `<section class="rgroup">${head}</section>`
+    const shown = only || rv.more.has(st) ? rs : rs.slice(0, LIST_MAX)
+    const more = rs.length > shown.length ? `<button class="rmore" type="button" data-more="${st}">${label} ${rs.length - shown.length}개 더 보기</button>` : ""
+    const body = rs.length ? `<div class="rgrid">${shown.map((r) => runCard(r, many)).join("")}</div>${more}` : `<div class="rempty">없음</div>`
+    return `<section class="rgroup">${head}${body}</section>`
+  }).join("")
+  setHTML($("runs"), `<div class="rhead"><div><h1>전체 run</h1><p>run마다 무슨 작업이었는지</p></div><div class="rfilter">${chips}</div></div>${groups}`)
+}
+
+// a line of markdown as plain text: a card is one button, with no links in it
+const plain = (t) => esc(String(t).replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/`+/g, ""))
+
+// what agent/land.json says land committed: files, lines and commits
+function landFacts(land) {
+  const repos = land && Array.isArray(land.repos) ? land.repos : []
+  const files = repos.flatMap((r) => (r && Array.isArray(r.files) ? r.files : []))
+  if (!files.length) return ""
+  const sum = (k) => files.reduce((n, f) => n + (f && typeof f[k] === "number" ? f[k] : 0), 0)
+  const commits = (land && Array.isArray(land.result) ? land.result : []).map((x) => x && x.commit).filter((c) => typeof c === "string" && c)
+  return `<span>파일 ${files.length}</span><span class="add">+${sum("add")}</span><span class="del">−${sum("del")}</span>` +
+    commits.map((c) => `<span class="cm">${esc(c.slice(0, 7))}</span>`).join("")
+}
+
+// one run at a glance: its title and goal; a run in progress shows its stage
+// and what it waits on, a closed one what land committed and how long it took
+function runCard(r, many) {
+  const s = r.summary || {}
+  const label = r.state === "complete" ? STATUS.done : `${STATUS[r.status]} · ${r.stageShort}`
+  const pj = many ? `<span class="pj">${esc(r.project)}${r.pc ? ` · ${esc(r.pc)}` : ""}</span>` : ""
+  const opened = Date.parse(r.opened)
+  let mid = ""
+  let facts
+  let when
+  if (r.state === "active") {
+    const segs = CHAIN.map((st) => {
+      const t = r.tones[st] || "wait"
+      return `<span class="${t === "now" && r.status === "ask" ? "ask" : t}"></span>`
+    }).join("")
+    const from = Date.parse(r.stages[r.stageShort] || r.opened)
+    mid = `<div class="rc-bar"><span class="segs">${segs}</span><span>${esc(r.stageShort)} ${KO[r.stageShort] || ""}${isNaN(from) ? "" : ` · <span data-age="${from}"></span>`}</span></div>`
+    const qs = s.questions && s.questions.length ? [`미해결 질문 ${s.questions.length}`] : []
+    const calls = r.view ? (r.view.pills || []).filter((p) => p.pulse).map((p) => `${esc(p.name)} 실행 중`) : []
+    const as = s.assumed ? [`가정 ${s.assumed}`] : []
+    facts = [...qs, ...calls, ...as].map((x) => `<span>${x}</span>`).join("")
+    when = isNaN(opened) ? "" : `시작 ${fmtDate(opened)} · <span data-age="${opened}"></span>`
+  } else {
+    facts = landFacts(r.land)
+    const to = Date.parse(r.closed)
+    when = fmtDate(r.closed || r.touched) + (!isNaN(to) && !isNaN(opened) ? ` · ${fmtSpan(to - opened)}` : "")
+  }
+  return `<button class="rcard" type="button" data-p="${esc(r.project)}" data-s="${esc(r.slug)}">` +
+    `<div class="rc-h"><span class="sl">${esc(r.slug)}</span>${pj}<span class="rst ${r.status}">${esc(label)}</span></div>` +
+    `<div class="rc-t">${plain(s.title || r.slug)}</div>` +
+    (s.goal ? `<div class="rc-g">${plain(s.goal)}</div>` : "") +
+    mid +
+    `<div class="rc-f"><span class="fx">${facts}</span><span class="w">${when}</span></div></button>`
 }
 
 function extLabel(a) {
@@ -2049,21 +2120,20 @@ function tick() {
 
 $("arail").addEventListener("click", (e) => {
   if (e.target.closest("[data-allruns]")) {
-    e.stopPropagation()
-    $("menu").hidden = !$("menu").hidden
-    return renderTop(findRun(sel.project, sel.slug), tabRuns())
+    if (sel.list) return
+    lastRun = { ...sel }
+    sel = { project: null, slug: null, key: null, view: null, side: null, list: true }
+    return render()
   }
-  const b = e.target.closest("[data-mode]")
-  if (!b) return
-  $("menu").hidden = true
+  if (!e.target.closest("[data-mode]") || !sel.list) return
+  sel = lastRun ? { ...lastRun, list: false } : { project: null, slug: null, key: null, view: null, side: null, list: false }
   render()
 })
 
 // ---------- events ----------
 
 function pick(project, slug) {
-  sel = { project, slug, key: null, view: null, side: null }
-  $("menu").hidden = true
+  sel = { project, slug, key: null, view: null, side: null, list: false }
   render()
 }
 
@@ -2079,26 +2149,27 @@ $("theme").addEventListener("click", () => {
   renderTop(findRun(sel.project, sel.slug), tabRuns())
 })
 
-$("menu").addEventListener("click", (e) => {
-  e.stopPropagation()
-  const f = e.target.closest("[data-fold]")
+$("runs").addEventListener("click", (e) => {
+  const f = e.target.closest("[data-rf]")
   if (f) {
-    folded[f.dataset.fold] = !folded[f.dataset.fold]
-    return renderMenu(findRun(sel.project, sel.slug))
+    rv.filter = f.dataset.rf || null
+    return renderRuns()
   }
-  const r = e.target.closest(".mrow")
+  const g = e.target.closest("[data-fold]")
+  if (g) {
+    folded[g.dataset.fold] = !folded[g.dataset.fold]
+    return renderRuns()
+  }
+  const m = e.target.closest("[data-more]")
+  if (m) {
+    rv.more.add(m.dataset.more)
+    return renderRuns()
+  }
+  const r = e.target.closest(".rcard")
   if (r) pick(r.dataset.p, r.dataset.s)
 })
 
-// the all-runs menu closed from outside: the rail stops marking it
-function closeMenu() {
-  if ($("menu").hidden) return
-  $("menu").hidden = true
-  if (data) renderTop(findRun(sel.project, sel.slug), tabRuns())
-}
-
 document.addEventListener("click", (e) => {
-  closeMenu()
   $("cmenu").hidden = true
   // a page shown large closes on a click anywhere but on it
   if (!e.target.closest("#pzoom .zpg, .pdfv .pg, .bimg .pgc")) closeZoom()
@@ -2118,10 +2189,7 @@ document.addEventListener("keydown", (e) => {
   if (ev && evKey(e)) return
   if (e.key === "Escape" && closeZoom()) return
   if (e.key === "Escape" && cm.basis !== null) return stopBasis(findRun(sel.project, sel.slug))
-  if (e.key === "Escape") {
-    closeMenu()
-    $("cmenu").hidden = true
-  }
+  if (e.key === "Escape") $("cmenu").hidden = true
   // C: the comment mode, when focus is not in a text field
   const t = e.target
   if ((e.key === "c" || e.key === "C") && !e.ctrlKey && !e.metaKey && !e.altKey && !(t.closest && t.closest("input, textarea, select, [contenteditable]"))) {

@@ -69,23 +69,45 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .arail svg { width: 18px; height: 18px; }
 .arail .n { position: absolute; right: 2px; bottom: 3px; min-width: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 7px; background: var(--chrome2); color: var(--ink2); font: 600 9.5px/14px var(--mono); text-align: center; }
 
-/* all runs, opened from the rail over the explorer */
-.menu { position: absolute; left: 56px; top: 6px; z-index: 10; width: 380px; max-height: min(75vh, 600px); overflow: auto;
-  background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px var(--shadow); padding: 6px; }
-.menu[hidden] { display: none; }
-.mgroup { padding: 2px 0; }
-.mhead { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px; font-size: 11.5px; font-weight: 600; color: var(--mute); border-radius: 6px; }
-.mhead:hover { background: var(--hover); }
-.mhead .n { font: 11px var(--mono); }
-.mhead .tw { width: 10px; font-size: 9px; }
-.mrow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px 5px 24px; border-radius: 6px; font: 12px var(--mono); color: var(--ink2); text-align: left; }
-.mrow:hover { background: var(--hover); }
-.mrow.on { background: var(--sel); color: var(--selink); }
-.mrow .s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.mrow .m { margin-left: auto; flex: none; font-size: 11px; color: var(--mute); }
-.mrow .pj { flex: none; font-size: 10.5px; color: var(--mute); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
-.mrow .d { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.mempty { padding: 4px 8px 6px 24px; color: var(--mute); font-size: 12px; }
+/* the all-runs page, in place of the explorer and editor: a card per run, grouped by state */
+.body[hidden], .runs[hidden] { display: none; }
+.runs { min-height: 0; overflow-y: auto; background: var(--paper2); padding: 28px 36px 36px; display: flex; flex-direction: column; gap: 24px; }
+.rhead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.rhead h1 { margin: 0; font-size: 22px; font-weight: 700; }
+.rhead p { margin: 2px 0 0; color: var(--mute); }
+.rfilter { display: flex; gap: 6px; flex-wrap: wrap; }
+.rfilter button { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink2); }
+.rfilter button b { font: 500 11px var(--mono); color: var(--mute); }
+.rfilter button.on { background: var(--nowbg); border-color: var(--nowln); color: var(--now-ink); }
+.rfilter button.on b { color: var(--now-ink); }
+.rgroup { display: flex; flex-direction: column; gap: 10px; }
+.rghead { align-self: flex-start; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--mute); }
+.rghead .n { font: 400 11.5px var(--mono); }
+.rghead .tw { width: 10px; font-size: 9px; }
+.rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.rempty { color: var(--mute); font-size: 12px; }
+.rmore { align-self: flex-start; color: var(--now); font-size: 12.5px; padding: 2px 0; }
+.rmore:hover { text-decoration: underline; }
+.rcard { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); text-align: left; min-width: 0; }
+.rcard:hover { border-color: var(--nowln); background: var(--hover-now); }
+.rc-h { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rc-h .sl { font: 12px var(--mono); color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.rc-h .pj { flex: none; font: 10.5px var(--mono); color: var(--mute); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+.rst { margin-left: auto; flex: none; font-size: 11.5px; padding: 1px 8px; border-radius: 10px; white-space: nowrap; background: var(--chrome2); color: var(--mute); }
+.rst.run { background: var(--nowbg); color: var(--now-ink); } .rst.ask { background: var(--workbg); color: var(--work-ink); }
+.rst.halt { background: var(--badbg); color: var(--bad-ink); } .rst.done { background: var(--donebg); color: var(--done-ink); }
+.rc-t { font-size: 15px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.rc-g { color: var(--ink2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.rc-bar { display: flex; align-items: center; gap: 8px; font: 11.5px var(--mono); color: var(--mute); }
+.rc-bar .segs { display: flex; gap: 3px; }
+.rc-bar .segs span { width: 18px; height: 4px; border-radius: 2px; background: var(--line); }
+.rc-bar .segs .done { background: var(--done); } .rc-bar .segs .now { background: var(--now); }
+.rc-bar .segs .ask { background: var(--work); } .rc-bar .segs .bad { background: var(--bad); }
+.rc-f { margin-top: auto; display: flex; align-items: flex-end; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line2); font-size: 12px; color: var(--mute); }
+.rc-f .fx { display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+.rc-f .add, .rc-f .del, .rc-f .cm, .rc-f .w { font-family: var(--mono); }
+.rc-f .add { color: var(--done-ink); } .rc-f .del { color: var(--bad-ink); } .rc-f .cm { color: var(--dim); }
+.rc-f .w { margin-left: auto; flex: none; font-size: 11.5px; }
 
 /* the status bar */
 .sbar { display: flex; align-items: center; gap: 18px; padding: 0 12px; min-width: 0; background: var(--stbg); border-top: 1px solid var(--stln); font: 11.5px var(--mono); color: var(--stink); white-space: nowrap; overflow: hidden; }
