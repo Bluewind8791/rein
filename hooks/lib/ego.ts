@@ -344,7 +344,7 @@ export function driverTask(e2e: E2e, check: Check, k: CheckRun, folder: string, 
     "   - download(note, trigger, { page }): runs trigger (the click that downloads) and saves the file.",
     "   - handOff(what): hands the space to the user and ends the round. See step 7.",
     "   - done(summary): ends your work on the check. See step 8.",
-    ...(check.data ? dataSteps() : ["5. Open the app, log in as the check says (the account, when one is named), reach the page by its menus and do the task. Open only the screens the task names; when you cannot find a screen or the data by the path it gives, record what you saw and call done() saying so, without searching elsewhere."]),
+    ...(check.data ? dataSteps() : ["5. Open the app at the App address above (another port on the same host is another app, even when the data conditions name it), log in as the check says (the account, when one is named), reach the page by its menus and do the task. Open only the screens the task names; when you cannot find a screen or the data by the path it gives, record what you saw and call done() saying so, without searching elsewhere."]),
     "   Record evidence for every part of what is expected: a shot for what the screen shows, and measure, appState, server, network, consoleLog, download or snapshot for what a screenshot cannot show. Collect every piece the plan asks for. When the screen disagrees with what is expected, record that state too: the judge decides, not you.",
     ...(changes(check) ? [`   This check changes the screen, so the judge also decides its layout. On each screen the expectation is about, once the task is done, save a shot of the whole screen and one measure noted \`${LAYOUT}\` that returns, for the selects, inputs and grids on it: each one's left, right, top and width (getBoundingClientRect); for a select, the width of its widest option's text in its own font; for a grid, its container's width and the sum of its columns' widths. Record what it returns, whatever it shows.`] : []),
     "6. What a round's output means: `ego's nodejs process exited with code N` is an error in your script, not the app's failure; read it and write the next round. `CdpRequestTimeoutError` is ego not answering, not your script: the hook's result says what to do. A notice that control of the task space is with the user means the user is using it: wait a minute, then run the same round file again. The hook's result after each round says what is next.",
@@ -371,7 +371,7 @@ export const NO_DATA = "데이터 없음:"
 // hold, and what it may never change.
 function dataSteps(): string[] {
   return [
-    "5. Open the app, log in as the check says (the account, when one is named) and reach the page by its menus. Before the task, check that the data the task names still meets every data condition: other runs and people test on the same data, so it may have changed since the plan was written.",
+    "5. Open the app at the App address above (another port on the same host is another app, even when the data conditions name it), log in as the check says (the account, when one is named) and reach the page by its menus. Before the task, check that the data the task names still meets every data condition: other runs and people test on the same data, so it may have changed since the plan was written.",
     "   Check it with the MCP tools you have (a database, say) and on the screen. Use MCP tools only to read: never run anything through them that saves, changes or deletes data. The hook records every MCP call you make, with its result, in the evidence folder (mcp-NN.json); the judge reads them.",
     "   When the task's data no longer meets every condition, find other data that does and that the check's account sees on this page, and do the task on it. You may change the data and the steps that reach it (search conditions, the row to click, paging). Never change the page, what is expected, whether the check changes the screen, or the account.",
     "   When no data meets the conditions, make it through the app's own screens; you may open the screen that creates it. Put a mark for this check alone into it (a name or memo field): `E2E` and the current month, day, hour, minute and second, such as `E2E1028143015`. Do the task on it, look only at what carries your mark, and once the evidence is saved put it back through the app (a disuse flag, deleting it). Rows others add while you work (other runs, people testing) are not yours: look past them.",
@@ -382,11 +382,13 @@ function dataSteps(): string[] {
 
 // the task of the rein:ego-judge for check k: decide it from the evidence
 // alone, part by part, into judge.md.
-export function judgeTask(check: Check, k: CheckRun, folder: string, file: string, summary: string | undefined): string {
+export function judgeTask(check: Check, k: CheckRun, folder: string, file: string, summary: string | undefined, url?: string): string {
   return [
     `Judge check \`${k.name}\` of a Rein run's integration test from its evidence alone, and write the result. Do not fix anything; you cannot see the browser.`,
     "",
     "The check:",
+    ...(url ? [`- App: ${url}`] : []),
+    ...(check.page ? [`- Page: ${check.page}`] : []),
     `- Task: ${listed(check.todo, true)}`,
     `- Expected: ${listed(check.expect, false)}`,
     ...(check.data ? [`- Data conditions (what the data the check ran on must be): ${listed(check.data, false)}`] : []),
@@ -405,6 +407,7 @@ export function judgeTask(check: Check, k: CheckRun, folder: string, file: strin
     "",
     "1. Split what is expected into its parts: each thing that must hold on its own.",
     "2. For each part, decide from the evidence: 통과 when a file shows it; 실패 when the evidence shows otherwise; 증거 부족 when nothing recorded shows it either way. A measurement counts only when its code measures what the part says: options of a closed select counted from the DOM, not the visible one; every row of a virtualized grid from the app's data, not the rendered rows. A shot shows only what is on it.",
+    ...(url ? ["   A part counts only from evidence recorded on this app: the url in round-NN.log after each action starts with the app's address above (scheme, host and port). Evidence from another address is another app's screen, so the part it would show is 증거 부족; say which address the driver used."] : []),
     ...(changes(check) ? [`   This check changes the screen, so add one more part, \`${LAYOUT}\`, decided from the shots and the driver's \`${LAYOUT}\` measure: 실패 when a select or input is wider than its widest content plus 60px, a grid's columns leave empty space in its container or overflow it, or fields that share a row or a column are out of line (their tops or edges differ by more than 3px); name the element and its numbers. 통과 when neither shows such a defect; 증거 부족 when the measure is missing. Judge only what the expected parts say appears or changes on the screen (a new or changed field, button, column, link); an element the task only uses (clicks, fills, uploads into) keeps the size and columns it had before this change, so note its defect in its line without failing it. When the expected parts name nothing on the screen, \`${LAYOUT}\` is 통과. When the expected parts are only about a printed or downloaded file, \`${LAYOUT}\` is 통과 (the screen is not what changed), citing the shot or the measure.`] : []),
     ...(check.data ? dataJudging() : []),
     `3. Write ${file} with Write, in exactly this form:`,

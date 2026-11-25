@@ -4673,7 +4673,7 @@ async function spawnJudge($: EngineInterface, run: Run, e: AgentSpawnInput, next
   const frozen = await frozenConfigs($, claimed)
   const e2e = "problem" in frozen ? undefined : (claimed.repos ?? []).map(r => frozen.configs[r]?.e2e).find(x => x !== undefined)
   const plan = planCheck(claimed, check, e2e)
-  const prompt = egoJudgeTask(plan, check, `${c.dir}/${checkFolder(check)}`, `${c.dir}/${judgeOf(check)}`, check.ego!.driven)
+  const prompt = egoJudgeTask(plan, check, `${c.dir}/${checkFolder(check)}`, `${c.dir}/${judgeOf(check)}`, check.ego!.driven, e2e?.apps[plan.app]?.url)
   let result: AgentSpawnResult
   try {
     result = await next({ ...e, prompt, description: `judge ${check.name}`, background: true })

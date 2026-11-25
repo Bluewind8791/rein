@@ -186,6 +186,19 @@ describe("the ego path's pieces", () => {
     expect(tasks({ ...base, kind: "대조" }).join(" ")).not.toContain("레이아웃")
   })
 
+  test("the judge counts only evidence recorded on the check's app address, and the driver opens that address", () => {
+    const e2e = readConfig(JSON.stringify({ qa: ["t"], e2e: E2E })).e2e!
+    const k: CheckRun = { name: "detail", minutes: 30, spent: 0 }
+    const check = CHECKS[0] as Check
+    const url = e2e.apps[check.app]!.url
+    const judge = judgeTask(check, k, "f", "f/judge.md", undefined, url)
+    expect(judge).toContain(`- App: ${url}`)
+    expect(judge).toContain("A part counts only from evidence recorded on this app: the url in round-NN.log after each action starts with the app's address above (scheme, host and port).")
+    expect(judgeTask(check, k, "f", "f/judge.md", undefined)).not.toContain("- App:")
+    expect(driverTask(e2e, check, k, "f", undefined, 1000)).toContain("Open the app at the App address above (another port on the same host is another app, even when the data conditions name it)")
+    expect(driverTask(e2e, { ...check, data: "a row with no order" }, k, "f", undefined, 1000)).toContain("Open the app at the App address above (another port on the same host is another app, even when the data conditions name it)")
+  })
+
   test("the judge reads the last round first and finds no evidence missing before reading every round's log", () => {
     const judge = judgeTask(CHECKS[0] as Check, { name: "detail", minutes: 30, spent: 0 }, "f", "f/judge.md", undefined)
     expect(judge).toContain("Start with the last round's log")
