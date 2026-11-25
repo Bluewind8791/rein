@@ -491,6 +491,27 @@ describe("running checks in ego", () => {
     expect(context(await $.tool.call(runRound(agentId!, folderOf("detail", 2), "01")))).toContain("Run the same round file again.")
     expect(context(await $.tool.call(runRound(agentId!, folderOf("detail", 2), "01")))).toContain("so the check is closed with no verdict")
   })
+
+  test("in a check that saves, ego not answering (CDP timeout) may come after a save: no rerun, the space is closed and a new attempt starts; a second loss closes the check", async ($, on) => {
+    const files = filesWith()
+    const said = "CdpRequestTimeoutError: CDP request timed out: Network.enable\n\nego's nodejs process exited with code 1."
+    const saving = { ...RUN, checks: [{ ...CHECKS[0]!, saves: true }, CHECKS[1]!] }
+    world(on, files, () => undefined, saving, host(files, [], { up: true }, { bash: c => (c.startsWith("ego-browser") ? { result: { stdout: said, stderr: "" }, text: said, isError: true } : undefined) }))
+    await toEgo($)
+    const { agentId } = await spawn($, DRIVER)
+    const folder = folderOf("detail")
+    await $.tool.call(round(agentId!, folder, "01"))
+    ran.length = 0
+    const first = context(await $.tool.call(runRound(agentId!, folder, "01")))
+    expect(first).not.toContain("Run the same round file again.")
+    expect(first).toContain("may have come after a save")
+    expect(first).toContain(`The hook started attempt 2 in a new space: write round-01.mjs in ${folderOf("detail", 2)}`)
+    expect(ran.filter(r => r.argv[0] === "ego-browser")).toHaveLength(1)
+    await $.tool.call(round(agentId!, folderOf("detail", 2), "01"))
+    const second = context(await $.tool.call(runRound(agentId!, folderOf("detail", 2), "01")))
+    expect(second).not.toContain("Run the same round file again.")
+    expect(second).toContain("so the check is closed with no verdict")
+  })
 })
 
 // Other runs and people test on the same data: a check with `- 데이터 조건:`

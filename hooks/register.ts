@@ -4810,7 +4810,8 @@ async function egoRoundStart($: EngineInterface, run: Run, c: Ctx, agentId: stri
 // (measured), so the hook closes the space and the next round opens it
 // afresh. A lost space gets a new attempt once; a second loss closes the
 // check with no verdict, as a run past its time does. ego not answering the
-// same round twice in a row (CDP timeout) is a lost space too.
+// same round twice in a row (CDP timeout) is a lost space too, and so is the
+// first time in a check that saves: a save may already be done.
 async function egoCaptured($: EngineInterface, run: Run, name: string, round: string, agentId: string, result: ToolCallResult): Promise<ToolCallResult> {
   const record = (typeof result.result === "object" && result.result !== null ? result.result : {}) as Record<string, unknown>
   const output = await bashOutput($, result)
@@ -4827,9 +4828,11 @@ async function egoCaptured($: EngineInterface, run: Run, name: string, round: st
   const done = await read(ends.done).catch(() => ({ summary: "" }))
   // ego not answering as the harness opens the space (a CDP timeout) is
   // run again once; the same round twice in a row counts as a lost space,
-  // closed by the hook.
+  // closed by the hook. The harness also opens a popup mid-round, so in a
+  // check that saves the round may have saved already: no rerun, a lost
+  // space at once.
   const unanswered = !timedOut && !lost && !handoff && !done && roundOutcome(output).kind === "ego"
-  const again = unanswered && k.ego.cdp === Number(round)
+  const again = unanswered && (k.saves === true || k.ego.cdp === Number(round))
   const gone = lost || again
   if (timedOut || again) await egoRun($, closeScript(oneSpace(k.ego.space)))
   if (timedOut) await $.fs.write(`${folder}/${REOPEN_MARK}`, "")
@@ -4865,7 +4868,7 @@ async function egoCaptured($: EngineInterface, run: Run, name: string, round: st
   const after = moved.e2e?.checks?.find(x => x.name === name)!
   if (outcome === "lost") {
     const settled = await egoSettle($)
-    return withContext(result, `check ${name}'s ego space was lost a second time (${again ? "ego did not answer the same round twice in a row: CDP timeout" : "the ego browser closed?"}), so the check is closed with no verdict, as an environment problem. Write nothing. ${await egoSettledLine($, moved, settled)}`)
+    return withContext(result, `check ${name}'s ego space was lost a second time (${again ? (k.saves ? "ego did not answer in a check that saves: CDP timeout" : "ego did not answer the same round twice in a row: CDP timeout") : "the ego browser closed?"}), so the check is closed with no verdict, as an environment problem. Write nothing. ${await egoSettledLine($, moved, settled)}`)
   }
   if (outcome === "handoff") return withContext(result, `The hook recorded the hand-off of check ${name}; its time stops. Stop now and answer \`넘김: ${after.ego!.handoff}\`. The main session asks the user and resumes you when they are done.`)
   if (outcome === "done") return withContext(result, `The hook recorded done() for check ${name}; its time stops. Stop now and answer \`완료: ${after.ego!.driven}\`. A rein:ego-judge decides it from the evidence.`)
@@ -4875,7 +4878,9 @@ async function egoCaptured($: EngineInterface, run: Run, name: string, round: st
     const e2e = "problem" in frozen ? undefined : (moved.repos ?? []).map(r => frozen.configs[r]?.e2e).find(x => x !== undefined)
     const fresh = `${c.dir}/${checkFolder(after)}`
     if (e2e) await writeHarness($, fresh, after, e2e, plan)
-    const why = again ? `ego did not answer check ${name}'s space twice in a row (CDP timeout), so the hook closed it.` : `check ${name}'s ego space is gone (the ego browser was closed?).`
+    const why = !again ? `check ${name}'s ego space is gone (the ego browser was closed?).`
+      : k.saves ? `ego did not answer in check ${name}'s round (CDP timeout). The check saves, and the timeout may have come after a save, so the hook closed its space and the check starts over in a new space rather than repeating the round.`
+        : `ego did not answer check ${name}'s space twice in a row (CDP timeout), so the hook closed it.`
     return withContext(result, `${why} The hook started attempt ${attemptOf(fresh)} in a new space: write round-01.mjs in ${fresh}, its first line now exactly:\n${importLine(fresh)}\nStart over from opening the app; the earlier folder's evidence does not count.`)
   }
   const limit = roundLimitMs(after, now)
