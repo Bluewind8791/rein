@@ -1,6 +1,6 @@
 # 4. review — 리뷰
 
-바뀐 코드를 읽기만 하고 판정합니다. 아무것도 실행하지 않습니다 — 빌드·테스트는 qa의 일입니다.
+바뀐 코드를 읽기만 하고 판정합니다. reviewer는 아무것도 실행하지 않습니다 — 테스트는 qa의 일입니다. 다만 config에 `precheck`가 있으면 그 전에 훅이 그 명령을 돌립니다([기계 검사](#기계-검사-precheck)).
 코드를 쓴 세션이 채점하지 않도록, 판정은 `rein:reviewer`만 합니다. `review.md`는 그 에이전트만 쓸 수 있습니다.
 
 에이전트 지시: [skills/review/SKILL.md](../../skills/review/SKILL.md) · [agents/reviewer.md](../../agents/reviewer.md)
@@ -13,6 +13,17 @@
 - **적용 룰** — 동결된 룰 중 `paths:` glob이 바뀐 파일에 맞는 것. `paths:`가 없는 룰은 항상 적용
 - **설계** — `2-plan.md`의 `## 상세 설계`
 - **지난 시도 기록** — `agent/fails.md`(회차별 읽은 실패). 실패일 때 구현·설계를 가리는 근거
+
+## 기계 검사 (precheck)
+
+`.rein/config.json`에 `precheck`(수십 초 안에 끝나는 컴파일·타입 검사)가 있으면, review의 첫 `mcp__rein__advance`에서 훅이 그 명령을 각 워크트리에서 돌립니다. qa가 qa 명령을 돌리는 것과 같은 방식이고, 명령은 plan 통과 때 승인된 config의 것입니다. 컴파일 오류가 리뷰를 한 바퀴 다 돈 뒤 qa에서야 드러나 dev→review→qa를 여러 번 오가는 일을 막으려는 것입니다.
+
+- 돌기 전에는 status에 `precheck: pending`이 보이고, `rein:reviewer`·`rein:review-splitter`를 띄우면 훅이 거부합니다.
+- 모두 통과 → `precheck: passed`. 그 뒤로는 지금까지와 같이 reviewer를 띄웁니다.
+- 하나라도 실패 → 훅이 명령별 종료 코드와 실패 출력의 끝을 `agent/precheck.md`에 쓰고, reviewer 없이 run을 dev로 보냅니다(`failFile`이 `precheck.md`). reviewer의 `원인: 구현`과 같이 구현 실패 한 번으로 셉니다. 숨은 상한에 닿으면 review에 머뭅니다(`failure-route`).
+- dev를 다녀오거나 `goto`로 review에 다시 들어오면 precheck는 다시 돕니다.
+
+`precheck`가 없으면 review는 예전과 같습니다. advance는 review를 옮기지 않습니다.
 
 ## review.md
 
@@ -60,6 +71,7 @@ dev를 다녀온 재리뷰는 실패한 묶음과, 통과했지만 그 뒤 파�
 
 | 결과 | 다음 |
 |---|---|
+| precheck 실패 | `dev` (reviewer 없이, worker가 `precheck.md`를 읽고 고침) |
 | 전부 통과 | `qa` |
 | 실패, 원인 구현 | `dev` (worker가 `review.md`를 읽고 고침) |
 | 실패, 원인 설계 | `plan` |

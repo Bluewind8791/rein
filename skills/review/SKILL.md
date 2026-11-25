@@ -5,9 +5,18 @@ description: The review stage of a Rein run. Use when a Rein hook says the run i
 
 # review stage
 
-The changed code is read and checked on two things: does it follow the detailed design in `2-plan.md`, and does it keep the project rules that apply. Nothing is run here; building and testing belong to `qa`.
+The changed code is read and checked on two things: does it follow the detailed design in `2-plan.md`, and does it keep the project rules that apply. You run nothing here; testing belongs to `qa`. Only when the repository's `.rein/config.json` has `precheck` commands (a quick compile or typecheck) does the hook run them first, so that code that does not compile goes back to dev without a review.
 
 You do not judge. The `rein:reviewer` agent does, because the session that wrote the code must not grade it. Only that agent may write `review.md`; the hook refuses your writes.
+
+## 0. The precheck, when status shows it
+
+Call `mcp__rein__status`. When it shows `precheck: pending`, call `mcp__rein__advance` before spawning any reviewer; the hook refuses a reviewer until then. The hook runs the config's precheck commands in each worktree:
+
+- all pass: status shows `precheck: passed`. Go on with step 1.
+- one fails: the hook writes the report to `agent/precheck.md` and the run goes to `dev` with it as `failFile`, counted like a reviewer's implementation failure. Invoke the `rein:dev` skill. When the failures reached the hook's limit, the run stops in review with `halt: failure-route` instead: see step 3.
+
+Without a `precheck:` line, skip this step.
 
 ## 1. Get the lists from the hook
 
@@ -91,7 +100,7 @@ When the reviewer is done, call `mcp__rein__status` and act on the stage:
 - `qa`: the review passed. Invoke the `rein:qa` skill.
 - `dev`: the reviewer judged the failure an implementation problem; `failFile` is `review.md`. Invoke the `rein:dev` skill.
 - `plan`: the reviewer judged the failure a design problem (`## 실패 원인` of `review.md`). Tell the user what failed, with the evidence the failure files give (an output line, a `path:line`); a cause no file shows is your guess: say `추측` and how to check it. Then invoke the `rein:plan` skill. The revised `2-plan.md` moves on once it is approved through `mcp__rein__advance`.
-- still `review`, `halt: failure-route`: the reviewer's implementation failures reached the hook's limit, so the run stopped. Read `review.md`, decide whether the code or the design must change, and call `mcp__rein__advance` with `dev로 보냄` or `plan으로 보냄`; when you cannot decide it alone, ask the user. Then invoke the skill of the stage the run went to. Do not spawn the reviewer again during this halt.
+- still `review`, `halt: failure-route`: the implementation failures (the reviewer's, or a failed precheck) reached the hook's limit, so the run stopped. Read the file the halt names (`review.md` or `precheck.md`), decide whether the code or the design must change, and call `mcp__rein__advance` with `dev로 보냄` or `plan으로 보냄`; when you cannot decide it alone, ask the user. Then invoke the skill of the stage the run went to. Do not spawn the reviewer again during this halt.
 - still `review`: the reviewer wrote nothing that passed the hook. Spawn it again with the same task. In a split review, status names the groups still to review; spawn a reviewer for each of them.
 
 ## Moving the run

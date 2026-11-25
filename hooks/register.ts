@@ -19,14 +19,14 @@ import { COMMENTS_FILE, commentsJson, handOverText, markOne, parseComments, send
 import { ARBITER_USE, KNOWLEDGE_FILE, knowledgeDescription, knowledgeIndex, knowledgePointer, AS_IS_USE, PLAN_USE, STATUS_USE, WORKER_USE, type Knowledge } from "./lib/knowledge.ts"
 import { applicableRules, freezeRule, ruleFile, sharedRulesOf } from "./lib/rules.ts"
 import { frameStatus, MAIN, type Activity, type End, type Land, type LandFile, type LandRepo, type LandResult } from "./lib/pane.ts"
-import { normalizeRun, projectOf, renderRun, withContext, type CheckRun, type Ctx, type E2eState, type EgoCheck, type Rule, type Run, type Seal, type Stage, type StageSpec, type Tree } from "./lib/state.ts"
+import { hasPrecheck, normalizeRun, precheckRepos, projectOf, renderRun, withContext, type CheckRun, type Ctx, type E2eState, type EgoCheck, type Rule, type Run, type Seal, type Stage, type StageSpec, type Tree } from "./lib/state.ts"
 import { inTree, landMessage, treeBranch, treeOwner, treePath, treeTable, WORKTREES } from "./lib/trees.ts"
 import { afterDeviation, arbiterTask, d62Entry, dev, devCommand, devDiff, devEntry, devFails, devRound, devTask, holdRoute, routeJudged, toDev, toPlan } from "./stages/dev.ts"
 import { outside, parsePlanVerdict, PLAN_REVIEW, PLAN_REVIEWS, planEntry, planReviewer, planReviewTask, repoCandidates, revisitNote } from "./stages/plan.ts"
 import { filesOf, landFiles, nameStatus, numstat, stagedPaths, stagingProblem, statusEntries, statusPaths } from "./stages/land.ts"
 import { backendsHint, commandReport, failedRun, failureOf, OUTPUT_FILE, outputLog, rerunQuestion, rewrote, type CommandResult } from "./stages/qa.ts"
 import { driverRow, egoSection, folderOf as checkFolder, judgeOf, judgeRow, NO_DATA_WORDS, settleEgo, asideSection, progressSection, allChecked, carriedPass, carriedTick, asideTick, egoTick, checklist, doubtful, IMPACT_DIFF, IMPACT_FILE, impactRow, impactTask, parseImpact, completionLine, completionTask, E2E_MANUAL, E2E_NONE, E2E_SKIPPED, e2eSection, entryOutcome, handChecked, judgeIntegration, keptPasses, openLayouts, parseResult, qaIntegration, remember, resultOf, runnerCheck, runnerRow, sameE2e, settleAside, tick, unchecked, UNSHOT, withHistory } from "./stages/qaIntegration.ts"
-import { GROUPS_FILE, groupFile, groupItems, groupsCover, groupTask, joinedReview, parseGroups, pendingGroups, review, reviewEntry, reviewLists, reviewNext, reviewTask, splits, splitterTask } from "./stages/review.ts"
+import { GROUPS_FILE, groupFile, groupItems, groupsCover, groupTask, joinedReview, parseGroups, pendingGroups, PRECHECK_FILE, PRECHECK_FIRST, precheckPending, review, reviewEntry, reviewLists, reviewNext, reviewTask, splits, splitterTask } from "./stages/review.ts"
 import { asIsTask, asIsWanted, DIMENSIONS, EVERY, gradeLine, graderTask, gradeSummary, openQuestions, passes, scoreGrade, screenRows, sketcherTask, spec, specProblem, specType, TYPES } from "./stages/spec.ts"
 import { unbuilt } from "./stages/unbuilt.ts"
 
@@ -136,7 +136,7 @@ const USER_LINES_JS = "const rl = require('readline').createInterface({ input: r
 const RENAME_JS = "const fs = require('fs'); for (let i = 0; ; i++) { try { fs.renameSync(process.env.REIN_FROM, process.env.REIN_TO); break } catch (e) { if (i >= 5 || (e.code !== 'EPERM' && e.code !== 'EBUSY')) { try { fs.unlinkSync(process.env.REIN_FROM) } catch {} console.error(e.message); process.exit(1) } Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * (i + 1)) } }"
 const WRITE_BYTES_JS = "const fs = require('fs'); let b = ''; process.stdin.setEncoding('utf8'); process.stdin.on('data', d => { b += d }); process.stdin.on('end', () => { fs.mkdirSync(require('path').dirname(process.env.REIN_TO), { recursive: true }); fs.writeFileSync(process.env.REIN_TO, Buffer.from(b, 'base64')) })"
 // how each stage moves on, for the advance tool and its refusals.
-const MOVES = "How each stage moves on: spec, by mcp__rein__advance once rein:grader graded 1-spec.md as it is and every comment the user left on 1-mockup.html is marked with mcp__rein__comment: the run then waits for the user, who approves 1-spec.md by typing /rein:plan (advance with 승인, D175); plan, by advance once 2-plan.md passes the hook's judgment and a rein:reviewer's design review given through mcp__rein__plan_review (after two failed reviews in one visit the user decides): the run then waits for the user, who approves 2-plan.md by typing /rein:dev (advance with 승인; what advance shows also names a config that differs from the one committed at HEAD, D120); dev, by writing dev-items.md; review, by the rein:reviewer's review.md (a failure goes to dev or plan as its ## 실패 원인 judges it, or stops the run in review for your decision, which advance takes); qa, by advance (the hook runs the qa commands: all pass moves on, once rein:impact wrote impact.md when e2e checks that passed before rest on files changed since, and with checks in 2-plan.md's ## e2e 확인 the run then waits in qa-integration for the user; after a failure, qa.md reporting a code problem sends the run to dev or plan as its ## 실패 원인 judges it, or stops it in qa for your decision, which advance takes; once the user fixed the environment advance takes their answer and reruns; a config changed while the commands ran stops the run for your decision; a config changed since plan, by advance with the approval; e2e configured but Aside unavailable, by advance with the decision); qa-integration, while it waits (e2e: wait), by advance with the user's answer only: they tested by 5-checklist.md and checked every box (/rein:land; the run goes to land), want aside or ego to run the checks (/rein:e2e, which asks which), or found a problem (back to dev or plan); on the aside path once a rein:e2e-runner agent ran each check of 2-plan.md's ## e2e 확인 and wrote its result (up to 5 at once, in the background; mcp__rein__status says how many to spawn now), on the ego path once a rein:ego-driver drove each check and a rein:ego-judge judged it from the evidence (a check handed to the user, by advance with their answer), by the rein:reviewer's completion check in e2e.md (a halt, a failed aside check, or nothing left to commit, by advance with the decision; a failed completion check halts the run until goto moves it; a layout box of 5-checklist.md left empty halts it until advance takes the user's answer that they compared and checked it, or found a layout that differs); land, by advance once the planned files that changed are staged and 6-land.md is written, which closes the run (the user commits it themselves). In any stage the main session may move the run to any stage with mcp__rein__goto, on its own judgment or the user's. In any stage, to stop, put aside or abandon the run: mcp__rein__park (it says what it takes). Call mcp__rein__status to see where the run stands."
+const MOVES = "How each stage moves on: spec, by mcp__rein__advance once rein:grader graded 1-spec.md as it is and every comment the user left on 1-mockup.html is marked with mcp__rein__comment: the run then waits for the user, who approves 1-spec.md by typing /rein:plan (advance with 승인, D175); plan, by advance once 2-plan.md passes the hook's judgment and a rein:reviewer's design review given through mcp__rein__plan_review (after two failed reviews in one visit the user decides): the run then waits for the user, who approves 2-plan.md by typing /rein:dev (advance with 승인; what advance shows also names a config that differs from the one committed at HEAD, D120); dev, by writing dev-items.md; review, by the rein:reviewer's review.md, after advance ran the config's precheck commands when it has any (one failing sends the run back to dev) (a failure goes to dev or plan as its ## 실패 원인 judges it, or stops the run in review for your decision, which advance takes); qa, by advance (the hook runs the qa commands: all pass moves on, once rein:impact wrote impact.md when e2e checks that passed before rest on files changed since, and with checks in 2-plan.md's ## e2e 확인 the run then waits in qa-integration for the user; after a failure, qa.md reporting a code problem sends the run to dev or plan as its ## 실패 원인 judges it, or stops it in qa for your decision, which advance takes; once the user fixed the environment advance takes their answer and reruns; a config changed while the commands ran stops the run for your decision; a config changed since plan, by advance with the approval; e2e configured but Aside unavailable, by advance with the decision); qa-integration, while it waits (e2e: wait), by advance with the user's answer only: they tested by 5-checklist.md and checked every box (/rein:land; the run goes to land), want aside or ego to run the checks (/rein:e2e, which asks which), or found a problem (back to dev or plan); on the aside path once a rein:e2e-runner agent ran each check of 2-plan.md's ## e2e 확인 and wrote its result (up to 5 at once, in the background; mcp__rein__status says how many to spawn now), on the ego path once a rein:ego-driver drove each check and a rein:ego-judge judged it from the evidence (a check handed to the user, by advance with their answer), by the rein:reviewer's completion check in e2e.md (a halt, a failed aside check, or nothing left to commit, by advance with the decision; a failed completion check halts the run until goto moves it; a layout box of 5-checklist.md left empty halts it until advance takes the user's answer that they compared and checked it, or found a layout that differs); land, by advance once the planned files that changed are staged and 6-land.md is written, which closes the run (the user commits it themselves). In any stage the main session may move the run to any stage with mcp__rein__goto, on its own judgment or the user's. In any stage, to stop, put aside or abandon the run: mcp__rein__park (it says what it takes). Call mcp__rein__status to see where the run stands."
 // what the main session reads when the completion check failed.
 const COMPLETION_FAILED = "the completion check in e2e.md failed, so the run is halted in qa-integration. Tell the user what failed and decide with them where the run goes, then call mcp__rein__goto: plan to revise the design, land to accept the evidence as it is, qa-integration to run the integration entry again (checks that passed stay passed) and the completion check after it, or any other stage."
 const WRITE_TOOLS = new Set(["Write", "Edit", "NotebookEdit"])
@@ -1617,6 +1617,7 @@ async function advance($: EngineInterface, input: Record<string, unknown>): Prom
 async function advanceRun($: EngineInterface, run: Run, answer: string | undefined): Promise<ToolCallResult> {
   if (run.halt?.rule === "failure-route") return routeGate($, run, answer)
   if (run.stage === "plan") return approvePlan($, run, answer)
+  if (run.stage === "review") return precheckGate($, run)
   if (run.stage === "qa") return qaGate($, run, answer)
   if (run.stage === "qa-integration" && run.halt?.rule === "D141") return asideGate($, run, answer)
   if (run.stage === "qa-integration" && run.halt?.rule === "D173") return failGate($, run, answer)
@@ -1788,7 +1789,7 @@ async function goTo($: EngineInterface, input: Record<string, unknown>): Promise
   // a halted integration qa runs its entry again with what it found.
   const reenter = to === "qa-integration" && run.stage === "qa-integration" && run.halt !== undefined && !judged
   const cleared: Partial<Run> = {
-    worker: undefined, arbiter: undefined, reviewer: undefined, splitter: undefined, reviewGroups: undefined, verifier: undefined, deviation: undefined,
+    worker: undefined, arbiter: undefined, reviewer: undefined, splitter: undefined, prechecked: undefined, reviewGroups: undefined, verifier: undefined, deviation: undefined,
     failFile: undefined, d62: undefined, keepRetries: undefined, halt: undefined, e2e: undefined, qaVisit: undefined,
     heads: undefined, landRepos: undefined, back: undefined,
     planReviewer: undefined, planReview: undefined, planVerdicts: undefined,
@@ -1821,6 +1822,46 @@ async function goTo($: EngineInterface, input: Record<string, unknown>): Promise
           : to === "qa" ? QA_ENTRY
             : LAND_ENTRY
   return { result: head, context: [`${entry}${setupLine(planted.setup)}`] }
+}
+
+// review with precheck commands in the approved config (a compile, a
+// typecheck): advance runs them in each worktree before any reviewer, as qa
+// runs its commands. All pass: the reviewers may be spawned. One fails: its
+// output's tail goes in precheck.md and the run goes to dev with it, counted
+// as an implementation failure (at the hidden cap it stops in review). No
+// precheck: advance moves nothing in review, as before.
+async function precheckGate($: EngineInterface, run: Run): Promise<ToolCallResult> {
+  if (!hasPrecheck(run)) return noTransition($, run)
+  const c = await ctxOf($, run)
+  const spawnNext = (r: Run) => reviewNext(r, c.dir).trim() || "Spawn rein:reviewer; the hook writes its task."
+  if (run.prechecked) return { deny: `the config's precheck commands already passed for this code; advance does not move the review stage. ${spawnNext(run)}` }
+  const token = await takeBusy($, "review", "precheck")
+  if (token === undefined) return { deny: "the hook is already running the precheck commands; wait for its result." }
+  try {
+    const now = await getRun($)
+    if (!now || now.stage !== "review" || now.halt || now.prechecked) return { deny: "the run changed before the precheck commands ran; nothing was run. Call mcp__rein__status." }
+    const results = await runAll($, precheckRepos(now), r => now.configSeen?.[r]?.precheck ?? [], 600_000)
+    await trace($, now, { ev: "precheck", stage: "review", results: stored(results) })
+    if (results.every(r => r.exit === 0)) {
+      const moved = await mutate($, r => (r?.stage === "review" && r.busy?.at === token ? { ...r, prechecked: true as const } : undefined))
+      if (!moved) return { deny: "the run left review while the precheck commands ran; nothing was moved." }
+      return { result: "The hook ran the config's precheck commands; all passed.", context: [`${commandReport(results)}\n\n${spawnNext(moved)}`] }
+    }
+    const file = `${c.dir}/${PRECHECK_FILE}`
+    await $.fs.write(file, `## 검증 명령\n\n${commandReport(results)}\n\n(훅이 리뷰 전에 config의 precheck 명령을 돌림)\n`)
+    let context = ""
+    const moved = await mutate($, r => {
+      if (r?.stage !== "review" || r.busy?.at !== token) return undefined
+      const routed = routeJudged({ ...r, busy: undefined }, file, "구현")
+      context = routed.context
+      return routed.run
+    })
+    if (!moved) return { deny: "the run left review while the precheck commands ran; nothing was moved." }
+    await trace($, now, moved.halt ? { ev: "halt", stage: "review", halt: moved.halt, retries: moved.retries } : { ev: "stage", from: "review", to: moved.stage, retries: moved.retries, cause: "구현" })
+    return { result: `A precheck command failed; no reviewer runs on this code. The run is now in the ${moved.stage} stage.`, context: [`The hook ran the config's precheck commands before review, and one failed:\n${commandReport(results)}\nIt counts as an implementation failure; ${file} has the report. ${context}`] }
+  } finally {
+    await dropBusy($, token)
+  }
 }
 
 // Work qa: a config that changed since plan comes first, since nothing
@@ -3257,7 +3298,7 @@ async function devExit($: EngineInterface, c: Ctx, result: ToolCallResult): Prom
     // holds has the change grouped anew; with no group left to review (no
     // file changed since every group passed), every group is reviewed again.
     const groups = r.reviewGroups?.map(g => (g.verdict?.pass ? g : { ...g, verdict: undefined }))
-    const next: Run = { ...r, stage: "review", failFile: undefined, arbiter: undefined, worker: undefined, sealed, ...(groups ? { reviewGroups: groups } : {}) }
+    const next: Run = { ...r, stage: "review", failFile: undefined, arbiter: undefined, worker: undefined, prechecked: undefined, sealed, ...(groups ? { reviewGroups: groups } : {}) }
     if (!next.reviewGroups) return next
     if (!groupsCover(next, c.dir)) return { ...next, reviewGroups: undefined }
     return pendingGroups(next).length > 0 ? next : { ...next, reviewGroups: next.reviewGroups.map(g => ({ ...g, verdict: undefined })) }
@@ -5851,6 +5892,8 @@ export const register: Register = (on) => {
     // each ego check's driver and judge.
     if (run && e.subagentType === DRIVER) return spawnDriver($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
     if (run && e.subagentType === JUDGE) return spawnJudge($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
+    // the config's precheck commands run before any reviewer judges the code.
+    if (run?.stage === "review" && (e.subagentType === SPLITTER || e.subagentType === "rein:reviewer") && precheckPending(run)) return { deny: PRECHECK_FIRST }
     // a split review's splitter and its reviewers, one per group.
     if (run?.stage === "review" && (e.subagentType === SPLITTER || (e.subagentType === "rein:reviewer" && splits(run)))) return spawnSplitReview($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
     // the design review of 2-plan.md.

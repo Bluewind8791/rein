@@ -27,6 +27,7 @@ If `<repository root>/.rein/config.json` already exists, read it and check it ag
 
 - It is a JSON object.
 - `qa` is a non-empty array of non-empty command strings.
+- `precheck`, when present, is an array of non-empty command strings.
 - `worktree`, when present, is an object whose `setup`, if given, is an array of non-empty command strings.
 - `e2e`, when present, is an object with `apps` (at least one app, each an http(s) `url` and, if given, a `login` string, a `note` string, a `profile` string and a `profiles` object of strings), a `production` array of hosts (it may be empty), a `backends` array of hosts (empty only when the apps call no backend), and, if given, a `timeout` that is a whole number from 1 to 60. An older `e2e` has one `url` and an `account` instead of `apps`; the hook still reads it as one app named `app`. Offer to rewrite it as `apps` only when the user wants to name a second app or a login.
 
@@ -57,6 +58,7 @@ A failure does not block anything. It may be the environment, and the call is th
 Ask with `AskUserQuestion`, the candidates as options. **Never write the file without the user's confirmation.**
 
 - `qa`: fast commands such as typecheck and unit tests. Required.
+- `precheck`: only compile or type checks that finish in tens of seconds (`npm run typecheck`, say). The hook runs them in each worktree before review, so that code that does not compile goes back to dev without a review; a failure counts as one implementation failure. Tests stay in `qa`. May be left out; then review starts as before. Ask whether to add it.
 - `e2e`: what the e2e agent needs to drive the apps. Leave it out if the user says there is no app to drive. When present:
   - `apps`, required: one entry per app, `"<name>": {"url": "...", "login": "..."}`. The name is what `2-plan.md`'s checks say under `- 앱:` (a short word: `admin`, `mobile`). `url` is the address to drive; never offer a production address as a candidate. `login`, optional, is one free sentence: the account, its password, and how to log in (for example "tester / test-pass, log in with the id and password form"). When every test account shares one password, the sentence can give only the way in and that password ("id and password form; the password is test-pass for every account"): each check in `2-plan.md` then names its account under `- 계정:`, so runs that test as different accounts need no config change. Tell the user the login goes into every aside command and stays in Rein's trace and in the Aside session, so it must be a test account. `note`, optional, is one free sentence of what every check of the app must mind, for example "after login a welcome tour opens; press Skip, since finishing it changes the account's settings". The hook puts it into every aside and ego command and once per page into `5-checklist.md`, so checks do not repeat it in their steps. Ask whether the app has such a thing; never put a password in it, since the person reads it.
   - `production`, required: the list of production hosts, `[]` if none. **Always ask for it**: the hook checks each app's `url` and every `backends` host against it and blocks e2e on production. The match is by host only (case, port, user info and a trailing dot ignored): `app.example.com` matches that host exactly, and `*.example.com` matches every host under `example.com` (not `example.com` itself; list it too if it is production).
@@ -74,6 +76,7 @@ Write the confirmed values to `<repository root>/.rein/config.json`:
 ```json
 {
   "qa": ["npm run typecheck", "npm test"],
+  "precheck": ["npm run typecheck"],
   "e2e": {
     "apps": {
       "admin": { "url": "http://localhost:8090", "login": "tester / test-pass, id and password form", "note": "after login press Skip on the welcome tour", "profile": "Tester1", "profiles": { "tester2": "Tester2" } },

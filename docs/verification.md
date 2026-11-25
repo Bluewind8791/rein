@@ -62,6 +62,7 @@ sequenceDiagram
 | `sketch` | sketcher의 `agent/tobe.html`을 as-is와 합쳐 `1-mockup.html`을 쓸 때 | `agentId`. 합치지 못하면 대신 `sketch-join`과 이유(`problem`: 표식 없는 `.compare`, as-is에 없는 `id`) |
 | `ask` | `spec`에서 메인 세션의 질문이 답을 받을 때 | 지금까지의 질문 수 (`D175`). 거부된 질문은 `tool` `deny` 줄에 `rule: D175` |
 | `rerun` | 훅이 `advance`에서 `qa` 명령을 돌린 뒤 — 첫 실행 포함 | 저장소·명령·exit code (`D56`, `D153`). 묻지 않고 돌렸으면 `rule: D153`, 실패 뒤 사람에게 물어 돌렸으면 `rule: D143`과 답. 명령이 config를 고쳤으면 `configRewritten` (`D120`) |
+| `precheck` | 훅이 review의 `advance`에서 config의 `precheck` 명령을 돌린 뒤 | 저장소·명령·exit code. 실패면 뒤따르는 `stage` 줄(`to: dev`, `cause: 구현`)이나 상한에 닿은 `halt` 줄 |
 | `release` | 멈춘 run을 사람이 풀 때 | 단계, 멈춘 이유, 답 (`D132`, `D141`) |
 | `halt` | e2e가 설정됐는데 aside를 못 써 멈출 때 | 단계(`qa` 또는 `qa-integration`), 멈춘 이유 (`D141`) |
 | `park` | 사람이 `park` 질문에 `보류`·`폐기`로 답할 때 | 단계, 답, 에이전트가 전한 이유, 옮겨 간 `state`. `defer/`·`drop/`의 새 위치에 씀 (`D146`) |

@@ -72,7 +72,7 @@ run마다 자기 git 워크트리에서 작업합니다. 같은 저장소에서 
 | `~/.rein/<project>/rules/` | 프로젝트 룰. `paths:` glob으로 적용 대상을 정함. run을 열 때 동결 |
 | `~/.rein/rules/` | 공용 룰. 모든 프로젝트의 run이 프로젝트 룰과 함께 동결하고, run이 고치는 모든 저장소에 적용. review에서는 `rules:<이름>`으로 부름 |
 | `~/.rein/<project>/knowledge/` | 도메인 지식. 에이전트가 화면·기능의 파일을 찾을 때 먼저 봄 |
-| `<repository>/.rein/config.json` | 저장소의 검증 명령 (`qa`, `e2e`)과 워크트리 준비 명령 (`worktree.setup`) |
+| `<repository>/.rein/config.json` | 저장소의 검증 명령 (`qa`, `e2e`), review 전에 훅이 돌리는 컴파일·타입 검사 (`precheck`, 선택)와 워크트리 준비 명령 (`worktree.setup`) |
 | `<repository>/.claude/worktrees/<runId>/` | run의 워크트리. land나 `폐기`에서 지움 |
 | `~/.claude/plugins/store/rein_*.json` | run 상태 (`$.store`) |
 
@@ -83,7 +83,7 @@ run 폴더 바로 아래에는 사람이 읽거나 쓰는 파일만 둡니다. �
 | spec | `1-spec.md`, `1-mockup.html`, `brief/`(기획서 사본) | `grade.md`, `asis.html`·`tobe.html`(목업의 두 부분, 훅이 합침), `comments.json`(사용자 코멘트), `layout-verify.md`, `layout/`(렌더링한 to-be) |
 | plan | `2-plan.md`, `2-plan.html` | `test-plan.md` |
 | dev | `handoff/` | `dev-items.md`, `dev-diff.md`(마지막 회차 diff), `fails.md`(회차별 읽은 실패), `deviation.md` |
-| review | | `review.md`, `review-groups.md`, `review-<n>.md` |
+| review | | `precheck.md`(precheck 명령이 실패했을 때), `review.md`, `review-groups.md`, `review-<n>.md` |
 | qa | `5-checklist.md` | `qa.md`, `qa-output.log`, `e2e.md`, `evidence/`(e2e 확인별 스크린샷·증거) |
 | land | `6-land.md`(커밋 메시지, 저장소별 파일 목록) | |
 | retro | | `retro.md`, `retro-read/`(reader가 읽은 몫과 메모) |

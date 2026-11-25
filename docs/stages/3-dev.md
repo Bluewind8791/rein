@@ -7,7 +7,7 @@
 ## 흐름
 
 1. 사용자가 **`/rein:dev`** 입력 → `2-plan.md` 승인 → run이 dev로.
-2. `rein:worker` 실행. 프롬프트는 훅이 run 상태로 통째로 씁니다 — 설계 파일, 넘길 파일, 재시도면 읽을 실패 파일. `## 배치 대조`가 있으면 화면마다 `1-mockup.html#<id>`와 헤드리스 Chrome으로 렌더링한 to-be PNG도 넘겨, 그 모양대로 짓게 합니다.
+2. `rein:worker` 실행. 프롬프트는 훅이 run 상태로 통째로 씁니다 — 설계 파일, 넘길 파일, 재시도면 읽을 실패 파일(`precheck.md`·`review.md`·`qa.md`·`e2e.md` 등). `## 배치 대조`가 있으면 화면마다 `1-mockup.html#<id>`와 헤드리스 Chrome으로 렌더링한 to-be PNG도 넘겨, 그 모양대로 짓게 합니다.
 3. worker가 코드와 테스트를 쓰고, 마지막에 `dev-items.md`를 씁니다.
 4. 훅이 바로 판정합니다. 통과하면 run은 `review`로, 아니면 worker를 다시 띄웁니다.
 
@@ -16,7 +16,7 @@
 | | 허용 |
 |---|---|
 | 쓰기 | 설계 파일, `dev-items.md`, `## 넘길 것`의 `handoff/` 파일. `.git` 안, `.rein/config.json`, `1-spec.md`, `2-plan.md`는 거부 |
-| Bash | 설계 파일의 `rm`, 읽기 전용 git, 읽기만 하는 명령(`cat`·`head`·`tail`·`wc`·`ls`·`grep`·`rg`·`find`·`cut`·`sed -n '<줄>p'`, 서로 파이프로 이을 수 있음)만. 빌드·테스트는 qa가 돌립니다 |
+| Bash | 설계 파일의 `rm`, 읽기 전용 git, 읽기만 하는 명령(`cat`·`head`·`tail`·`wc`·`ls`·`grep`·`rg`·`find`·`cut`·`sed -n '<줄>p'`, 서로 파이프로 이을 수 있음)만. 빌드·테스트는 훅이 돌립니다 — config의 `precheck`(컴파일·타입 검사)는 review 전에, qa 명령은 review 뒤에 |
 
 worker의 모든 쓰기는 기록됩니다. 되돌려도 기록은 지워지지 않습니다.
 

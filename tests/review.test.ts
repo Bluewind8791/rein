@@ -1,7 +1,8 @@
 import { describe, expect } from "claude-code/testing"
-import { parseCover, parseReview } from "../hooks/lib/parse.ts"
+import { readConfig, viewOf } from "../hooks/lib/config.ts"
+import { checkConfig, parseCover, parseReview } from "../hooks/lib/parse.ts"
 import { reviewTask } from "../hooks/stages/review.ts"
-import { relay, COVER, DIR, REIN, SPEC_TEXT, spawned, store, world, reviewed, test } from "./world.ts"
+import { relay, COVER, DIR, REIN, SPEC_TEXT, ran, spawned, store, world, reviewed, test } from "./world.ts"
 
 // The review stage: only the recorded reviewer's review.md is a verdict
 //, its form is checked before it lands, the verdict moves the
@@ -393,5 +394,71 @@ describe("review hardening", () => {
   test("status in review shows the run directory", async ($, on) => {
     world(on, {}, undefined, REVIEW_RUN)
     expect(await status($)).toContain(`run directory: ${DIR}`)
+  })
+})
+
+// the config's precheck: quick commands (a compile, a typecheck) the hook
+// runs at the first advance in review, before any reviewer is spawned. A
+// failure goes back to dev as an implementation failure, with precheck.md.
+describe("review precheck", () => {
+  const PRECHECK = `${DIR}/agent/precheck.md`
+  const seen = (precheck?: string[]) => ({ configSeen: { "E:/proj": { qa: ["npm test"], ...(precheck ? { precheck } : {}) } } })
+  const advance = { tool: "mcp__rein__advance" } as never
+  const splitter = { ...(spawn as object), subagentType: "rein:review-splitter" } as never
+  const typecheck = (exit: number) => ({
+    run: (argv: string[]) => (argv[2] === "npm run typecheck" ? { exitCode: exit, stdout: exit === 0 ? "" : "src/login.ts(3,7): error TS2322: Type 'string' is not assignable to type 'number'.\n" } : { exitCode: 0 }),
+  })
+
+  test("a failing precheck refuses the reviewer and sends the run to dev with precheck.md, counted", async ($, on) => {
+    const files: Record<string, string> = {}
+    world(on, files, undefined, { ...REVIEW_RUN, ...seen(["npm run typecheck"]) }, typecheck(2))
+    expect(await status($)).toContain("precheck: pending")
+    expect(await $.agent.spawn(spawn)).toEqual(refused("precheck"))
+    expect(await $.agent.spawn(splitter)).toEqual(refused("mcp__rein__advance"))
+    expect(spawned).toEqual([])
+
+    const r = await $.tool.call(advance)
+    expect(ran).toContainEqual({ argv: ["C:/Program Files/Git/bin/bash.exe", "-c", "npm run typecheck"], cwd: "E:/proj" })
+    expect(context(r)).toContain(`came back from a failure (D61): the hook tells the worker to read ${PRECHECK}`)
+    expect(files[PRECHECK]).toContain("`npm run typecheck` (E:/proj) — exit 2")
+    expect(files[PRECHECK]).toContain("error TS2322")
+    expect(saved()).toMatchObject({ stage: "dev", retries: 1, failFile: PRECHECK })
+    expect(spawned).toEqual([])
+    expect(files[`${DIR}/agent/trace.jsonl`]).toContain(`"ev":"precheck","stage":"review"`)
+
+    // back in review with new code, the precheck runs again.
+    await $.agent.spawn({ ...(spawn as object), subagentType: "rein:worker" } as never)
+    await $.tool.call(write(`${DIR}/agent/dev-items.md`, "- [x] src/login.ts\n", "agent-rein:worker"))
+    expect(saved().stage).toBe("review")
+    expect(await status($)).toContain("precheck: pending")
+    expect(await $.agent.spawn(spawn)).toEqual(refused("precheck"))
+  })
+
+  test("a passing precheck lets the reviewer go on as before", async ($, on) => {
+    world(on, {}, undefined, { ...REVIEW_RUN, ...seen(["npm run typecheck"]) }, typecheck(0))
+    const r = (await $.tool.call(advance)) as { result?: string }
+    expect(r.result).toContain("precheck")
+    expect(ran.map(x => x.argv[2])).toEqual(["npm run typecheck"])
+    expect(await status($)).not.toContain("precheck: pending")
+    await $.agent.spawn(spawn)
+    expect(spawned).toEqual([expect.objectContaining({ type: "rein:reviewer" })])
+    expect(context(await $.tool.call(write(REVIEW, GOOD, REVIEWER)))).toContain("The run is now in the qa stage.")
+  })
+
+  test("with no precheck in the config review is as it was: advance moves nothing, the reviewer is spawned", async ($, on) => {
+    world(on, {}, undefined, { ...REVIEW_RUN, ...seen() })
+    expect(await status($)).not.toContain("precheck")
+    expect(await $.tool.call(advance)).toEqual(refused("D112: advance does not move the review stage"))
+    expect(ran).toEqual([])
+    await $.agent.spawn(spawn)
+    expect(spawned).toEqual([expect.objectContaining({ type: "rein:reviewer" })])
+  })
+
+  test("precheck, when there, is an array of command strings, and the approved view keeps it", () => {
+    expect(checkConfig(JSON.stringify({ qa: ["t"], precheck: ["npm run typecheck"] }))).toBeUndefined()
+    expect(checkConfig(JSON.stringify({ qa: ["t"], precheck: "npm run typecheck" }))).toContain("`precheck`")
+    expect(checkConfig(JSON.stringify({ qa: ["t"], precheck: [""] }))).toContain("`precheck`")
+    expect(viewOf(readConfig(JSON.stringify({ qa: ["t"], precheck: ["tsc"] })))).toEqual({ qa: ["t"], precheck: ["tsc"] })
+    expect(viewOf(readConfig(JSON.stringify({ qa: ["t"] })))).toEqual({ qa: ["t"] })
   })
 })

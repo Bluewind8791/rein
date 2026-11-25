@@ -54,6 +54,7 @@ export type Run = {
   arbiter?: string // G3, agentId of the rein:arbiter spawned in dev
   reviewer?: string // agentId of the rein:reviewer spawned in review
   splitter?: string // agentId of the rein:review-splitter spawned in review, when the change is large enough to split (review.ts SPLIT_AT)
+  prechecked?: true // the config's precheck commands passed a hook run in this review visit; gone when dev passes again or goto moves the run
   reviewGroups?: ReviewGroup[] // the split review's groups from review-groups.md, kept across a dev retry and a plan pass while they hold every changed file; gone by goto
   verifier?: string // agentId of the integration qa reviewer (trace only)
   deviation?: { verdict: "합당" | "부당"; file: string } // G3, the arbiter's last verdict
@@ -226,6 +227,11 @@ function writesLines(writes: string[], planFiles: string[] | undefined): string[
   return ["writes: the files of planFiles, with these differences:", ...unwritten.map(f => `- not written: ${f}`), ...unplanned.map(w => `- written, not in planFiles: ${w}`)]
 }
 
+// the repositories whose approved config has precheck commands, which the
+// hook runs before review; none: review is as before.
+export const precheckRepos = (run: Run): string[] => (run.repos ?? []).filter(r => (run.configSeen?.[r]?.precheck?.length ?? 0) > 0)
+export const hasPrecheck = (run: Run): boolean => precheckRepos(run).length > 0
+
 // G2: the run as the status tool shows it, only the fields that are set.
 export function renderRun(run: Run): string {
   const lines = [`runId: ${run.runId}`, `stage: ${run.stage}`]
@@ -244,6 +250,7 @@ export function renderRun(run: Run): string {
   for (const r of run.rules) lines.push(`- ${r.path} (${r.shared ? "shared, every repository of the run; " : ""}${r.paths === null ? "no paths: list, always applies" : `paths: ${r.paths.join(", ")}`})`)
   if (run.worker) lines.push(`worker: ${run.worker} (writes the code, then dev-items.md)`)
   if (run.arbiter) lines.push(`arbiter: ${run.arbiter} (may write deviation.md)`)
+  if (run.stage === "review" && hasPrecheck(run)) lines.push(run.prechecked ? "precheck: passed" : "precheck: pending (call mcp__rein__advance: the hook runs the config's precheck commands before any reviewer)")
   if (run.reviewer) lines.push(`reviewer: ${run.reviewer} (may write review.md)`)
   if (run.splitter) lines.push(`review splitter: ${run.splitter} (may write review-groups.md)`)
   for (const [i, g] of (run.reviewGroups ?? []).entries()) {

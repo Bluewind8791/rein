@@ -2,7 +2,7 @@ import { readOnly } from "../lib/bash.ts"
 import { itemPath, parseReview } from "../lib/parse.ts"
 import { resolve, same } from "../lib/paths.ts"
 import { applicableRules, ruleFile } from "../lib/rules.ts"
-import type { ReviewGroup, Run, Seal, StageSpec } from "../lib/state.ts"
+import { hasPrecheck, type ReviewGroup, type Run, type Seal, type StageSpec } from "../lib/state.ts"
 
 // the rule files review checks, by file name relative to rules/
 // (`api.md`, `spring/naming.md`): the frozen rules the changed files
@@ -260,9 +260,17 @@ export function reviewEntry(run: Run, root: string, dir: string): string {
   return `The run is now in the review stage. Invoke the rein:review skill.\n${reviewLists(run, root)}${reviewNext(run, dir)}`
 }
 
-// what the main session does next in a split review, "" when the change is
-// small enough for one reviewer.
+// the config's precheck commands (a compile, a typecheck) run before any
+// reviewer; precheck.md holds the output of a failed run, which dev reads.
+export const PRECHECK_FILE = "agent/precheck.md"
+export const precheckPending = (run: Run) => hasPrecheck(run) && !run.prechecked
+export const PRECHECK_FIRST = "this repository's .rein/config.json has precheck commands, and they have not passed for this code yet: the hook runs them before any reviewer, so that a compile or type error goes back to dev without a review. Call mcp__rein__advance."
+
+// what the main session does next in review: the precheck first, when the
+// config has one; then, in a split review, the splitter and the groups. ""
+// when the change is small enough for one reviewer.
 export function reviewNext(run: Run, dir: string): string {
+  if (precheckPending(run)) return "\nThe config has precheck commands: call mcp__rein__advance before spawning any reviewer; the hook runs them in each worktree. All pass: spawn the reviewers. One fails: the run goes back to dev."
   if (!splits(run)) return ""
   if (!groupsCover(run, dir)) {
     return `\nThis change has ${run.writes.length} changed files (${SPLIT_AT} or more), so its review is split: spawn rein:review-splitter first, once; the hook writes its task. It groups the files that belong together in ${GROUPS_FILE}. Do not spawn rein:reviewer before that.`

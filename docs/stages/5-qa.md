@@ -20,6 +20,7 @@
   - **환경 탓** (JDK 버전, DB·Docker 미기동, 네트워크 등) → 사용자에게 알림. 고친 뒤 `다시 돌림`
 - 명령 실행 중 `.rein/config.json`이 바뀌면 실패로 봅니다. 판정할 에이전트가 없어 run을 멈추고(`failure-route`) 메인 세션이 dev·plan을 고릅니다. 코드가 자기 검사를 바꾼 것이기 때문입니다.
 - plan 통과 후 config가 바뀌었으면 돌리기 전에 `새 config 승인` / `그대로`를 묻습니다.
+- config의 `precheck`(컴파일·타입 검사)는 review 전에 이미 돌아 통과한 것입니다([4-review.md](./4-review.md#기계-검사-precheck)). qa는 그와 상관없이 `qa` 명령을 모두 돌립니다. 테스트처럼 오래 걸리는 검사는 `qa`에만 둡니다.
 
 ## 통합 qa
 
