@@ -4255,7 +4255,7 @@ async function landTrees($: EngineInterface, run: Run, dir: string, text: string
     if (picked.exitCode !== 0) {
       await gitQuiet($, t.repo, ["cherry-pick", "--abort"])
       await trace($, run, { ev: "error", stage: "land", tool: ADVANCE, repo: t.repo, commit, error: firstLine(picked) })
-      return { deny: `the commit ${commit} is in the worktree ${t.path}, but \`git cherry-pick\` into ${t.repo} (${l.into}) failed (${firstLine(picked)}). It was undone (cherry-pick --abort), so the main working tree is as it was; the commit stays in the worktree.${already()} git refuses while the main tree has anything staged, or changes of its own to the same files. Tell the user; once they have committed, stashed or unstaged those, call advance again (it asks again).` }
+      return { deny: `the commit ${commit} is in the worktree ${t.path}, but \`git cherry-pick\` into ${t.repo} (${l.into}) failed (${firstLine(picked)}). It was undone (cherry-pick --abort), so the main working tree is as it was; the commit stays in the worktree.${already()} git refuses while the main tree has anything staged, or changes of its own to the same files, or when the branch has commits since the worktree was made that change the same files: then rebase the worktree onto it and go back to review, as the rein:land skill says. Tell the user; once they have committed, stashed or unstaged those, call advance again (it asks again).` }
     }
     await setTree(t.path, { landed: true })
     landed.push(t)
