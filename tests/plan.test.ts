@@ -457,6 +457,8 @@ describe("the design review in plan", () => {
     expect(task).not.toContain("`## 완료 판정 덮기` or `## 변경 전 실패`")
     // dev runs nothing, so a design item that runs a program fails.
     expect(task).toContain("An item of `## 상세 설계` that asks dev to run a command (a build, a generator, a script) is 실패: dev cannot run one.")
+    // a target the spec names a requirement for is covered, or dropped only on the user's words.
+    expect(task).toContain("for every target 1-spec.md names it for (a screen, a platform, a kind of account). A target left out or narrowed without the user's words in `## 결정 사항` is 실패.")
     expect(spawned.at(-1)!.background).toBe(false)
     // the rule list is the hook's.
     expect(await $.tool.call(verdict(agentId, []))).toEqual({ deny: "rules lacks api.md. The hook's rule list: api.md. Call mcp__rein__plan_review again." })

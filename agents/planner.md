@@ -49,7 +49,7 @@ config 없음: <repository root>, ... | 없음
 ```
 
 - `config 없음`: each repository of step 6 without a usable `.rein/config.json`. The main session runs `/rein:setup` for it.
-- `사람에게`: only what the design cannot go on without, such as a choice the spec leaves open between designs that differ for the user. Each question on its own `사람에게:` line.
+- `사람에게`: only what the design cannot go on without, such as a choice the spec leaves open between designs that differ for the user. Also when the design would leave out or narrow, for one of the targets `1-spec.md` names (a screen, a platform, a kind of account), a behaviour the spec gives it: ask, with the reason and the alternatives you see, instead of writing it as a `## 결정 사항` row. Each question on its own `사람에게:` line.
 
 ## The verification, and later messages
 
@@ -84,6 +84,8 @@ Each line under `## 미해결 질문` is a question the user saw and chose to le
 `## 결정 트리`, when there is one, is the record of the questions asked in spec. Its lines are neither requirements nor open questions: the decisions are in the other sections, and a line marked `미룸` is under `## 미해결 질문` as well.
 
 A `[?]` left in another section of `1-spec.md` (a line of `## 요구사항`, a row of `## 범위`, a sentence anywhere) is undecided too: the spec passed its grade with it still open. Treat it the same way: a row of `## 결정 사항` with what is undecided as 결정, what you assume as 채택 and `가정: <why this one>` as 근거, and design on that assumption.
+
+A target `1-spec.md` names for a behaviour (in `## 영향 범위`, `## 범위` or elsewhere) is decided: a design that drops it there is not yours to settle (`사람에게`, under First call).
 
 A line of `## 요구사항` marked `보류` or `제외` is a requirement the user put off or dropped: design nothing for it. Its `[<element>]` names the element of the to-be (`data-id`) it is about.
 
