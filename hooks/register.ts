@@ -16,7 +16,6 @@ import { afterPlan, clearSession, fromPortable, pastPlan, toPortable, type HubIn
 import { quoted } from "./lib/quote.ts"
 import { AS_IS, ASIS_FILE, asIsBlocks, joinMockup, TOBE_FILE } from "./lib/mockup.ts"
 import { COMMENTS_FILE, commentsJson, handOverText, markOne, parseComments, sendDrafts, unmarked, type Comment } from "./lib/comments.ts"
-import { collatorLines, docChangeLines, earlierLand, earlierNotice, REQ_DIR, sketcherLines, specNotice, type EarlierRuns, type ScreenDoc } from "./lib/requirements.ts"
 import { ARBITER_USE, KNOWLEDGE_FILE, knowledgeDescription, knowledgeIndex, knowledgePointer, AS_IS_USE, PLAN_USE, STATUS_USE, WORKER_USE, type Knowledge } from "./lib/knowledge.ts"
 import { applicableRules, freezeRule, ruleFile, sharedRulesOf } from "./lib/rules.ts"
 import { frameStatus, MAIN, type Activity, type End, type Land, type LandFile, type LandRepo, type LandResult } from "./lib/pane.ts"
@@ -1457,129 +1456,6 @@ async function knowledge($: EngineInterface, projects: string[] = []): Promise<K
   return items
 }
 
-// the project's domains: the folders of its knowledge/ and rules/, as
-// /rein:setup took them from the catalog.
-async function domainsOf($: EngineInterface): Promise<string[]> {
-  const project = await projectDir($)
-  const out = new Set<string>()
-  for (const kind of ["knowledge", "rules"]) {
-    const dir = `${project}/${kind}`
-    if (!(await $.fs.exists(dir))) continue
-    for (const d of await $.fs.list(dir)) if (d.kind === "dir") out.add(d.name)
-  }
-  return [...out].sort()
-}
-
-// the screen document of each id, where one exists:
-// requirements/<domain>/<id>.md, or requirements/<id>.md in a project with
-// no domain.
-async function screenDocs($: EngineInterface, ids: string[]): Promise<ScreenDoc[]> {
-  const dir = `${await projectDir($)}/requirements`
-  if (ids.length === 0 || !(await $.fs.exists(dir))) return []
-  const entries = await $.fs.list(dir)
-  const out: ScreenDoc[] = []
-  for (const id of ids) {
-    const rels = [`${id}.md`, ...entries.filter(e => e.kind === "dir").map(e => `${e.name}/${id}.md`)]
-    for (const rel of rels) if (await $.fs.exists(`${dir}/${rel}`)) out.push({ id, rel, path: `${dir}/${rel}` })
-  }
-  return out
-}
-
-// the screen documents land wrote into the run folder `dir`
-// (agent/requirements/, in the layout of requirements/), as paths relative to it.
-async function landedDocs($: EngineInterface, dir: string): Promise<string[]> {
-  const base = `${dir}/${REQ_DIR}`
-  if (!(await $.fs.exists(base))) return []
-  const out: string[] = []
-  for (const e of await $.fs.list(base)) {
-    if (e.kind === "file" && /\.md$/i.test(e.name)) out.push(e.name)
-    if (e.kind !== "dir") continue
-    for (const f of await $.fs.list(`${base}/${e.name}`)) if (f.kind === "file" && /\.md$/i.test(f.name)) out.push(`${e.name}/${f.name}`)
-  }
-  return out.sort()
-}
-
-// the approval's lines for the screen documents of the run folder `dir`,
-// against the project's copies as they stand.
-async function docChanges($: EngineInterface, dir: string): Promise<string | undefined> {
-  const project = await projectDir($)
-  const docs = []
-  for (const rel of await landedDocs($, dir)) {
-    const now = `${project}/requirements/${rel}`
-    docs.push({ rel, before: (await $.fs.exists(now)) ? await $.fs.read(now) : undefined, after: await $.fs.read(`${dir}/${REQ_DIR}/${rel}`) })
-  }
-  return docChangeLines(docs, project)
-}
-
-// the run closed in `dir`: its screen documents are copied into the
-// project's requirements/, the run keeping its own as the record of what it
-// landed, and the local frame server sends them to the hub. The line for
-// the main session; empty when there were none.
-async function publishDocs($: EngineInterface, dir: string): Promise<string> {
-  const rels = await landedDocs($, dir)
-  if (rels.length === 0) return ""
-  const project = await projectDir($)
-  const done: string[] = []
-  const failed: string[] = []
-  for (const rel of rels) {
-    try {
-      await $.fs.write(`${project}/requirements/${rel}`, await $.fs.read(`${dir}/${REQ_DIR}/${rel}`))
-      done.push(`${project}/requirements/${rel}`)
-    } catch (err) {
-      failed.push(`${rel} (${String(err)})`)
-    }
-  }
-  if (done.length > 0 && (await hubOf($))) await kick($)
-  return `${done.length > 0 ? ` The screen documents are updated: ${done.join(", ")}.` : ""}${failed.length > 0 ? ` Copying these screen documents out of ${dir}/${REQ_DIR} failed: ${failed.join("; ")}; tell the user, who copies them into ${project}/requirements/ by hand.` : ""}`
-}
-
-// the ids with no screen document, and the 1-spec.md of each completed
-// run of the project (but the one in `self`) whose `## 화면` names them.
-async function earlierRuns($: EngineInterface, ids: string[], self: string): Promise<EarlierRuns[]> {
-  if (ids.length === 0) return []
-  const base = `${await projectDir($)}/complete`
-  if (!(await $.fs.exists(base))) return []
-  const specs: { path: string; ids: string[] }[] = []
-  for (const e of await $.fs.list(base)) {
-    const path = `${base}/${e.name}/1-spec.md`
-    if (e.kind !== "dir" || `${base}/${e.name}` === self || !(await $.fs.exists(path))) continue
-    specs.push({ path, ids: screenRows(await $.fs.read(path)).map(r => r.id) })
-  }
-  return ids.map(id => ({ id, specs: specs.filter(s => s.ids.includes(id)).map(s => s.path) })).filter(r => r.specs.length > 0)
-}
-
-// the main session wrote 1-spec.md in spec: the screen documents of the
-// screens of `## 화면` it was not told of yet, once each, and the earlier
-// runs of the screens with none.
-async function docsNotice($: EngineInterface, dir: string): Promise<string | undefined> {
-  const ids = screenRows(await $.fs.read(`${dir}/1-spec.md`)).map(r => r.id)
-  const docs = await screenDocs($, ids)
-  const told = (await getRun($))?.docsTold ?? []
-  const fresh = docs.filter(d => !told.includes(d.path))
-  const earlier = (await earlierRuns($, ids.filter(id => !docs.some(d => d.id === id)), dir))
-    .map(r => ({ ...r, specs: r.specs.filter(s => !told.includes(s)) }))
-    .filter(r => r.specs.length > 0)
-  if (fresh.length === 0 && earlier.length === 0) return undefined
-  const paths = [...fresh.map(d => d.path), ...earlier.flatMap(r => r.specs)]
-  await mutate($, r => (r?.stage === "spec" ? { ...r, docsTold: [...(r.docsTold ?? []), ...paths] } : undefined))
-  return [fresh.length > 0 ? specNotice(fresh) : "", earlier.length > 0 ? earlierNotice(earlier) : ""].filter(Boolean).join(" ")
-}
-
-// the screen documents status names in spec and land: the ones of the
-// screens of `## 화면`, and in land where the updated copies go.
-async function docsLines($: EngineInterface, run: Run, dir: string): Promise<string> {
-  if (run.stage !== "spec" && run.stage !== "land") return ""
-  const spec = `${dir}/1-spec.md`
-  const ids = (await $.fs.exists(spec)) ? screenRows(await $.fs.read(spec)).map(r => r.id) : []
-  if (ids.length === 0) return ""
-  const docs = await screenDocs($, ids)
-  const found = docs.length > 0 ? docs.map(d => d.path).join(", ") : "none yet"
-  const earlier = await earlierRuns($, ids.filter(id => !docs.some(d => d.id === id)), dir)
-  if (run.stage === "spec") return `\nscreen documents of the screens of \`## 화면\`: ${found}${earlier.length > 0 ? `; earlier completed runs of the screens with none: ${earlier.map(r => `${r.id} (${r.specs.join(", ")})`).join("; ")}` : ""}`
-  const domains = await domainsOf($)
-  return `\nscreen documents of the screens of \`## 화면\` (${ids.join(", ")}): ${found}. The updated copies go in ${dir}/${REQ_DIR}/, as <domain>/<screen id>.md; the project's domains: ${domains.length > 0 ? domains.join(", ") : `none (write <screen id>.md; it stays on this PC)`}.${earlier.length > 0 ? earlierLand(earlier) : ""}`
-}
-
 // an agent's task with the knowledge index after it, the run's
 // outside projects' too.
 async function withKnowledge($: EngineInterface, task: string, use: string, run: Run): Promise<string> {
@@ -2791,8 +2667,7 @@ async function status($: EngineInterface, input: Record<string, unknown>): Promi
   const indexFile = `${c.dir}/${KNOWLEDGE_FILE}`
   if (index && (!(await $.fs.exists(indexFile)) || (await $.fs.read(indexFile)) !== `${index}\n`)) await $.fs.write(indexFile, `${index}\n`).catch(() => {})
   const waits = await waitsFor($, shown, c.dir)
-  const docs = await docsLines($, shown, c.dir)
-  const text = `${renderRun(shown)}${waits.length > 0 ? `\nwaits for the user: they type ${waits.join(" or ")}` : ""}${extra}${docs}\nrun directory: ${c.dir}${index ? `\n${knowledgePointer(known, indexFile)}` : ""}${after}`
+  const text = `${renderRun(shown)}${waits.length > 0 ? `\nwaits for the user: they type ${waits.join(" or ")}` : ""}${extra}\nrun directory: ${c.dir}${index ? `\n${knowledgePointer(known, indexFile)}` : ""}${after}`
   await trace($, run, { ev: "tool", stage: run.stage, tool: STATUS, input, decision: "allow", textLength: text.length, text: clip(text) })
   return { result: text }
 }
@@ -4276,7 +4151,6 @@ async function landTrees($: EngineInterface, run: Run, dir: string, text: string
     land.repos.push({ repo: l.tree.repo, branch: l.into, files: await landFilesOf($, l.tree.path, rels, l.tree.commit === undefined ? "head" : { commit: l.tree.commit }), left: l.dropped.map(p => rel(l.tree, p)) })
   }
   await writeLand($, dir, land)
-  const docs = await docChanges($, dir)
   const facts = [
     `run ${run.runId}의 변경을 커밋해 메인 작업 트리로 가져올까요? 승인하면 저장소마다 워크트리에서 아래 파일만 커밋하고, 메인 작업 트리의 브랜치에 cherry-pick한 뒤, 워크트리와 브랜치 ${treeBranch(run.runId)}를 지웁니다. 저장소의 git hook(pre-commit 등)은 돌지 않습니다.`,
     `커밋 메시지:\n${quoted(message)}`,
@@ -4286,7 +4160,6 @@ async function landTrees($: EngineInterface, run: Run, dir: string, text: string
       ...(l.dropped.length > 0 ? [`  커밋하지 않고 워크트리와 함께 지워질 파일: ${l.dropped.map(p => rel(l.tree, p)).join(", ")}`] : []),
     ].join("\n")),
     ...(landed.length > 0 ? [`이미 넣은 저장소: ${landed.map(t => t.repo).join(", ")}`] : []),
-    ...(docs ? [docs] : []),
   ].join("\n\n")
   if (answer === undefined) {
     await trace($, run, { ev: "tool", stage: "land", tool: ADVANCE, decision: "deny", reason: "no answer" })
@@ -4350,17 +4223,15 @@ async function finishRun($: EngineInterface, run: Run, cleanup: string[] = []): 
     return { deny: `D144: ${run.trees !== undefined ? "the commits are in" : "the staging is ready"}, but the run folder could not be moved to complete (${left.problem}), so the run stays open in land. Tell the user (on Windows a file in the run folder may be open in another program); once fixed, call mcp__rein__advance: the hook finishes the run.` }
   }
   const done = await folderOf($, "complete", run.runId)
-  // the screen documents land wrote go to the project's requirements/.
-  const docs = await publishDocs($, done)
   // the handoff files moved with the folder; the person applies them.
   const handoff = run.handoff?.length
     ? ` The user still has to apply the handoff files by hand, as 2-plan.md's \`## 넘길 것\` says (${done}/2-plan.md): ${run.handoff.map(h => `${done}/handoff/${h}`).join(", ")}. Tell them each file and what to do with it.`
     : ""
   if (run.trees !== undefined) {
     const removed = cleanup.length > 0 ? ` Removing the worktrees did not finish: ${cleanup.join("; ")}.` : ""
-    return { result: "The run is finished.", context: [`D60: the run's commit is in the main working tree of ${run.trees.filter(t => t.landed).map(t => t.repo).join(", ")}, with the message in ${done}/6-land.md. The run is finished and closed; its record is in ${done}.${removed}${docs}${left.note}${handoff} Tell the user.${left.retro}`] }
+    return { result: "The run is finished.", context: [`D60: the run's commit is in the main working tree of ${run.trees.filter(t => t.landed).map(t => t.repo).join(", ")}, with the message in ${done}/6-land.md. The run is finished and closed; its record is in ${done}.${removed}${left.note}${handoff} Tell the user.${left.retro}`] }
   }
-  return { result: "The run is finished.", context: [`D60: the planned files that changed are staged in ${(run.landRepos ?? []).join(", ")}. The run is finished and closed; its record is in ${done}. The user commits the staging themselves, with the message in ${done}/6-land.md: give them that path.${docs}${left.note}${handoff} Tell the user.${left.retro}`] }
+  return { result: "The run is finished.", context: [`D60: the planned files that changed are staged in ${(run.landRepos ?? []).join(", ")}. The run is finished and closed; its record is in ${done}. The user commits the staging themselves, with the message in ${done}/6-land.md: give them that path.${left.note}${handoff} Tell the user.${left.retro}`] }
 }
 
 // the next round of dev-diff.md: each repository's planned files against HEAD,
@@ -5405,8 +5276,7 @@ async function spawnSketcher($: EngineInterface, run: Run, e: AgentSpawnInput, n
   const check = run.sketchCheck
   const looping = check?.state === "differ"
   const redraw = looping ? redrawLines(dir, check.fails, Object.keys(check.shots).map(id => `${MOCKUP_SHOTS}/${id}.boxes.txt`)) : []
-  const docs = await screenDocs($, screenRows(await $.fs.read(`${dir}/1-spec.md`)).map(r => r.id))
-  const prompt = sketcherTask(dir, redraw, sketcherLines(docs))
+  const prompt = sketcherTask(dir, redraw)
   const background = run.sketched !== undefined && !looping && e.background
   const result = await next({ ...e, prompt, background })
   if (result.deny !== undefined || result.agentId === undefined) return result
@@ -5975,14 +5845,7 @@ export const register: Register = (on) => {
     if (run && e.subagentType === IMPACT) return spawnImpact($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
     // the collator reads the images pasted since the run opened, so they are
     // saved to brief/ before it starts.
-    // It gets the screen documents of the screens of `## 화면` too, after
-    // the main session's prompt.
-    if (run?.stage === "spec" && e.subagentType === COLLATOR) {
-      await savePastes($, run)
-      const spec = `${await folderOf($, "active", run.runId)}/1-spec.md`
-      const docs = (await $.fs.exists(spec)) ? await screenDocs($, screenRows(await $.fs.read(spec)).map(r => r.id)) : []
-      if (docs.length > 0) return next({ ...e, prompt: `${e.prompt ?? ""}\n\n${collatorLines(docs)}` })
-    }
+    if (run?.stage === "spec" && e.subagentType === COLLATOR) await savePastes($, run)
     // each aside check's runner.
     if (run && e.subagentType === RUNNER) return spawnRunner($, run, e as AgentSpawnInput, next as (e: AgentSpawnInput) => Promise<AgentSpawnResult>)
     // each ego check's driver and judge.
@@ -6353,9 +6216,7 @@ export const register: Register = (on) => {
     if (scope.main && !artifact && result.deny === undefined && ((isWrite && landed) || isBash)) {
       try {
         const changed = await drifted($)
-        const docs = isWrite && run.stage === "spec" && target !== undefined && dir !== undefined && same(target, `${dir}/1-spec.md`) ? await docsNotice($, dir) : undefined
-        const lines = [...changed, ...(docs ? [docs] : [])]
-        return lines.length > 0 ? withContext(result, lines.join("\n")) : result
+        return changed.length > 0 ? withContext(result, changed.join("\n")) : result
       } catch (err) {
         await trace($, run, { ev: "error", stage: run.stage, tool, error: String(err) })
         return result

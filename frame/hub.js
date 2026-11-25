@@ -179,15 +179,8 @@ function makeHub({ root, peerOk = tailnet }) {
     return next
   }
 
-  // the catalog's screen documents, .hub/domains/<domain>/requirements/<id>.md;
-  // a domain is not any one project's
-  const docFiles = () => listDir(DOMAINS).filter(d => d.isDirectory()).flatMap(d =>
-    listDir(path.join(DOMAINS, d.name, "requirements"))
-      .filter(f => f.isFile() && f.name.endsWith(".md"))
-      .map(f => ({ project: null, domain: d.name, file: path.join(DOMAINS, d.name, "requirements", f.name) })))
-
   // the run's page, its list and its change events, read-only
-  const view = makeView({ root: ROOT, readOnly: true, recordOf, debounceMs: 1000, docFiles })
+  const view = makeView({ root: ROOT, readOnly: true, recordOf, debounceMs: 1000 })
 
   // the records of one project, or of all
   function records(project) {

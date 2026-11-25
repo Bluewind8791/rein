@@ -85,10 +85,10 @@ The grader checks that the completion line covers every result on the list not m
 
 ## Requirements (`## 요구사항`)
 
-`## 요구사항` lists the requirements this run adds, changes, puts off or drops, one line each. Write it always, with or without a planning document: a request told in words has requirements too. When the run lands, its lines go into the screen documents (see Screen documents), and the next run on the same screen starts from them.
+`## 요구사항` lists the requirements this run adds, changes, puts off or drops, one line each. Write it always, with or without a planning document: a request told in words has requirements too.
 
-- Only this run's lines. A row a screen document has already is not copied: write only what the request adds, changes or drops.
-- Each line ends with the element it is about, `[<data-id>]`: the `data-id` of that element in the to-be, a dot-separated path in lowercase Latin (`search.period`, `list.col.amount`, `toolbar.excel`), or `[-]` for a rule of the whole screen. You name the key, and `rein:sketcher` gives the element that `data-id`. An element a screen document has already keeps its key. When `## 화면` has two or more screens, put the screen id first: `[order0101/search.period]`, `[order0101p01/-]`. A run with no `## 화면` writes its lines without an element.
+- Only this run's lines: what the request adds, changes or drops.
+- Each line ends with the element it is about, `[<data-id>]`: the `data-id` of that element in the to-be, a dot-separated path in lowercase Latin (`search.period`, `list.col.amount`, `toolbar.excel`), or `[-]` for a rule of the whole screen. You name the key, and `rein:sketcher` gives the element that `data-id`. When `## 화면` has two or more screens, put the screen id first: `[order0101/search.period]`, `[order0101p01/-]`. A run with no `## 화면` writes its lines without an element.
 - The lines of the request itself come first, above any `원본:` line: `- <the requirement> — <status> [<element>]`.
 - The status is one of:
   - `포함`: done as asked, or as the document says.
@@ -99,15 +99,6 @@ The grader checks that the completion line covers every result on the list not m
 - Only the user changes, puts off or leaves out a requirement. When you think one should change, ask; never write `변경`, `보류` or `제외` on your own.
 - When the user settles something about a requirement during the questions, rewrite its line at once.
 - These lines are the requirements of the screens. Do not copy them into other sections; `## 문제` says why the work is needed.
-
-### Screen documents
-
-The requirements earlier runs landed live in one screen document per screen, `~/.rein/<project>/requirements/<domain>/<screen id>.md`, a table of rows: 요소 (the `data-id`, or `-`), 요구사항, 상태 (`구현됨`, `보류` or `폐기`), 근거 and the run that last changed it. When `1-spec.md` names a screen of `## 화면` that has one, the write's result gives its path; `mcp__rein__status` names them too.
-
-- Read each one before you write the screen's lines. Its rows are decisions already made.
-- When the request touches a row (changes a `구현됨` row, or brings back a `보류` or `폐기` one), ask the user with `AskUserQuestion` before you write the line, showing the row and its 근거.
-- `rein:sketcher` keeps the rows `1-spec.md` says nothing of, and `rein:collator` reports where a planning document differs from a row. The hook gives both the documents.
-- A screen with no document yet that earlier completed runs touched: the write's result names their `1-spec.md` instead. Read them the same way: what they landed is a decision already made. Land writes the screen's first document from them.
 
 ### Planning document
 
@@ -125,11 +116,10 @@ Then write the section:
 - One block per document: a line ``원본: `brief/<file>` (<pages>)`` naming the copy in `brief/` (for slides, the `.pptx`), then that document's lines right below it, until the next `원본:` line.
 - `(<pages>)` maps the page numbers printed on the document, which the lines use, to the file's own pages (a PDF's pages, a deck's slides, counted from 1), and so gives the pages in scope: `(p.3~p.5 = 1~3쪽)`, `(p.7 = 2쪽)`. When the document prints no page numbers, the lines use the file's pages: `(p.1~p.<N> = 1~<N>쪽)`. An image has no pages: no parentheses, and its lines have no `p.<n>`.
 - Go through each document page by page, in its order, one line per requirement: `- p.<n> <the requirement> — <status> [<element>]` (for an image, `- <the requirement> — <status> [<element>]`), with the statuses above. One line holds one thing: a table's columns, a click and what it opens, a default value, a button and where it sits, a rule. The layout of a new or changed screen goes here too: how many columns each table has, the order of the fields, which cells are clickable. Keep the document's words where you can; do not summarize several requirements into one line.
-- A requirement a screen document already holds as it is needs no line. One the document asks anew or otherwise than a row does gets its line, and the question above (ask before you write it).
 
-`rein:collator` checks the section against the document, only when there is a planning document. It reads `1-spec.md` and the documents its `원本:` lines name, never the conversation, so give it the path of `1-spec.md` alone; the hook adds the screen documents. It answers with the requirements that have no line, the `포함` lines that say something else than the document, and, under `지난 결정과 다름:`, the requirements of the document that differ from a row of a screen document; it does not report `변경`, `보류`, `제외` or `[?]` lines.
+`rein:collator` checks the section against the document, only when there is a planning document. It reads `1-spec.md` and the documents its `원본:` lines name, never the conversation, so give it the path of `1-spec.md` alone. It answers with the requirements that have no line and the `포함` lines that say something else than the document; it does not report `변경`, `보류`, `제외` or `[?]` lines.
 
-1. Once the first `1-spec.md` is written, before the first picture and the first grade, spawn `rein:collator`. Add each missing requirement as a `포함` line, or `[?]` when the document leaves it open, and correct each line it reports. For each difference from a screen document, ask the user which holds, and write their answer as the line. When it could not read part of a document, tell the user.
+1. Once the first `1-spec.md` is written, before the first picture and the first grade, spawn `rein:collator`. Add each missing requirement as a `포함` line, or `[?]` when the document leaves it open, and correct each line it reports. When it could not read part of a document, tell the user.
 2. In End, before you call `mcp__rein__advance`, spawn it again if `1-spec.md` changed since it last ran, and do the same with its answer.
 
 ## Visuals (`1-mockup.html`)

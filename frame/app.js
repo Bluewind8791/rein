@@ -22,8 +22,6 @@ const IMAGE = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp"])
 const OPENABLE = new Set(["xlsx", "xls", "csv", "sql", "docx", "pptx"])
 // run subfolders and the stage each belongs to
 const SUB_STAGE = { brief: "spec", handoff: "land" }
-// the location hash of the screen page
-const SCREENS_HASH = "~screens"
 
 const $ = (id) => document.getElementById(id)
 const esc = Md.esc
@@ -31,18 +29,10 @@ const enc = encodeURIComponent
 const shortOf = (s) => (s === "qa-integration" ? "e2e" : s)
 
 let data = null // [{ name, runs: [run] }]
-// the screen documents: { project (null on the hub), domain, id, name, updated, rows }
-let docs = []
 let skew = 0 // server clock minus ours
 let ro = false // the hub's page: read only, and each run names its PC
 let hub = null // a local page's uploader status (/api/runs hub); null without a server
-// screen: null shows the runs; otherwise the screen page, at the screen of
-// that key ("": none picked yet)
-let sel = readHash() // { project, slug, key, view, side, screen }
-let lastRun = null // the run selection the screen page was opened from
-// the screen page: the status its table is filtered to, and the unfolded
-// rows ("<screen key>|<element>")
-const sv = { filter: null, open: new Set() }
+let sel = readHash() // { project, slug, key, view, side }
 let sideAt = { page: null, req: null } // the PDF page and the 요구사항 row the right tab was opened for
 const sideOff = new Set() // "<project>/<slug>" of runs whose right tab the person closed
 let fav = "done"
@@ -72,26 +62,17 @@ let cpOff = lsGet("rein.cpoff") === "1"
 const stgOpen = new Map()
 
 // ---------- location hash: #<project>/<slug>/<artifact>[/md][&r=<artifact on the right>] ----------
-// the screen page: #~screens[/<screen key>] (SCREENS_HASH)
 
 function readHash() {
   const de = (s) => {
     try { return decodeURIComponent(s) } catch { return "" }
   }
   const [main, r] = location.hash.slice(1).split("&r=")
-  if (main === SCREENS_HASH || main.startsWith(SCREENS_HASH + "/")) {
-    return { project: null, slug: null, key: null, view: null, side: null, screen: de(main.slice(SCREENS_HASH.length + 1)) }
-  }
   const p = main.split("/").map(de)
-  return { project: p[0] || null, slug: p[1] || null, key: p[2] || null, view: p[3] === "md" || p[3] === "html" ? p[3] : null, side: r ? de(r) || null : null, screen: null }
+  return { project: p[0] || null, slug: p[1] || null, key: p[2] || null, view: p[3] === "md" || p[3] === "html" ? p[3] : null, side: r ? de(r) || null : null }
 }
 
 function writeHash() {
-  if (sel.screen != null) {
-    const h = "#" + SCREENS_HASH + (sel.screen ? "/" + enc(sel.screen) : "")
-    if (location.hash !== h) history.replaceState(null, "", h)
-    return
-  }
   if (!sel.project || !sel.slug) return
   const h = "#" + [sel.project, sel.slug, sel.key || ""].map(enc).join("/") + (sel.view ? "/" + sel.view : "") + (sel.side ? "&r=" + enc(sel.side) : "")
   if (location.hash !== h) history.replaceState(null, "", h)
@@ -254,21 +235,13 @@ const fileUrl = (run, name) => `/files/${[run.project, run.state, run.slug, ...n
 const fileAct = (name) => (!ro && OPENABLE.has(extOf(name)) ? ["data-open", "열기"] : ["download", "내려받기"])
 
 function render() {
-  const screens = sel.screen != null
-  document.querySelector(".body").hidden = screens
-  $("scr").hidden = !screens
-  const run = screens ? null : resolve()
+  const run = resolve()
   const tabs = tabRuns()
   fav = tabs.some((r) => r.status === "halt") ? "halt" : tabs.some((r) => r.status === "ask") ? "idle" : tabs.length ? "walk" : "done"
-  document.title = run ? `${run.slug} · Rein` : screens ? "화면 · Rein" : "Rein"
+  document.title = run ? `${run.slug} · Rein` : "Rein"
   renderTop(run, tabs)
   renderHub()
   renderStatus(run)
-  if (screens) {
-    renderScreens()
-    writeHash()
-    return tick()
-  }
   const mock = isMock(run)
   const key = mock ? `${run.project}/${run.slug}` : null
   if (cm.key !== key) {
@@ -297,22 +270,18 @@ function render() {
 
 const ICON = {
   run: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg>`,
-  screens: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>`,
   all: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`,
   sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
   moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`,
   comment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>`,
 }
 
-// the run tabs, the theme button and the icon rail: run | 화면 | 전체 run
+// the run tabs, the theme button and the icon rail: run | 전체 run
 function renderTop(run, tabs) {
   document.querySelector(".brand").textContent = ro ? "HUB" : "REIN"
-  const screens = sel.screen != null
   const menu = !$("menu").hidden
-  const n = screenList().length
   const btn = (attr, on, label, icon, count) => `<button type="button" ${attr} class="${on ? "on" : ""}" title="${label}" aria-label="${label}">${icon}${count ? `<span class="n">${count}</span>` : ""}</button>`
-  setHTML($("arail"), btn(`data-mode="run"`, !screens && !menu, "run", ICON.run, 0) +
-    btn(`data-mode="screens"`, screens && !menu, "화면", ICON.screens, n) +
+  setHTML($("arail"), btn(`data-mode="run"`, !menu, "run", ICON.run, 0) +
     btn(`data-allruns`, menu, `전체 run ${allRuns().length}`, ICON.all, allRuns().length))
   // the open run stays a tab even when it is closed
   const shown = run && !tabs.some((r) => r.project === run.project && r.slug === run.slug) ? [...tabs, run] : tabs
@@ -347,7 +316,7 @@ function renderStatus(run) {
       const tail = run.state === "active" ? ` · <span data-age="${opened}"></span>` : !isNaN(to) ? ` · 총 ${fmtSpan(to - opened)}` : ""
       parts.push(`<span>시작 ${fmtDate(opened)}${tail}</span>`)
     }
-  } else if (sel.screen != null) parts.push(`<span>화면 ${screenList().length}</span>`)
+  }
   parts.push(`<span>진행 중 run ${tabRuns().length}</span>`)
   setHTML($("sinfo"), parts.join(""))
 }
@@ -606,7 +575,7 @@ const showSeg = () => `<span class="seg">${Object.entries(SHOW).map(([k, l]) => 
 // The server sandboxes a run's page, so the frame and the mockup talk by
 // message (skills/spec/template.html's script): the frame says which part
 // of each screen to show, whether a click picks an element to comment on,
-// the comments to pin, and the element a row of 지난 결정 points at; the mockup says which screen was clicked, with
+// and the comments to pin; the mockup says which screen was clicked, with
 // its `to-be source` (the planning document scrolls to that page), which
 // element was picked, which comments found no element and which pin was
 // clicked. A mockup from an older template answers none of it.
@@ -709,43 +678,8 @@ const canComment = (run) => !!run && run.state === "active" && run.stageShort ==
 // mockup's screens, id -> { name, source }; basis: the n of the draft whose
 // basis box is being picked on the planning document; flash: the n of the
 // box to scroll to and flash once it is drawn
-const freshCm = (key) => ({ key, mode: false, pick: null, edit: null, text: "", on: null, missing: new Set(), old: null, err: null, busy: false, sent: null, srcs: null, timer: null, basis: null, flash: null, tab: "c" })
+const freshCm = (key) => ({ key, mode: false, pick: null, edit: null, text: "", on: null, missing: new Set(), old: null, err: null, busy: false, sent: null, srcs: null, timer: null, basis: null, flash: null })
 
-// the screen documents of the run's "## 화면": its project's on this PC,
-// the catalog's on the hub
-function runDocs(run) {
-  const ids = ((run.summary && run.summary.screens) || []).map((s) => s.id)
-  return docs.filter((d) => ids.includes(d.id) && (d.project === null || d.project === run.project))
-}
-
-// the row a screen's document holds for an element (null: the screen as a whole, "-")
-function pastRow(rd, screen, el) {
-  const d = rd.find((x) => x.id === screen)
-  return (d && d.rows.find((r) => r.el === (el || "-"))) || null
-}
-
-const pastBox = (r) => !r ? ""
-  : `<div class="cpast"><span class="h"><b>지난 결정</b>${docChip(r.status)}</span><span>${esc(r.req)}</span><span class="m">${esc(r.basis)}${r.run ? ` · ${esc(r.run)}` : ""}</span></div>`
-
-// the 지난 결정 tab: the rows this run's 요구사항 lines or comments name
-// first, then each screen's other rows in the document's order
-function pastList(run, rd) {
-  const touched = new Set([
-    ...((run.summary && run.summary.reqs) || []).map((q) => `${q.screen}|${q.el}`),
-    ...commentsOfRun(run).map((c) => `${c.screen}|${c.el || "-"}`),
-  ])
-  const row = (d, r) => `<button type="button" class="prow${r.status === "폐기" ? " gone" : ""}" data-pscr="${esc(d.id)}" data-pel="${esc(r.el)}" title="목업에서 보기">` +
-    `<span class="t"><span class="el">${esc(r.el)}</span>${docChip(r.status)}</span><span class="rq">${esc(r.req)}</span>` +
-    `<span class="bs">${esc(r.basis)}${r.run ? ` · ${esc(r.run)}` : ""}</span></button>`
-  const mine = rd.flatMap((d) => d.rows.filter((r) => touched.has(`${d.id}|${r.el}`)).map((r) => row(d, r)))
-  let html = mine.length ? `<div class="pgh">이번 run이 다루는 줄</div>${mine.join("")}` : ""
-  for (const d of rd) {
-    const rest = d.rows.filter((r) => !touched.has(`${d.id}|${r.el}`))
-    html += `<div class="pgh"><span>${esc(d.name || d.id)} <span class="id">#${esc(d.id)}</span></span>` +
-      `<button type="button" class="go" data-goscr="${esc(scrKey(d.project, d.id))}">화면 보기 ↗</button></div>` + rest.map((r) => row(d, r)).join("")
-  }
-  return html
-}
 let cm = freshCm(null)
 
 const commentsOfRun = (run) => (run.comments || []).filter((c) => c && Number.isInteger(c.n) && typeof c.screen === "string").sort((a, b) => a.n - b.n)
@@ -809,7 +743,6 @@ function renderPanel(run, mock = isMock(run)) {
   const canBasis = can && briefDocs(run).some(boxable)
   pickingBasis(run)
   const list = commentsOfRun(run)
-  const rd = runDocs(run)
   const drafts = list.filter((c) => c.status === "draft").length
   const open = list.filter((c) => c.status === "draft" || c.status === "sent").length
   const where = (screen, el) => {
@@ -846,13 +779,12 @@ function renderPanel(run, mock = isMock(run)) {
       `<div class="cct"><span class="cno ${st}">${c.n}</span>${where(c.screen, c.el)}<span class="cst ${st}">${esc(CST[c.status] || String(c.status))}</span></div>` +
       (miss ? `<div class="cmiss">요소 없음</div>` : "") +
       (editing ? input("save-edit") : `<div class="ctx">${esc(c.text || "")}</div>`) +
-      pastBox(pastRow(rd, c.screen, c.el)) +
       (c.note ? `<div class="cnote"><b>Rein</b>${esc(c.note)}</div>` : "") +
       (bas || bacts ? `<div class="cbrow">${bas}<span class="sp"></span>${bacts}</div>` : "") +
       (srcHtml || acts ? `<div class="cact">${srcHtml}<span class="sp"></span>${acts}</div>` : "") + `</div>`
   }).join("")
   const pick = can && cm.pick
-    ? `<div class="ccard new"><div class="cct"><span class="cno draft">+</span>${where(cm.pick.screen, cm.pick.el)}<span class="cst draft">새 코멘트</span></div>${input("save-new")}${pastBox(pastRow(rd, cm.pick.screen, cm.pick.el))}</div>`
+    ? `<div class="ccard new"><div class="cct"><span class="cno draft">+</span>${where(cm.pick.screen, cm.pick.el)}<span class="cst draft">새 코멘트</span></div>${input("save-new")}</div>`
     : ""
   let note = ""
   if (cm.old) note = `<div class="cline">이 목업은 코멘트 기능 이전 템플릿으로 그려져 핀과 코멘트 달기가 동작하지 않습니다.</div>`
@@ -860,15 +792,8 @@ function renderPanel(run, mock = isMock(run)) {
   const empty = !list.length && !pick
     ? `<div class="cempty">${can && cm.old === false ? "「코멘트」를 켜고 목업의 요소를 누르면 코멘트를 답니다." : "코멘트가 없습니다."}</div>`
     : ""
-  // with screen documents for the run's screens, a 지난 결정 tab beside the comments
-  const nPast = rd.reduce((n, d) => n + d.rows.length, 0)
-  const past = rd.length > 0 && cm.tab === "d"
-  const head = rd.length
-    ? `<div class="chd ctabs"><button type="button" class="${past ? "" : "on"}" data-ctab="c">코멘트 <span class="cnt">${list.length}${open ? ` · 반영 전 ${open}` : ""}</span></button>` +
-      `<button type="button" class="${past ? "on" : ""}" data-ctab="d">지난 결정 <span class="cnt">${nPast}</span></button></div>`
-    : `<div class="chd"><b>코멘트</b><span class="cnt">${list.length}${open ? ` · 반영 전 ${open}` : ""}</span></div>`
-  const html = head + (past ? "" : note) +
-    `<div class="clist">${past ? pastList(run, rd) : cards + pick + empty}</div>` +
+  const html = `<div class="chd"><b>코멘트</b><span class="cnt">${list.length}${open ? ` · 반영 전 ${open}` : ""}</span></div>${note}` +
+    `<div class="clist">${cards}${pick}${empty}</div>` +
     (cm.err ? `<div class="cerr">${esc(cm.err)}</div>` : "") +
     (can ? `<div class="cfoot">다음 입력 때 보낼 코멘트 <b>${drafts}</b>개</div>` : "")
   // the input keeps its focus and caret when the panel is drawn again
@@ -2122,143 +2047,6 @@ function tick() {
   document.querySelectorAll("[data-age]").forEach((el) => { el.textContent = fmtAge(now - Number(el.dataset.age)) })
 }
 
-// ---------- the screen page: the requirements landed for each screen ----------
-
-// A screen document (requirements/<domain>/<id>.md) holds one row per
-// element: what was landed for it and why. The page lists every screen
-// with a document, and every screen a live or landed run's "## 화면" names
-// without one yet. A screen is a project's on this PC; on the hub, whose
-// documents are the catalog's, it is its id, and runs of every project
-// count.
-const DOC_ST = { 구현됨: "inc", 보류: "hold", 폐기: "exc" }
-const docChip = (s) => `<span class="sb ${DOC_ST[s] || "q"}">${esc(s || "?")}</span>`
-const scrKey = (project, id) => (ro || project === null ? id : `${project}/${id}`)
-const liveOrLanded = (r) => r.state === "active" || r.state === "complete"
-
-function screenList() {
-  if (!data) return []
-  const map = new Map()
-  for (const d of docs) {
-    const key = scrKey(d.project, d.id)
-    if (!map.has(key)) map.set(key, { key, id: d.id, project: ro ? null : d.project, domain: d.domain, name: d.name || "", doc: d, runs: [] })
-  }
-  for (const r of allRuns().filter(liveOrLanded)) {
-    for (const s of (r.summary && r.summary.screens) || []) {
-      const key = scrKey(r.project, s.id)
-      let x = map.get(key)
-      if (!x) map.set(key, (x = { key, id: s.id, project: ro ? null : r.project, domain: null, name: "", doc: null, runs: [] }))
-      if (!x.name && s.name) x.name = s.name
-      x.runs.push(r)
-    }
-  }
-  // the runs live first, then the landed ones, the latest first
-  const at = (r) => (r.state === "active" ? Infinity : Date.parse(r.closed || r.opened) || 0)
-  for (const x of map.values()) x.runs.sort((a, b) => at(b) - at(a))
-  return [...map.values()]
-}
-
-// the screens by domain: the named ones, then a project's with no domain,
-// then the screens with no document yet
-function screenGroups(list) {
-  const label = (x) => (x.doc ? (x.domain ? x.domain : "도메인 없음") : "도메인 모름")
-  const rank = (x) => (!x.doc ? 2 : x.domain ? 0 : 1)
-  const sorted = list.slice().sort((a, b) => rank(a) - rank(b) || label(a).localeCompare(label(b)) || a.id.localeCompare(b.id))
-  const groups = []
-  for (const x of sorted) {
-    const g = groups[groups.length - 1]
-    if (g && g.label === label(x)) g.items.push(x)
-    else groups.push({ label: label(x), items: [x] })
-  }
-  return groups
-}
-
-// the lines of the screen's runs that name the element, the latest first
-function elementLines(s, el) {
-  const out = []
-  for (const r of s.runs) {
-    for (const q of (r.summary && r.summary.reqs) || []) if (q.screen === s.id && q.el === el) out.push({ run: r, q })
-  }
-  return out
-}
-
-function renderScreens() {
-  const list = screenList()
-  let s = list.find((x) => x.key === sel.screen) || null
-  if (!s && list.length) s = screenGroups(list)[0].items[0]
-  sel.screen = s ? s.key : ""
-  const many = !ro && data.length > 1
-  const nav = screenGroups(list).map((g) => `<div class="sgh">${esc(g.label)}</div>` + g.items.map((x) => {
-    const cnt = x.doc ? `${x.doc.rows.length} · run ${x.runs.length}` : `문서 없음 · run ${x.runs.length}`
-    return `<button type="button" class="sitem${s && x.key === s.key ? " on" : ""}" data-scr="${esc(x.key)}">` +
-      `<span class="t"><span class="id">${esc(x.id)}</span><span class="c">${cnt}</span></span>` +
-      `<span class="nm">${esc(x.name || "")}${many && x.project ? `<span class="pj">${esc(x.project)}</span>` : ""}</span></button>`
-  }).join("")).join("")
-  const left = `<nav class="slist" aria-label="화면 목록"><div class="sgt">화면</div>${nav || `<div class="sempty">화면이 없습니다. spec의 <code>## 화면</code>에 화면 id를 적은 run이 생기면 여기에 보입니다.</div>`}</nav>`
-  if (!s) return setHTML($("scr"), left + `<main class="smain"></main><aside class="sruns"></aside>`)
-  setHTML($("scr"), left + `<main class="smain">${screenDoc(s)}</main><aside class="sruns" aria-label="이 화면을 다룬 run">${screenRuns(s)}</aside>`)
-}
-
-function screenDoc(s) {
-  const d = s.doc
-  const head = `<div class="shead"><h1>${esc(s.name || s.id)}</h1><span class="id">#${esc(s.id)}</span><span class="sp"></span>` +
-    `<span class="meta">${d && d.updated ? `갱신 ${esc(d.updated)}` : ""}${s.project && !ro && data.length > 1 ? ` · ${esc(s.project)}` : ""}</span></div>`
-  if (!d) return head + `<div class="sempty">아직 화면 문서가 없습니다. 이 화면을 다룬 run이 land하면 생깁니다.</div>`
-  const n = (st) => d.rows.filter((r) => r.status === st).length
-  const filt = [[null, "전체", d.rows.length], ["구현됨", "구현됨", n("구현됨")], ["보류", "보류", n("보류")], ["폐기", "폐기", n("폐기")]]
-    .map(([f, l, k]) => `<button type="button" class="${sv.filter === f ? "on" : ""}" data-sf="${f || ""}">${l} <b>${k}</b></button>`).join("")
-  const rows = d.rows.filter((r) => !sv.filter || r.status === sv.filter).map((r) => {
-    const key = `${s.key}|${r.el}`
-    const open = sv.open.has(key)
-    let html = `<tr class="srow${open ? " open" : ""}${r.status === "폐기" ? " gone" : ""}" data-sel="${esc(r.el)}">` +
-      `<td class="el"><span class="tw">${open ? "▾" : "▸"}</span>${esc(r.el)}</td><td class="rq">${Md.inline(r.req, { href: (u) => u })}</td>` +
-      `<td>${docChip(r.status)}</td><td class="bs">${esc(r.basis)}</td><td class="rn">${esc(r.run)}</td></tr>`
-    if (open) html += `<tr class="shist"><td colspan="5">${rowHistory(s, r)}</td></tr>`
-    return html
-  }).join("")
-  return head + `<div class="sfilter">${filt}</div>` +
-    `<div class="stbl"><table><thead><tr><th>요소</th><th>요구사항</th><th>상태</th><th>근거</th><th>run</th></tr></thead><tbody>${rows}</tbody></table></div>`
-}
-
-// a row unfolded: its basis step by step and the land, then the lines of
-// the screen's runs that name its element
-function rowHistory(s, r) {
-  const steps = r.basis.split(/\s*→\s*/).filter(Boolean)
-  if (r.run) steps.push(`land · ${r.run}`)
-  const chain = steps.map((t) => `<div class="hs"><span class="hd"></span><span>${esc(t)}</span></div>`).join("")
-  const lines = elementLines(s, r.el).map(({ run, q }) => {
-    const b = briefRow(q.line)
-    const when = run.state === "active" ? `진행 중 · ${KO[run.stageShort] || run.stageShort}` : fmtDate(run.closed || run.opened)
-    return `<div class="hrun"><div class="t"><button type="button" class="rn" data-p="${esc(run.project)}" data-s="${esc(run.slug)}">${esc(run.slug)}</button>` +
-      `<span class="w">${esc(when)}</span>${b.status ? `<span class="sb ${STATUS_CLS[b.status]}">${esc(b.status)}</span>` : ""}</div>` +
-      `<div class="ln">${b.p !== null ? `p.${b.p} ` : ""}${esc(b.req)}${b.detail ? ` — ${esc(b.detail)}` : ""}</div>` +
-      `<div class="src">${q.src ? `원본: ${esc(q.src.replace(/`/g, ""))}` : "요청에서 온 줄"}</div></div>`
-  }).join("")
-  // runs of the screen whose 요구사항 names no element (before 0.72.0)
-  const old = s.runs.filter((x) => !((x.summary && x.summary.reqs) || []).some((q) => q.screen === s.id))
-  const note = old.length ? `<div class="hold">요소 태그가 없는 run ${old.length}개(${old.map((x) => esc(x.slug)).join(", ")})는 빠짐</div>` : ""
-  return `<div class="hgrp"><span class="hl">근거</span><div class="hchain">${chain}</div></div>` +
-    (lines || note ? `<div class="hgrp"><span class="hl">이 요소를 다룬 run</span>${lines}${note}</div>` : "")
-}
-
-function screenRuns(s) {
-  const cards = s.runs.map((r) => {
-    const when = r.state === "active" ? `진행 중 · ${KO[r.stageShort] || r.stageShort}` : `${fmtDate(r.closed || r.opened)} land`
-    const title = r.summary && r.summary.title
-    return `<button type="button" class="scrun${r.state === "active" ? " live" : ""}" data-p="${esc(r.project)}" data-s="${esc(r.slug)}">` +
-      `<span class="t"><span class="d ${r.state === "active" ? r.status : "done"}"></span><span class="s">${esc(r.slug)}</span><span class="w">${esc(when)}</span></span>` +
-      (title ? `<span class="g">${Md.inline(title, { href: (u) => u })}</span>` : "") +
-      (ro || data.length > 1 ? `<span class="pj">${esc(r.project)}${r.pc ? ` · ${esc(r.pc)}` : ""}</span>` : "") + `</button>`
-  }).join("")
-  return `<div class="srh">이 화면을 다룬 run <span class="n">${s.runs.length}</span></div>${cards || `<div class="sempty">진행 중이거나 land된 run이 없습니다.</div>`}`
-}
-
-function goScreens(key = "") {
-  if (sel.screen == null) lastRun = { ...sel }
-  sel = { project: null, slug: null, key: null, view: null, side: null, screen: key }
-  $("menu").hidden = true
-  render()
-}
-
 $("arail").addEventListener("click", (e) => {
   if (e.target.closest("[data-allruns]")) {
     e.stopPropagation()
@@ -2268,34 +2056,7 @@ $("arail").addEventListener("click", (e) => {
   const b = e.target.closest("[data-mode]")
   if (!b) return
   $("menu").hidden = true
-  if (b.dataset.mode === "screens") return goScreens(sel.screen || "")
-  if (sel.screen == null) return render()
-  if (sel.screen == null) return
-  sel = lastRun ? { ...lastRun, screen: null } : { project: null, slug: null, key: null, view: null, side: null, screen: null }
   render()
-})
-
-$("scr").addEventListener("click", (e) => {
-  const it = e.target.closest("[data-scr]")
-  if (it) {
-    sel.screen = it.dataset.scr
-    sv.filter = null
-    return render()
-  }
-  const f = e.target.closest("[data-sf]")
-  if (f) {
-    sv.filter = f.dataset.sf || null
-    return render()
-  }
-  const r = e.target.closest("[data-p][data-s]")
-  if (r) return pick(r.dataset.p, r.dataset.s)
-  const row = e.target.closest(".srow[data-sel]")
-  if (row && !e.target.closest("a")) {
-    const key = `${sel.screen}|${row.dataset.sel}`
-    if (sv.open.has(key)) sv.open.delete(key)
-    else sv.open.add(key)
-    render()
-  }
 })
 
 // ---------- events ----------
@@ -2373,15 +2134,6 @@ document.addEventListener("keydown", (e) => {
 $("cpanel").addEventListener("click", (e) => {
   const run = findRun(sel.project, sel.slug)
   if (!run) return
-  const tab = e.target.closest("[data-ctab]")
-  if (tab) {
-    cm.tab = tab.dataset.ctab
-    return renderPanel(run)
-  }
-  const go = e.target.closest("[data-goscr]")
-  if (go) return goScreens(go.dataset.goscr)
-  const pr = e.target.closest("[data-pscr]")
-  if (pr) return toMock({ rein: "element", screen: pr.dataset.pscr, el: pr.dataset.pel === "-" ? null : pr.dataset.pel })
   const s = e.target.closest("[data-csrc]")
   if (s) return jumpBrief(run, s.dataset.csrc)
   const card = e.target.closest(".ccard[data-cn]")
@@ -2645,7 +2397,6 @@ async function load() {
       skew = j.now - Date.now()
       ro = j.readOnly === true
       hub = j.hub && typeof j.hub === "object" ? j.hub : null
-      docs = Array.isArray(j.docs) ? j.docs : []
       data = j.projects.map((p) => ({ name: p.name, runs: p.runs.map((r) => decorate(p.name, r)) }))
       render()
     } catch {}

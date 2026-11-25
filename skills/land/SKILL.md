@@ -10,8 +10,8 @@ Bring the finished work into one commit per repository, with the message in `6-l
 
 How depends on the run:
 
-- **A run in worktrees** (status shows `worktrees:`, or the land repositories are under `.claude/worktrees/`): the hook commits. Skip step 1. Write `6-land.md` (step 2) and the screen documents (step 2a), then advance asks the user to approve the commit (step 3, "In worktrees"). You do not stage or commit yourself.
-- **A run without worktrees** (opened before Rein made them): leave the work staged; the user commits it themselves, and nothing is asked. Do steps 1, 2, 2a and 3.
+- **A run in worktrees** (status shows `worktrees:`, or the land repositories are under `.claude/worktrees/`): the hook commits. Skip step 1. Write `6-land.md` (step 2), then advance asks the user to approve the commit (step 3, "In worktrees"). You do not stage or commit yourself.
+- **A run without worktrees** (opened before Rein made them): leave the work staged; the user commits it themselves, and nothing is asked. Do steps 1, 2 and 3.
 
 ## 0. The user tested by hand
 
@@ -68,41 +68,6 @@ The message follows the project's commit convention when one is set: in its Rein
 - One title line, then a blank line. In the default form, ideally within 50 characters and never over 72, and no `feat:` or `fix:` prefixes.
 - The reference is the `참조:` line in the front matter of `1-spec.md`, copied as it is without its quotes. Under a convention it goes where the convention puts it, else in a last body line `Refs: <reference>`. When it says `없음`, write no reference (in the default form, no brackets). Never invent one.
 - If the repositories' conventions differ, use the default form and say so in `6-land.md`: one message serves every repository.
-
-## 2a. Update the screen documents
-
-A screen document holds the requirements landed so far for one screen, so that the next run on it starts from them. When `1-spec.md` has a `## 화면` table and lines in `## 요구사항` with an element (`[<data-id>]`), write the updated document of each screen those lines are about. Otherwise skip this step. `mcp__rein__status` shows, under `screen documents`, each screen's document as it stands, where the updated copies go, and the project's domains.
-
-- Write each one into the run folder, at `agent/requirements/<domain>/<screen id>.md`, whole. A screen with a document keeps its domain folder. For a new one: the project's domain; with several, ask the user with `AskUserQuestion` which one; with none, `agent/requirements/<screen id>.md` (it stays on this PC).
-- Start from the document as it stands, or from a new one in this form:
-
-```
----
-화면: <screen id>
-이름: <the screen's name in ## 화면>
-갱신: <YYYY-MM-DD> (run <runId>)
----
-
-| 요소 | 요구사항 | 상태 | 근거 | run |
-|---|---|---|---|---|
-| <data-id, or -> | <the requirement> | <구현됨, 보류 or 폐기> | <the source, and what the user decided> | <the run that last changed the row> |
-```
-
-- Each line of `## 요구사항` about the screen becomes a row: 요소 its element without the screen id (`-` for `[-]`), 요구사항 the requirement as built (for a `변경` line, what it was changed to), run this run's runId. 상태 and 근거 follow the line's status. The source is `기획서 <file> p.<n>` (with the document's words when a comment's basis box quoted them), `요청` for a line of the request, `사용자 코멘트` for one a comment added:
-
-| line in `## 요구사항` | 상태 | 근거 |
-|---|---|---|
-| `포함` | `구현됨` | the source |
-| `변경: … (사용자, <date>)` | `구현됨` | the source, then `→ 사용자 변경 <date>` |
-| `보류 (사용자, <date>: <why>)` | `보류` | the source, then `→ 사용자: <why> <date>` |
-| `제외 (사용자, <date>: <why>)` | `폐기` | the source, then `→ 사용자 제외 <date>: <why>` |
-| `[?] …`, still open | `구현됨` | the source, then `가정 (plan)`: it was built on the assumption in `2-plan.md`'s `## 결정 사항` |
-
-- Rows of the same element: replace a row the line changes or contradicts, and add a row for a requirement no row holds. Which is which is your judgment; the user sees each changed row when they approve. Never delete a row: a dropped requirement stays, `폐기`.
-- Leave every row no line touches as it is, and update `갱신:`.
-- A screen with no document yet that earlier completed runs touched: status names their `1-spec.md` after `No document yet for:`. Write its first document from their lines in `## 요구사항` (or `## 기획서 대조`) and this run's, the earlier runs first, so this run's rows replace theirs. Their lines name no element: find it among the `data-id`s of that run folder's `1-mockup.html`, and leave out a line whose element you cannot tell. The run column is the run the line came from.
-
-In a run in worktrees, the approval in step 3 shows the rows each document adds and drops. When the run closes, the hook copies the documents into `~/.rein/<project>/requirements/`, and the local frame server sends them to the hub. The run folder keeps its own copy.
 
 ## 3. Finish
 

@@ -435,12 +435,3 @@ test("shared rules work the same way, hashed as rules/<rel>", async t => {
   // the shared rules folder is not a project
   assert.deepStrictEqual((await h.call("GET", "/api/runs")).json.projects, [])
 })
-
-test("the hub's run list carries the catalog's screen documents, by domain and no project", async t => {
-  const h = await hubOn(t)
-  const dir = path.join(h.root, ".hub", "domains", "shop", "requirements")
-  fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(path.join(dir, "order0101.md"), "---\n화면: order0101\n이름: 주문 목록\n---\n\n| 요소 | 요구사항 | 상태 | 근거 | run |\n|---|---|---|---|---|\n| - | 조회는 주문팀만 | 구현됨 | 요청 | order-perm |\n")
-  const got = (await h.call("GET", "/api/runs")).json
-  assert.deepStrictEqual(got.docs.map(d => [d.project, d.domain, d.id, d.name, d.rows.length]), [[null, "shop", "order0101", "주문 목록", 1]])
-})
