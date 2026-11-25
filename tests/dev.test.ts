@@ -172,6 +172,28 @@ describe("dev exit", () => {
     expect(files[`${DIR}/agent/fails.md`]).toMatch(/^# 읽은 실패\n\n## 2회차 \([^,]+, review\.md 이후\)\n\n> ## 설계 대조\n>\n> 판정: 실패\n>\n> src\/login\.ts:3 has no lock\n$/)
   })
 
+  test("a retry after an e2e failure quotes only the failed checks, without ## 이전 진입", async ($, on) => {
+    const e2e =
+      "## e2e\n\n방법: aside가 화면을 직접 확인함\n\n" +
+      "### list\n\n- 할 일: 목록을 연다\n- 본 것: 목록이 보임\n- 결과: 통과\n- 스크린샷: 없음\n\n" +
+      "### save\n\n- 할 일: 저장한다\n- 본 것: 오류 창\n- 결과: 실패\n- 스크린샷: agent/evidence/save/1/shot.png\n\n![](evidence/save/1/shot.png)\n\n" +
+      "판정: 실패\n\n## 이전 진입\n\n### 1차 진입 — e2e\n\n방법: aside가 화면을 직접 확인함\n\n#### list\n\n- 결과: 진행 중\n\n판정: 미정\n"
+    const files: Record<string, string> = {
+      [`${DIR}/agent/dev-diff.md`]: "# dev diff\n\n## 1회차 (t1)\n\n### E:/proj\n\n없음\n",
+      [`${DIR}/agent/fails.md`]: "# 읽은 실패\n",
+      [`${DIR}/agent/e2e.md`]: e2e,
+    }
+    world(on, files, undefined, { ...DEV_RUN, retries: 1, failFile: `${DIR}/agent/e2e.md` }, { run: gitDiff })
+    await $.tool.call(write(`${DIR}/agent/dev-items.md`, DEV_MD))
+    const fails = files[`${DIR}/agent/fails.md`]!
+    expect(fails).toContain("> ## e2e\n>\n> 방법: aside가 화면을 직접 확인함\n")
+    expect(fails).toContain("> ### save\n>\n> - 할 일: 저장한다\n> - 본 것: 오류 창\n> - 결과: 실패\n")
+    expect(fails).toContain("> 판정: 실패\n")
+    expect(fails).not.toContain("### list")
+    expect(fails).not.toContain("이전 진입")
+    expect(fails).not.toContain("진행 중")
+  })
+
   test("a run from before fails.md has its dev-diff.md's failures carried over before that is replaced", async ($, on) => {
     const old = "# dev diff\n\n## 1회차 (t1)\n\n### E:/proj\n\n없음\n\n## 2회차 (t2, review.md 이후)\n\n### 읽은 실패\n\n> 판정: 실패\n>\n> a\n\n### E:/proj\n\n```diff\n+x\n```\n\n## 3회차 (t3, qa.md 이후)\n\n### 읽은 실패\n\n> b\n\n### E:/proj\n\n없음\n"
     const files: Record<string, string> = { [`${DIR}/agent/dev-diff.md`]: old, [`${DIR}/agent/qa.md`]: "c\n" }

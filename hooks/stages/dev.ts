@@ -122,8 +122,33 @@ export function devFails(before: string | undefined, oldDiff: string, heading: s
       })
     : []
   const parts = before !== undefined ? [before.trimEnd()] : ["# 읽은 실패", ...carried]
-  if (failure?.trim()) parts.push("", heading, "", ...failure.trim().split(/\r?\n/).map(l => (l ? `> ${l}` : ">")))
+  const quoted = failure === undefined ? undefined : failedOnly(failure)
+  if (quoted?.trim()) parts.push("", heading, "", ...quoted.trim().split(/\r?\n/).map(l => (l ? `> ${l}` : ">")))
   return `${parts.join("\n")}\n`
+}
+
+// An e2e.md is quoted without `## 이전 진입`, which an earlier round already
+// quoted, and without the checks that did not fail. A `### ` block runs to
+// the next heading or `판정:` line; one with no `- 결과:` line stays.
+function failedOnly(text: string): string {
+  const lines = text.split(/\r?\n/)
+  const out: string[] = []
+  for (let i = 0; i < lines.length; ) {
+    const line = lines[i]!
+    const history = line.trim() === "## 이전 진입"
+    if (!history && !/^###\s/.test(line)) {
+      out.push(line)
+      i++
+      continue
+    }
+    let end = lines.findIndex((l, j) => j > i && (history ? /^##\s/.test(l) : /^#{1,3}\s|^판정:/.test(l)))
+    if (end < 0) end = lines.length
+    const block = lines.slice(i, end)
+    const result = block.find(l => l.startsWith("- 결과:"))
+    if (!history && (result === undefined || /^- 결과:\s*실패/.test(result))) out.push(...block)
+    i = end
+  }
+  return out.join("\n")
 }
 
 // dev-diff.md, the page the person reads to see what dev changed before land:
