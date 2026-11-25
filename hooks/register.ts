@@ -4167,15 +4167,26 @@ async function landings($: EngineInterface, run: Run): Promise<{ landings: Landi
     const changed = [...new Set(statusPaths(status.stdout, root))]
     const ofPlan = (p: string) => planned.some(f => same(f, p))
     let files = changed.filter(ofPlan)
-    // a commit no longer the worktree's HEAD (reset or rebased since) is
-    // made anew: cherry-picking it, or an ancestor of HEAD, would miss the
-    // later changes.
-    const made = tree.commit !== undefined && (await headOf($, root)) === tree.commit ? tree.commit : undefined
+    // the recorded commit is reused while it is the worktree's HEAD. Once
+    // reset (the changes uncommitted again) it is made anew: cherry-picking
+    // it, or an ancestor of HEAD, would miss the later changes. Once rebased
+    // keeping it (no planned file uncommitted, HEAD the one commit on top of
+    // the branch it goes into, with planned files in it), HEAD is landed.
+    const head = tree.commit !== undefined ? await headOf($, root) : undefined
+    let ahead: string[] = []
+    if (tree.commit !== undefined && head && head !== tree.commit && files.length === 0) {
+      const listed = await gitQuiet($, root, ["rev-list", `${into}..HEAD`, "--"])
+      if (listed.exitCode === 0) ahead = listed.stdout.split("\n").filter(c => c !== "")
+    }
+    let made = tree.commit !== undefined && (head === tree.commit || ahead.length === 1) ? head : undefined
     if (made !== undefined) {
       const shown = await gitQuiet($, root, ["diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", made])
-      files = shown.stdout.split("\0").filter(p => p !== "").map(p => resolve(`${root}/${p}`, root))
+      const held = shown.stdout.split("\0").filter(p => p !== "").map(p => resolve(`${root}/${p}`, root))
+      if (made === tree.commit || held.some(ofPlan)) files = held
+      else made = undefined
     }
-    if (files.length === 0) problems.push(`no planned file of ${root} is changed any more, so it has nothing to commit`)
+    if (ahead.length > 1) problems.push(`${root} has ${ahead.length} commits on top of ${into}, and land cherry-picks one: squash them (\`git -C ${root} reset --soft ${into}\` leaves the run's changes staged, and land commits them anew)`)
+    else if (files.length === 0) problems.push(`no planned file of ${root} is changed any more, so it has nothing to commit`)
     else out.push({ tree: { ...tree, commit: made }, files, dropped: changed.filter(p => !ofPlan(p)), into })
   }
   return problems.length > 0 ? { problem: problems.join("; ") } : { landings: out }
@@ -4188,9 +4199,9 @@ async function landings($: EngineInterface, run: Run): Promise<{ landings: Landi
 // tree's branch, and the worktree and its branch go, with whatever else was
 // left in it. A cherry-pick git refuses or that conflicts is undone and land
 // stops there, the commit kept in the worktree; when advance comes again
-// that commit is reused while it is still the worktree's HEAD (a commit no
-// longer the worktree's HEAD, reset or rebased since, is made anew), and a
-// repository already landed is skipped.
+// that commit is reused while it is still the worktree's HEAD (reset since,
+// it is made anew; rebased since keeping it, the rebased commit is landed
+// and recorded), and a repository already landed is skipped.
 async function landTrees($: EngineInterface, run: Run, dir: string, text: string, answer: string | undefined): Promise<ToolCallResult> {
   const message = landMessage(text)
   if (message === undefined) return { deny: "6-land.md has no commit message: write it in a fenced block under `## 커밋 메시지`, as the rein:land skill says. Then call advance again." }
@@ -4252,7 +4263,7 @@ async function landTrees($: EngineInterface, run: Run, dir: string, text: string
       commit = head.stdout.trim()
       await setTree(t.path, { commit })
       await trace($, run, { ev: "commit", stage: "land", repo: t.path, commit, files: l.files })
-    }
+    } else if (commit !== run.trees?.find(x => same(x.path, t.path))?.commit) await setTree(t.path, { commit })
     const picked = await gitQuiet($, t.repo, ["cherry-pick", commit])
     if (picked.exitCode !== 0) {
       await gitQuiet($, t.repo, ["cherry-pick", "--abort"])
