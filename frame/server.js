@@ -21,7 +21,7 @@ const path = require("path")
 const os = require("os")
 const { spawn } = require("child_process")
 const { makeView, send, json, readJson } = require("./view.js")
-const { serverOf } = require("./sync.js")
+const { serverOf, hubRootOf } = require("./sync.js")
 const { makeUploader } = require("./uploader.js")
 
 const ROOT = path.resolve(process.env.REIN_HOME || path.join(os.homedir(), ".rein"))
@@ -47,8 +47,32 @@ const VERSION = (readJson(path.join(__dirname, "..", ".claude-plugin", "plugin.j
 let uploader = null
 
 // the runs, the page and the checklist writes; the run list carries the
-// uploader's status as hub
-const view = makeView({ root: ROOT, extra: () => ({ hub: uploader ? uploader.status() : null }) })
+// uploader's status as hub, with canStart on the PC that runs the hub
+const view = makeView({ root: ROOT, extra: () => ({ hub: uploader ? { ...uploader.status(), canStart: hubRootOf(ROOT) !== null } : null }) })
+
+// the hub on this PC, when sync.json names its folder (hubRoot): looked at
+// every HUB_CHECK_MS and started again when its process is gone, or at once
+// from the page's button
+const HUB_CHECK_MS = 60 * 1000
+
+// start hub.js unless its process runs (it holds 127.0.0.1:<its port>, even
+// while it waits for a Tailscale address); true when it was started
+async function startHub() {
+  const hubRoot = hubRootOf(ROOT)
+  const server = serverOf(ROOT)
+  if (!hubRoot || !server) return false
+  const url = new URL(server)
+  const port = Number(url.port) || (url.protocol === "https:" ? 443 : 80)
+  if (await listening(port)) return false
+  spawn(process.execPath, [path.join(__dirname, "hub.js"), "serve", "--root", hubRoot, "--port", String(port)], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  }).unref()
+  // the uploader looks again once the new hub has had time to listen
+  setTimeout(() => uploader && uploader.kick(), 5000).unref()
+  return true
+}
 
 // sync.json read (again): the uploader follows its server
 function configure() {
@@ -82,6 +106,7 @@ function handler(port) {
         if (uploader) uploader.kick()
         return json(res, 200, { ok: true, hub: uploader !== null })
       }
+      if (req.method === "POST" && p === "/api/hub/start") return json(res, 200, { ok: true, started: await startHub() })
       if (req.method === "POST" && p === "/api/quit") {
         res.on("finish", quit)
         return json(res, 200, { ok: true })
@@ -162,6 +187,9 @@ async function serve() {
   process.on("SIGHUP", quit)
 
   configure()
+  const watchHub = () => startHub().catch(() => {})
+  watchHub()
+  setInterval(watchHub, HUB_CHECK_MS).unref()
   view.watch(name => {
     if (name === "sync.json") configure()
     else if (uploader) uploader.mark(name)

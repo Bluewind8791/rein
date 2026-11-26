@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Rein의 함수 훅이 로드되지 않았으면 원인(Claude Code 버전)을 알리고, 저장소의 Rein 검증 명령을 사용자 확인을 받아 <repository root>/.rein/config.json에 쓰거나, 훅이 쓸 수 없는 config를 고치고, 허브 서버의 도메인 카탈로그에서 사용자가 고른 도메인의 룰과 지식을 ~/.rein/<project>/로 받고, 공용 룰을 받고, 카탈로그·공용 룰의 충돌을 사용자에게 물어 풀고, 다른 PC와 run과 카탈로그를 주고받을 허브 서버 주소를 ~/.rein/sync.json에 정하고, 예전 setup이 Herdr App에 넣은 run 진행 상황 블록(rein mod와 레이아웃 노드)과 ~/.rein/pane/이 남아 있으면 사용자 확인을 받아 지운다. 사용자가 /rein:setup을 입력했을 때, 또는 Rein plan 단계가 쓸 수 있는 .rein/config.json이 없는 저장소에 대해 부를 때 사용.
+description: Rein의 함수 훅이 로드되지 않았으면 원인(Claude Code 버전)을 알리고, 저장소의 Rein 검증 명령을 사용자 확인을 받아 <repository root>/.rein/config.json에 쓰거나, 훅이 쓸 수 없는 config를 고치고, 허브 서버의 도메인 카탈로그에서 사용자가 고른 도메인의 룰과 지식을 ~/.rein/<project>/로 받고, 공용 룰을 받고, 카탈로그·공용 룰의 충돌을 사용자에게 물어 풀고, 다른 PC와 run과 카탈로그를 주고받을 허브 서버 주소를(허브 PC면 허브 폴더도) ~/.rein/sync.json에 정하고, 예전 setup이 Herdr App에 넣은 run 진행 상황 블록(rein mod와 레이아웃 노드)과 ~/.rein/pane/이 남아 있으면 사용자 확인을 받아 지운다. 사용자가 /rein:setup을 입력했을 때, 또는 Rein plan 단계가 쓸 수 있는 .rein/config.json이 없는 저장소에 대해 부를 때 사용.
 ---
 
 # setup
@@ -139,6 +139,7 @@ Rein can send each run's files to a hub server, so another PC can see the run or
 5. Write `~/.rein/sync.json` as `{ "server": "<url>" }`: drop `remote` and keep any other key the file has. Tell the user the absolute path.
 6. If `~/.rein/.sync/` exists (the old sync's git cache, about 0.5 GB; nothing reads it now), run `node ${CLAUDE_PLUGIN_ROOT}/frame/server.js kick`, which starts sending this PC's runs, then `node ${CLAUDE_PLUGIN_ROOT}/frame/sync.js status`. While `reachable` is `null`, the server has not looked yet: run `status` again a few seconds later. When it shows `reachable: true` and `unsent: 0`, ask with `AskUserQuestion` whether to delete `~/.rein/.sync/`, and delete it with `rm -r` only if they say so. Otherwise leave it, and tell the user it can go once status shows nothing unsent.
 7. Tell the user that each PC needs its own `sync.json` with the same address, and that `mcp__rein__status` with no run open lists this project's runs on the hub. If step 6 stopped for want of the hub, do step 6 now.
+8. If this PC runs the hub, the frame server starts the hub again when it finds it gone, and the frame page shows a button that starts it; both need the hub's folder in `sync.json`. Do this sub-step when `sync.json` has `server` and its host's first label equals this PC's `hostname` (ignoring case); otherwise skip it. If `sync.json` already has `hubRoot`, show it and change it only if the user asks. Otherwise ask with `AskUserQuestion` for the folder this PC's hub serves (its `--root`, the folder holding `.hub/`); the other option is `이 PC는 허브 PC가 아님`, and then write nothing. Check that the folder has `.hub/`; if it does not, say so and ask again. Write it to `sync.json` as `hubRoot` (absolute path), keeping the other keys, and tell the user that the hub writes what it does and why it stopped to `<that folder>/.hub/hub.log`.
 
 ## 8. Remove the Herdr App block
 

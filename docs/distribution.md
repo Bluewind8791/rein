@@ -31,7 +31,7 @@ tests/            훅 시험
   - `e2e`: 앱 URL·로그인, 운영 호스트(`production`, `backends`), 시간 제한, ego 프로필
 - `~/.rein/<project>/rules/`, `knowledge/` — 허브 서버의 카탈로그에서 고른 도메인의 룰과 지식
 - `~/.rein/rules/` — 모든 프로젝트에 적용할 공용 룰 (선택). 허브 서버와 주고받음
-- `~/.rein/sync.json` — 허브 서버 주소 `{ "server": "http://<MagicDNS 이름>:7380" }` (선택). PC마다 따로 둠
+- `~/.rein/sync.json` — 허브 서버 주소 `{ "server": "http://<MagicDNS 이름>:7380" }` (선택). PC마다 따로 둠. 허브 PC에는 허브 폴더 `"hubRoot": "<폴더>"`도 둠
 
 ## 허브 서버
 
@@ -46,6 +46,9 @@ node frame/hub.js serve --root <폴더> [--port 7380] [--bind <ip>]
 - `node frame/hub.js print-task --root <폴더>`가 로그온 때 서버를 띄우는 작업 스케줄러 명령을 보여 줍니다.
 - 브라우저로 `http://<MagicDNS 이름>:7380`을 열면 모든 PC의 run을 읽기 전용으로 봅니다.
 - 카탈로그는 `<폴더>/.hub/domains/<도메인>/`, 공용 룰은 `<폴더>/rules/`입니다. 각 PC의 `/rein:setup`이 카탈로그에서 도메인을 골라 받습니다.
+- 서버는 시작, 주소 변경, 멈춘 이유(처리하지 못한 예외와 종료 신호)를 `<폴더>/.hub/hub.log`에 남깁니다.
+- 실행 중에는 `127.0.0.1:<포트>`를 잡아 둡니다. 같은 PC에서 서버를 하나 더 띄우면 바로 멈춥니다.
+- 허브 PC의 `sync.json`에 `hubRoot`가 있으면, 로컬 frame 서버가 1분마다 허브 프로세스를 확인해, 없으면 다시 띄웁니다. 허브에 닿지 않으면 frame 페이지 아래쪽 상태 표시 옆에 「허브 서버 켜기」 버튼이 나옵니다.
 
 `sync.json`에 `server`가 있는 PC는 로컬 frame 서버가 run 파일을 바뀔 때마다 올립니다. 세션을 시작할 때 카탈로그와 공용 룰의 바뀐 파일을 받고, 이 PC에서 고친 파일을 보냅니다. 서버에 닿지 않으면 쌓아 두었다가 다음에 닿을 때 보냅니다.
 

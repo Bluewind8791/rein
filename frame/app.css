@@ -124,6 +124,10 @@ a.hubst[href]:hover { text-decoration: underline; }
 .hubst.off { color: var(--work); }
 .hubst.off::before { background: var(--work); }
 .hubst .wd { width: 7px; height: 7px; border-radius: 50%; background: var(--bad); flex: none; }
+/* on the PC that runs the hub, while it is not reached: start it */
+.hubgo { flex: none; padding: 1px 8px; border: 1px solid var(--work); border-radius: 4px; color: var(--work); }
+.hubgo[hidden] { display: none; }
+.hubgo:disabled { opacity: .6; cursor: default; }
 
 /* left: the explorer, a status card over the stage tree */
 .body { display: grid; grid-template-columns: 290px minmax(0, 1fr); min-height: 0; }

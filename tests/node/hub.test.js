@@ -6,7 +6,8 @@ const http = require("http")
 const fs = require("fs")
 const os = require("os")
 const path = require("path")
-const { makeHub, serve, tailnet } = require("../../frame/hub.js")
+const net = require("net")
+const { makeHub, serve, tailnet, logTo } = require("../../frame/hub.js")
 const { sha256, bodyHash, treeDigest } = require("../../frame/text.js")
 
 // a hub on 127.0.0.1 over a temp root; peerOk stands in for the tailnet
@@ -220,6 +221,34 @@ test("serve refuses to listen anywhere but on a Tailscale address", async t => {
     await assert.rejects(serve({ root, bind, port: 0, log: () => {} }), /Tailscale address only/, bind)
   }
   assert.ok(!fs.existsSync(path.join(root, ".hub", "hub.json")))
+})
+
+test("serve stops at once when another hub on this PC holds 127.0.0.1 on its port", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rein-hub-"))
+  const held = net.createServer(sock => sock.destroy())
+  await new Promise(r => held.listen(0, "127.0.0.1", r))
+  t.after(() => {
+    held.close()
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+  await assert.rejects(serve({ root, bind: "100.64.0.1", port: held.address().port, log: () => {} }), /a hub already runs on this PC/)
+  assert.ok(!fs.existsSync(path.join(root, ".hub", "hub.json")))
+})
+
+test("the hub's log writes each line with its time to .hub/hub.log, a repeated line once", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rein-hub-"))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const err = console.error
+  console.error = () => {}
+  try {
+    const log = logTo(root)
+    for (const m of ["starting", "no Tailscale address yet", "no Tailscale address yet", "listening", "no Tailscale address yet"]) log(m)
+  } finally {
+    console.error = err
+  }
+  const lines = fs.readFileSync(path.join(root, ".hub", "hub.log"), "utf8").trim().split("\n")
+  assert.deepStrictEqual(lines.map(l => l.replace(/^\S+ /, "")), ["starting", "no Tailscale address yet", "listening", "no Tailscale address yet"])
+  assert.ok(lines.every(l => /^\d{4}-\d\d-\d\dT[\d:.]+Z /.test(l)), lines.join("\n"))
 })
 
 test("a run file gone between its look-up and its read is a 404, and the hub keeps running", async t => {

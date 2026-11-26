@@ -136,6 +136,14 @@ function serverOf(root = ROOT) {
   return /^https?:\/\/./.test(server) ? server : null
 }
 
+// the hub's folder from <root>/sync.json, set only on the PC that runs the
+// hub; null elsewhere
+function hubRootOf(root = ROOT) {
+  const said = readJson(path.join(root, "sync.json"))
+  const dir = said && typeof said.hubRoot === "string" ? said.hubRoot.trim() : ""
+  return dir ? path.resolve(dir) : null
+}
+
 // ---------- local runs and their files ----------
 
 // a file that never goes to the hub: temp files, Office locks, the
@@ -316,7 +324,7 @@ function out(obj, code) {
 }
 
 // before the commands run: catalog.js, which they require, requires this file
-module.exports = { OfflineError, makeClient, runPath, serverOf, fileHash, localFiles, digestOf, localRuns, pullRun, writeAtomic, readBase, withBase }
+module.exports = { OfflineError, makeClient, runPath, serverOf, hubRootOf, fileHash, localFiles, digestOf, localRuns, pullRun, writeAtomic, readBase, withBase }
 
 if (require.main === module) {
   const command = COMMANDS[process.argv[2]]

@@ -12,6 +12,7 @@
 "use strict"
 
 const http = require("http")
+const net = require("net")
 const fs = require("fs")
 const path = require("path")
 const os = require("os")
@@ -480,6 +481,35 @@ function answers(ip, port, timeout = 800) {
   })
 }
 
+// a log that writes each line to stderr and, with its time, to
+// <root>/.hub/hub.log; a line the same as the one before it (a retry every
+// RETRY_MS while Tailscale is down) goes to the file once
+function logTo(root) {
+  const file = path.join(path.resolve(root), ".hub", "hub.log")
+  let last = null
+  return m => {
+    console.error(m)
+    if (m === last) return
+    last = m
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.appendFileSync(file, `${new Date().toISOString()} ${m}\n`)
+    } catch {}
+  }
+}
+
+// hold 127.0.0.1:port while this process runs, so a second hub on this PC
+// stops at once even while the first one still waits for a Tailscale
+// address; the OS lets go of it however the process ends. The frame server
+// on the hub PC tries this port before it starts a hub.
+function lockPort(port) {
+  return new Promise((resolve, reject) => {
+    const lock = net.createServer(sock => sock.destroy())
+    lock.once("error", e => reject(e.code === "EADDRINUSE" ? new Error(`a hub already runs on this PC (127.0.0.1:${port} is taken)`) : e))
+    lock.listen(port, "127.0.0.1", () => resolve(lock))
+  })
+}
+
 // listen, and again RETRY_MS after there is no address yet or the socket
 // fails. Resolves with { server, at } the first time it listens.
 async function serve({ root, port = PORT, bind = null, peerOk, log = m => console.error(m) }) {
@@ -488,6 +518,7 @@ async function serve({ root, port = PORT, bind = null, peerOk, log = m => consol
   const INFO = path.join(hub.root, ".hub", "hub.json")
   const was = readJson(INFO)
   if (was && was.pid !== process.pid && was.ip && (await answers(was.ip, was.port))) throw new Error(`a hub for ${hub.root} already runs at http://${was.ip}:${was.port}/`)
+  if (port !== 0) await lockPort(port)
   const at = { ip: null, port }
   const server = http.createServer(hub.handler(at))
   fs.mkdirSync(path.dirname(INFO), { recursive: true })
@@ -529,20 +560,19 @@ if (require.main === module) {
     process.exit(2)
   }
   if (cmd === "serve") {
-    serve({ root, port: arg("--port") ? Number(arg("--port")) : PORT, bind: arg("--bind") || null })
-      .then(({ info }) => {
-        const quit = () => {
-          try { if ((readJson(info) || {}).pid === process.pid) fs.unlinkSync(info) } catch {}
-          process.exit(0)
-        }
-        process.on("SIGINT", quit)
-        process.on("SIGTERM", quit)
-        process.on("SIGHUP", quit)
-      })
-      .catch(e => {
-        console.error(e && e.message)
-        process.exit(1)
-      })
+    const log = logTo(root)
+    const info = path.join(path.resolve(root), ".hub", "hub.json")
+    const stop = (why, code) => {
+      log(`stopped: ${why}`)
+      try { if ((readJson(info) || {}).pid === process.pid) fs.unlinkSync(info) } catch {}
+      process.exit(code)
+    }
+    process.on("uncaughtException", e => stop((e && e.stack) || String(e), 1))
+    process.on("unhandledRejection", e => stop((e && e.stack) || String(e), 1))
+    for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => stop(sig, 0))
+    log(`starting (pid ${process.pid})`)
+    serve({ root, port: arg("--port") ? Number(arg("--port")) : PORT, bind: arg("--bind") || null, log })
+      .catch(e => stop(e && e.message, 1))
   } else if (cmd === "print-task") {
     const tr = `"${process.execPath}" "${__filename}" serve --root "${path.resolve(root)}"`
     console.log(`schtasks /Create /SC ONLOGON /TN "Rein hub" /TR "${tr.replace(/"/g, '\\"')}" /F`)
@@ -552,4 +582,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { makeHub, serve, tailnet, hostOk }
+module.exports = { makeHub, serve, tailnet, hostOk, logTo }

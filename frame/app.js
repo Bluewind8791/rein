@@ -438,7 +438,29 @@ function renderHub() {
   b.classList.toggle("off", off)
   if (hub.reachable) b.href = hub.server
   else b.removeAttribute("href")
+  const go = $("hubgo")
+  go.hidden = !(off && hub.canStart)
+  go.disabled = Date.now() < hubStarting
+  go.textContent = go.disabled ? "허브 서버 켜는 중…" : "허브 서버 켜기"
 }
+
+// until when the start button waits for the hub it started (ms)
+let hubStarting = 0
+
+// the hub PC's button: the frame server starts the hub, and the badge turns
+// when the uploader reaches it
+$("hubgo").addEventListener("click", async () => {
+  hubStarting = Date.now() + 15000
+  renderHub()
+  setTimeout(renderHub, 15000)
+  try {
+    const res = await fetch("/api/hub/start", { method: "POST" })
+    if (!res.ok) throw new Error(String(res.status))
+  } catch {
+    hubStarting = 0
+    renderHub()
+  }
+})
 
 // the all-runs page: a card per run, grouped by state, saying what each run
 // was for; with more than one project (and on the hub) each card names its own
