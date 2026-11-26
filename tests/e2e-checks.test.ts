@@ -723,7 +723,7 @@ describe("the integration test waits for the user (5-checklist.md)", () => {
         "  - 할 일:\n    1. /member/detail를 연다\n    2. 회원 테스트회원A를 검색해 회원유형을 본다\n" +
         "  - 기대:\n    - [ ] 우수회원만 체크\n    - [ ] 네 라디오가 모두 비활성\n  - 참고: 테스트회원A는 휴면 회원\n\n" +
         "## (페이지 기록 없음)\n\n- 접근: (기록 없음)\n- 앱: mobile (http://localhost:3000)\n- 계정: 따로 없음 — mobile 앱의 login 설정대로\n\n" +
-        `- **mobile**\n  - 할 일: ${CHECKS[1]!.todo}\n  - 기대:\n    - [ ] ${CHECKS[1]!.expect}\n  - 저장: 할 일대로 저장하고, 원래 값으로 되돌립니다\n`,
+        `- **mobile**\n  - 할 일: ${CHECKS[1]!.todo}\n  - 기대:\n    - [ ] ${CHECKS[1]!.expect}\n  - 저장: 할 일대로 저장합니다. 되돌리기는 할 일에 그 단계가 있을 때만 합니다\n`,
     )
     expect(files[LIST]).not.toContain("test-pass")
     expect(tick(files[LIST]!, "detail-control", "aside 통과")).toContain(

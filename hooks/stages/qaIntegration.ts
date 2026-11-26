@@ -261,7 +261,7 @@ export function checklist(title: string, checks: Check[], apps: Record<string, A
       todo: listed(k.todo, true, "    "),
       data: k.data ? `  - 데이터 조건 (할 일의 데이터가 이와 맞지 않으면 맞는 데이터로 바꿔서 확인): ${listed(k.data, false, "    ")}` : "",
       expect: itemsOf(k.expect).map(x => `    - [ ] ${x}`).join("\n"),
-      saves: k.saves ? "  - 저장: 할 일대로 저장하고, 원래 값으로 되돌립니다" : "",
+      saves: k.saves ? "  - 저장: 할 일대로 저장합니다. 되돌리기는 할 일에 그 단계가 있을 때만 합니다" : "",
       reference: k.reference ? `  - 참고: ${k.reference}` : "",
     }))
     return `${head}${check.join("\n")}${body.slice(block.index + block[0].length)}`
