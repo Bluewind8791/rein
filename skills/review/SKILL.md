@@ -114,4 +114,4 @@ If the user wants to stop, put aside or abandon the run, call `mcp__rein__park` 
 ## Do not
 
 - Write `review.md`, `review-groups.md` or `review-<n>.md`. Only the reviewer's and the splitter's writes count; yours moves nothing.
-- Fix code. A failure goes back to `dev`; a design file you change now is reviewed with the rest, and one you change after review is told to you (`mcp__rein__goto` with `review` has it reviewed again).
+- Fix code unless the user asks you to. A failure goes back to `dev`; a design file you change now is reviewed with the rest, and one you change after review is told to you (`mcp__rein__goto` with `review` has it reviewed again).

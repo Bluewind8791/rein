@@ -95,9 +95,9 @@ If the user wants to stop, put aside or abandon the run, call `mcp__rein__park` 
 
 ## Do not
 
-- Design or write `2-plan.md` yourself. The planner does.
-- Edit source code. The worker writes it in dev.
-- Touch `1-spec.md`.
+- Design or write `2-plan.md` yourself unless the user asks you to. The planner does; the reviewer judges it either way.
+- Edit source code unless the user asks you to. The worker writes it in dev.
+- Touch `1-spec.md` unless the user asks you to.
 - Ask the user to approve the plan before advance passes it.
 - Write `.rein/config.json` outside the `rein:setup` skill.
 - Decide tests, exemptions or e2e checks yourself.

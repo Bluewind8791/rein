@@ -14,7 +14,7 @@ Two layers, each with its own stage and file:
 
 The files are in the run directory, next to `1-spec.md`. Call `mcp__rein__status` first; its `stage` says which layer you are in.
 
-You do not fix the code here. A code failure goes back to `dev` through `qa.md`, and the hook decides where the run goes. The hook does not refuse your writes or commands. A design file you change after dev is not reviewed: the hook tells you once and the run stays where it is; `mcp__rein__goto` with `review` has it reviewed again. What you may fix is the environment: files off the design (a helper script the qa commands call, a local setting) are not reviewed or committed, and a `.rein/config.json` you change is approved at the next advance.
+You do not fix the code here unless the user asks you to. A code failure goes back to `dev` through `qa.md`, and the hook decides where the run goes. The hook does not refuse your writes or commands. A design file you change after dev is not reviewed: the hook tells you once and the run stays where it is; `mcp__rein__goto` with `review` has it reviewed again. What you may fix is the environment: files off the design (a helper script the qa commands call, a local setting) are not reviewed or committed, and a `.rein/config.json` you change is approved at the next advance.
 
 **At a gate you decide, with the user; the hook asks no one**. Call `mcp__rein__advance` without `answer`: at a gate it changes nothing and says what is decided, with the labels it takes and what it knows (the failure, the changed config, what aside saw). Show the user that and ask with `AskUserQuestion`, or decide on your own when the choice is plain. Then call `mcp__rein__advance` again with `answer` set to the label of the decision, and the user's own words, when they answered, in `said`. An answer that is no label changes nothing. Below, "ask" means this.
 
@@ -224,6 +224,6 @@ If the user wants to stop, put aside or abandon the run, call `mcp__rein__park` 
 
 ## Do not
 
-- Fix the code. A code failure goes to `dev` through the triage's `qa.md`.
+- Fix the code unless the user asks you to. A code failure goes to `dev` through the triage's `qa.md`; a fix of yours is reviewed only once `mcp__rein__goto` with `review` has it reviewed.
 - Run the qa commands in place of the hook, or an aside or ego check in place of its agents: only their runs count.
 - Judge the completion line yourself, or write `## 완료 판정 대조`. Only the reviewer's write is a verdict; to go on past a failed one, use `mcp__rein__goto`.

@@ -216,10 +216,10 @@ If the user wants to stop, put aside or abandon the run, at any point, call `mcp
 
 ## Do not
 
-- Propose or design a solution. That is `plan`'s job.
+- Propose or design a solution unless the user asks you to. That is `plan`'s job.
 - Split scope into "in / out" lists. Three exceptions: the rows of `## 범위`, one per part of the system, the `보류` and `제외` lines of `## 요구사항`, the user's own decisions about a requirement, and the `제외` lines of the results in `## 문제`, the user's own decisions about the request.
 - Turn the completion check into a list of acceptance criteria. It is one line, even when it names edge cases.
-- Edit source code. The worker writes it in dev.
+- Edit source code unless the user asks you to. The worker writes it in dev.
 
 Keep this stage light. Investigate first, then write the problem and the completion check on top of what you found.
 
