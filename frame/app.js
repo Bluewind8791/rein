@@ -505,6 +505,8 @@ function runCard(r, many) {
   const label = r.state === "complete" ? STATUS.done : `${STATUS[r.status]} · ${r.stageShort}`
   const pj = many ? `<span class="pj">${esc(r.project)}${r.pc ? ` · ${esc(r.pc)}` : ""}</span>` : ""
   const opened = Date.parse(r.opened)
+  // every card keeps the line, empty without a reference, so cards stay even
+  const ref = s.ref && s.ref !== "없음" ? plain(s.ref) : ""
   let mid = ""
   let facts
   let when
@@ -529,6 +531,7 @@ function runCard(r, many) {
     `<div class="rc-h"><span class="sl">${esc(r.slug)}</span>${pj}<span class="rst ${r.status}">${esc(label)}</span></div>` +
     `<div class="rc-t">${plain(s.title || r.slug)}</div>` +
     (s.goal ? `<div class="rc-g">${plain(s.goal)}</div>` : "") +
+    `<div class="rc-r"><span class="k">참조</span><span class="v">${ref}</span></div>` +
     mid +
     `<div class="rc-f"><span class="fx">${facts}</span><span class="w">${when}</span></div></button>`
 }
