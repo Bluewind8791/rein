@@ -110,9 +110,10 @@ export function driverRow(k: CheckRun): StageSpec {
       return importsHarness(String(input.content ?? ""), `${c.dir}/${folder}`) ? undefined : `a round's first line must be the harness import, exactly:\n${first}`
     },
     bash(command, c, input) {
-      if (driverReads(command, c)) return undefined
+      const read = readOnly(command, c.run.repos ?? [], c.root)
+      if (read === undefined) return undefined
       const form = roundCommand(command, `${c.dir}/${folder}`, c.root)
-      if ("deny" in form) return form.deny
+      if ("deny" in form) return /^\s*ego-browser\b/.test(command) ? form.deny : `${form.deny} As a read-only command it is refused too: ${read}`
       if (input.run_in_background === true) return "run the round in the foreground; the hook reads its output."
       return undefined
     },
