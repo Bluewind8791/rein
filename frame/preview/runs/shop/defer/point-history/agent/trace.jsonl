@@ -1,0 +1,4 @@
+{"ev":"load","t":"2026-11-19T15:00:00.000+09:00","worktree":null,"branch":null}
+{"ev":"stage","t":"2026-11-19T15:00:05.000+09:00","from":null,"to":"spec"}
+{"ev":"stage","t":"2026-11-19T15:40:00.000+09:00","from":"spec","to":"plan"}
+{"ev":"stage","t":"2026-11-19T16:30:00.000+09:00","from":"plan","to":null}

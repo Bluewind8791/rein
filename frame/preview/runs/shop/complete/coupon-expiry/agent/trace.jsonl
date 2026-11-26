@@ -1,0 +1,9 @@
+{"ev":"load","t":"2026-11-20T13:00:00.000+09:00","worktree":null,"branch":null}
+{"ev":"stage","t":"2026-11-20T13:00:05.000+09:00","from":null,"to":"spec"}
+{"ev":"stage","t":"2026-11-20T13:40:00.000+09:00","from":"spec","to":"plan"}
+{"ev":"stage","t":"2026-11-20T14:30:00.000+09:00","from":"plan","to":"dev"}
+{"ev":"stage","t":"2026-11-20T15:20:00.000+09:00","from":"dev","to":"review"}
+{"ev":"stage","t":"2026-11-20T15:45:00.000+09:00","from":"review","to":"qa"}
+{"ev":"stage","t":"2026-11-20T16:10:00.000+09:00","from":"qa","to":"qa-integration"}
+{"ev":"stage","t":"2026-11-21T10:00:00.000+09:00","from":"qa-integration","to":"land"}
+{"ev":"stage","t":"2026-11-21T10:12:00.000+09:00","from":"land","to":null}

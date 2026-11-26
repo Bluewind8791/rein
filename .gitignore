@@ -4,3 +4,4 @@
 eval/node_modules/
 eval/results/
 !eval/fixture/.rein/
+frame/preview/out/

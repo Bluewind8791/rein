@@ -1,0 +1,1 @@
+{"repos":[{"repo":"shop-api","branch":"main","files":[{"path":"src/auth/login.ts","status":"M","add":22,"del":3},{"path":"src/auth/lock.ts","status":"A","add":40,"del":0}],"left":[]}],"result":[{"repo":"shop-api","branch":"main","commit":"a17c03e95b2d4f6a8c0e1b3d5f7a9c2e4b6d8f01","removed":true}]}

@@ -1,0 +1,6 @@
+{"ev":"load","t":"2026-11-26T09:30:00.000+09:00","worktree":null,"branch":null}
+{"ev":"stage","t":"2026-11-26T09:30:05.000+09:00","from":null,"to":"spec"}
+{"ev":"stage","t":"2026-11-26T10:05:00.000+09:00","from":"spec","to":"plan"}
+{"ev":"stage","t":"2026-11-26T10:50:00.000+09:00","from":"plan","to":"dev"}
+{"ev":"stage","t":"2026-11-26T11:40:00.000+09:00","from":"dev","to":"review"}
+{"ev":"stage","t":"2026-11-26T12:30:00.000+09:00","from":"review","to":"qa"}
