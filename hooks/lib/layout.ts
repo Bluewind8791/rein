@@ -143,7 +143,7 @@ export function layoutCheck(l: Layout, app: string, measure: boolean): Check {
     page: l.page,
     route: l.route,
     todo: l.saves
-      ? `경로의 단계대로 ${l.page} 화면의 상태를 만든다 (경로: ${l.route}). 저장할 때마다 완료 알림이 뜰 때까지 기다린다. ${shoot} 그런 뒤 경로의 되돌리기 단계대로 저장한 것을 되돌린다.`
+      ? `경로의 단계대로 ${l.page} 화면의 상태를 만든다 (경로: ${l.route}). 저장할 때마다 완료 알림이 뜰 때까지 기다린다. ${shoot} 그런 뒤 경로에 되돌리기 단계가 있으면 그대로 저장한 것을 되돌린다.`
       : `${l.page} 화면을 연다 (경로: ${l.route}). ${shoot}`,
     expect: `배치가 1-mockup.html#${l.anchor}의 to-be와 같다: ${l.look}`,
     saves: l.saves === true,

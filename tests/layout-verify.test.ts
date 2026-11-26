@@ -282,7 +282,7 @@ describe("integration qa's layout check", () => {
   test("layoutCheck of a screen that saves makes its state by 경로, shoots it and puts it back", () => {
     const saving = layoutCheck({ ...LAYOUT, route: "홈 > 대시보드 > 주문 저장 > 주문 삭제", saves: true }, "admin", false)
     expect(saving.saves).toBe(true)
-    expect(saving.todo).toBe("경로의 단계대로 대시보드 화면의 상태를 만든다 (경로: 홈 > 대시보드 > 주문 저장 > 주문 삭제). 저장할 때마다 완료 알림이 뜰 때까지 기다린다. 데이터가 다 그려질 때까지 기다린 뒤, 화면 전체를 스크린샷으로 찍는다 (fullPage). 그런 뒤 경로의 되돌리기 단계대로 저장한 것을 되돌린다.")
+    expect(saving.todo).toBe("경로의 단계대로 대시보드 화면의 상태를 만든다 (경로: 홈 > 대시보드 > 주문 저장 > 주문 삭제). 저장할 때마다 완료 알림이 뜰 때까지 기다린다. 데이터가 다 그려질 때까지 기다린 뒤, 화면 전체를 스크린샷으로 찍는다 (fullPage). 그런 뒤 경로에 되돌리기 단계가 있으면 그대로 저장한 것을 되돌린다.")
   })
 
   test("a layout check that saves runs alone: its driver waits until the other check's driver is done", async ($, on) => {

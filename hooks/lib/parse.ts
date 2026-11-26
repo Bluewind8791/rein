@@ -264,7 +264,7 @@ export function parseLayouts(text: string): { layouts: Layout[] } | { reason: st
     if (field && items.length > 0) (items.at(-1)!.fields[field[1]!] ??= []).push(field[2]!)
     else if (items.length === 0 && /^없음(?:\s|[.—–-]|$)/.test(line.trim())) none = true
   }
-  const form = "Each screen is `### <its .screen id in 1-mockup.html>` with one line each of `- 페이지: <the page>`, `- 경로: <the menus that reach it, as A > B > C>` and `- 볼 곳: <what of its layout to compare>`, and `- 저장: 있음` when the to-be shows only with saved data (경로 then saves it and puts it back). With no to-be screen in 1-mockup.html, the section holds only the line `없음`, or is left out."
+  const form = "Each screen is `### <its .screen id in 1-mockup.html>` with one line each of `- 페이지: <the page>`, `- 경로: <the menus that reach it, as A > B > C>` and `- 볼 곳: <what of its layout to compare>`, and `- 저장: 있음` when the to-be shows only with saved data (경로 then saves it and puts it back, or says what data it leaves behind). With no to-be screen in 1-mockup.html, the section holds only the line `없음`, or is left out."
   if (items.length === 0) return none ? { layouts: [] } : { reason: `\`## 배치 대조\` has no \`### <anchor>\` screen and no line \`없음\`. ${form}` }
   const twice = items.map(i => i.anchor).filter((a, i, all) => all.indexOf(a) !== i)
   if (twice.length > 0) return { reason: `these screens appear more than once in \`## 배치 대조\`: ${[...new Set(twice)].join(", ")}.` }

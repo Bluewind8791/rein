@@ -151,7 +151,7 @@ The tests, the e2e checks, `## 완료 판정 덮기` and `## 변경 전 실패` 
 - `페이지`: the name of the page, as the app shows it.
 - `경로`: how a person reaches it from the app's start, the menus in order: `주문 > 주문관리 > 주문상세`. When the screen opens from a record (a row of a list, a document), name one that exists in the test environment: the one an e2e check of `2-plan.md` opens on that screen, when there is one. A path that ends at "any row" may reach an empty list.
 - `볼 곳`: what of the layout to compare, from the to-be's changed parts (`class="changed"`): the order of areas, columns and buttons, say. One line.
-- `저장: 있음`, only when a part of the to-be shows only once data is saved (a status set by a save, a row added by another screen). Then `경로` holds the steps that save that data, from the app's start, and after them the steps that put it back as it was. In integration qa on ego, the driver follows those steps, waits for each save to finish, shoots the screen, then puts the data back; such a screen runs alone. Without the line, the screen is only opened and nothing is saved.
+- `저장: 있음`, only when a part of the to-be shows only once data is saved (a status set by a save, a row added by another screen). Then `경로` holds the steps that save that data, from the app's start, and after them the steps that put it back as it was. When no screen can put it back (a save that cannot be undone, say), keep the screen anyway, since the test comes first: leave those steps out and end `경로` with `(되돌릴 화면 없음: <the data it leaves behind>)`. In integration qa on ego, the driver follows those steps, waits for each save to finish, shoots the screen, then puts the data back when `경로` says how; such a screen runs alone. Without the line, the screen is only opened and nothing is saved.
 
 The hook writes each into `5-checklist.md` as a box; integration qa does not pass to land while one is empty. Without a to-be in `1-mockup.html`, leave the section out.
 
@@ -292,7 +292,7 @@ The hook judges `2-plan.md` when the main session calls advance, and refuses it 
 8. `## 넘길 것`, if present, has `### <file name>` items: one plain file name each (no folder), each with a line saying what the person does with it. A `넘김` line names one of them.
 9. With `e2e` in a config, `## e2e 확인` has checks in the test-planner's form, each naming an app of `e2e.apps`, or `없음`. Without it, no check.
 10. `## 완료 판정 덮기` has a line per part: each part is in the completion line of `1-spec.md`, each `e2e:` check is in `## e2e 확인`, each `테스트:` file is a design item or exists, each `확인 불가` has a reason.
-11. `## 배치 대조` has one `### <id>` per to-be screen of `1-mockup.html`, each with one line of `- 페이지:`, `- 경로:` and `- 볼 곳:`, `- 저장: 있음` only when the to-be shows only with saved data (its `경로` then also puts the data back), and no other id. Without a to-be, no item.
+11. `## 배치 대조` has one `### <id>` per to-be screen of `1-mockup.html`, each with one line of `- 페이지:`, `- 경로:` and `- 볼 곳:`, `- 저장: 있음` only when the to-be shows only with saved data (its `경로` then also puts the data back, or says what data it leaves behind), and no other id. Without a to-be, no item.
 
 ## Do not
 
