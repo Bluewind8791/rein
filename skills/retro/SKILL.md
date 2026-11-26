@@ -70,10 +70,3 @@ Tell the user how many were kept, and that the Rein repository's `learn` skill w
 ## 7. Close
 
 End your answer with one line saying, in Korean, that the run is over, from what the hook's message that closed the run said. Name where its change went: the repositories (and branches) the commit went into; staged in the repositories, for the user to commit; or no commit (ended without one, `폐기`, `완료`). Name its record folder, the run folder above. The user reads this line to know the work is done.
-
-## Do not
-
-- Edit domain rules, or any plugin or repository file.
-- Edit domain knowledge, except a merge the user asked for in step 4.
-- Write anything in the run folder but `7-retro.md`; `retro-parts.js` and the readers write `agent/retro-read/`.
-- Mark a candidate `채택` that the user did not pick.

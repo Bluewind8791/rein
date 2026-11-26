@@ -31,7 +31,7 @@ Before you call advance, tell the user not to edit `.rein/config.json` while the
 The result says what happened:
 
 - All pass: the hook wrote `qa.md` from its results and moved the run on. Go on as "The hook decides" below says.
-- One fails: the run stays in `qa`. The result shows the failing command and the tail of its output; the whole output of every failing command is in `agent/qa-output.log` in the run directory. Do not read the log yourself: have `rein:triage` decide whose failure it is (step 2). The log can run to hundreds of KiB, so it is read outside your context.
+- One fails: the run stays in `qa`. The result shows the failing command and the tail of its output; the whole output of every failing command is in `agent/qa-output.log` in the run directory. Have `rein:triage` decide whose failure it is (step 2). The log can run to hundreds of KiB, so the triage reads it outside your context.
 
 ### 2. Triage the failure
 
@@ -225,6 +225,5 @@ If the user wants to stop, put aside or abandon the run, call `mcp__rein__park` 
 ## Do not
 
 - Fix the code. A code failure goes to `dev` through the triage's `qa.md`.
-- Read `qa-output.log` to sort out a failure yourself. `rein:triage` does.
 - Run the qa commands in place of the hook, or an aside or ego check in place of its agents: only their runs count.
 - Judge the completion line yourself, or write `## 완료 판정 대조`. Only the reviewer's write is a verdict; to go on past a failed one, use `mcp__rein__goto`.

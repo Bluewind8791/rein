@@ -7,7 +7,7 @@ description: The review stage of a Rein run. Use when a Rein hook says the run i
 
 The changed code is read and checked on two things: does it follow the detailed design in `2-plan.md`, and does it keep the project rules that apply. You run nothing here; testing belongs to `qa`. Only when the repository's `.rein/config.json` has `precheck` commands (a quick compile or typecheck) does the hook run them first, so that code that does not compile goes back to dev without a review.
 
-You do not judge. The `rein:reviewer` agent does, because the session that wrote the code must not grade it. Only that agent may write `review.md`; the hook refuses your writes.
+You do not judge. The `rein:reviewer` agent does, because the session that wrote the code must not grade it. Only that agent's `review.md` counts; the hook lets your writes through, but they move nothing.
 
 ## 0. The precheck, when status shows it
 
