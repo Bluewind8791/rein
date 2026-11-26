@@ -175,7 +175,7 @@ describe("2-plan.md's checks and cover (D168, D169)", () => {
     world(on, files, undefined, { stage: "plan", runId: "login-fix" })
     expect(await planned($, PLAN(COVER))).toContain("D168: 2-plan.md does not pass yet, so the run stays in plan: a repository's config has e2e, so 2-plan.md needs `## e2e 확인`")
     const stray = CHECK_SECTION.replace("- 앱: admin\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: 회원을 정지", "- 앱: shop\n- 페이지: 회원상세\n- 경로: 회원 > 회원관리 > 회원상세\n- 할 일: 회원을 정지")
-    expect(await planned($, PLAN(stray + COVER))).toContain("these checks name an app config e2e.apps does not have: stop-member (shop). The apps are: admin, mobile.")
+    expect(await planned($, PLAN(stray + COVER))).toContain("these checks name an app E:/proj/.rein/config.json e2e.apps does not have: stop-member (shop). The apps are: admin, mobile. Integration qa uses only this config, the first in 2-plan.md's file order with e2e; add the app there, not to the other repositories' configs.")
     expect(await planned($, PLAN(CHECK_SECTION))).toContain("D169: 2-plan.md does not pass yet, so the run stays in plan: 2-plan.md has no `## 완료 판정 덮기`")
     const off = '\n## 완료 판정 덮기\n\n- "잠긴다" — e2e: detail, grid\n'
     expect(await planned($, PLAN(CHECK_SECTION + off))).toContain('"잠긴다" names grid, not a check of `## e2e 확인`')

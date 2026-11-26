@@ -224,7 +224,7 @@ Write it in Korean, in this form. Keep the headings exactly as they are:
 ### <확인 이름>
 - 제목: <무엇을 보는지, 몇 단어>
 - 구분: <변경 | 대조>
-- 앱: <config e2e.apps의 이름>
+- 앱: <e2e가 있는 첫 저장소 config의 e2e.apps 이름>
 - 페이지: <확인할 페이지 이름>
 - 경로: <메뉴 > 메뉴 > 페이지>
 - 할 일:
@@ -290,7 +290,7 @@ The hook judges `2-plan.md` when the main session calls advance, and refuses it 
 6. Every file is in a git repository, not under `~/.rein`. A repository outside the session root whose project has rules or knowledge keeps the run in plan once, the first time it is named.
 7. Every one of those repositories has a usable `.rein/config.json`.
 8. `## 넘길 것`, if present, has `### <file name>` items: one plain file name each (no folder), each with a line saying what the person does with it. A `넘김` line names one of them.
-9. With `e2e` in a config, `## e2e 확인` has checks in the test-planner's form, each naming an app of `e2e.apps`, or `없음`. Without it, no check.
+9. With `e2e` in a config, `## e2e 확인` has checks in the test-planner's form, each naming an app of `e2e.apps` of the first repository's config with `e2e` (in the order of the files on the list), or `없음`. Without it, no check.
 10. `## 완료 판정 덮기` has a line per part: each part is in the completion line of `1-spec.md`, each `e2e:` check is in `## e2e 확인`, each `테스트:` file is a design item or exists, each `확인 불가` has a reason.
 11. `## 배치 대조` has one `### <id>` per to-be screen of `1-mockup.html`, each with one line of `- 페이지:`, `- 경로:` and `- 볼 곳:`, `- 저장: 있음` only when the to-be shows only with saved data (its `경로` then also puts the data back, or says what data it leaves behind), and no other id. Without a to-be, no item.
 

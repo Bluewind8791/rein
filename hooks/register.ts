@@ -3170,7 +3170,7 @@ async function judgePlan($: EngineInterface, c: Ctx): Promise<PlanJudgment> {
     const reason = `these repositories have no usable .rein/config.json: ${bare.join(", ")}.`
     return { ok: false, rule: "D50", reason, fix: "Invoke the rein:setup skill for each (it asks the user before it writes)." }
   }
-  const checked = await judgeChecks($, plan, parsed.files, parsed.handoff, `${c.dir}/handoff`, repos.map(r => readConfig(texts[r]!)), specText, c.root)
+  const checked = await judgeChecks($, plan, parsed.files, parsed.handoff, `${c.dir}/handoff`, repos.map(r => readConfig(texts[r]!)), repos, specText, c.root)
   if ("reason" in checked) return { ok: false, rule: checked.rule, reason: checked.reason, fix: again }
   const html = `${c.dir}/1-mockup.html`
   const placed = judgeLayouts(plan, (await $.fs.exists(html)) ? toBeScreens(await $.fs.read(html)) : [])
@@ -3213,8 +3213,9 @@ async function takeOutside($: EngineInterface, take: { outside: string[]; rules:
 // each part a piece of the spec's completion line, each test file a design
 // item or an existing file. Each file a check names on `- 파일:` is a design
 // item or a handoff file, kept as dev's seal names it.
-async function judgeChecks($: EngineInterface, plan: string, files: string[], handoff: string[], handoffDir: string, configs: Config[], spec: string | undefined, root: string): Promise<{ checks: Check[] } | { rule: string; reason: string }> {
-  const e2e = configs.map(x => x.e2e).find(x => x !== undefined)
+async function judgeChecks($: EngineInterface, plan: string, files: string[], handoff: string[], handoffDir: string, configs: Config[], repos: string[], spec: string | undefined, root: string): Promise<{ checks: Check[] } | { rule: string; reason: string }> {
+  const at = configs.findIndex(x => x.e2e !== undefined)
+  const e2e = configs[at]?.e2e
   const parsed = parseChecks(plan)
   if (parsed && "reason" in parsed) return { rule: "D168", reason: parsed.reason }
   const checks = parsed?.checks
@@ -3227,7 +3228,7 @@ async function judgeChecks($: EngineInterface, plan: string, files: string[], ha
   const apps = Object.keys(e2e?.apps ?? {})
   const strays = (checks ?? []).filter(k => !apps.includes(k.app))
   if (strays.length > 0) {
-    return { rule: "D168", reason: `these checks name an app config e2e.apps does not have: ${strays.map(k => `${k.name} (${k.app})`).join(", ")}. The apps are: ${apps.join(", ")}.` }
+    return { rule: "D168", reason: `these checks name an app ${repos[at]}/.rein/config.json e2e.apps does not have: ${strays.map(k => `${k.name} (${k.app})`).join(", ")}. The apps are: ${apps.join(", ")}. Integration qa uses only this config, the first in 2-plan.md's file order with e2e; add the app there, not to the other repositories' configs.` }
   }
   const unknown: string[] = []
   const named = (checks ?? []).map(k => {
@@ -3617,7 +3618,7 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
     const unticked = (run.layouts ?? []).filter(l => ticked === undefined || openLayouts(ticked, [l]).length > 0)
     const extra = unticked.map(l => layoutCheck(l, appFor(run, l.page, e2e!), (run.layoutFails?.[l.anchor] ?? 0) >= MEASURE_AT - 1))
     await mutate($, r => (ready(r) ? { ...r, layoutChecks: extra.length > 0 ? extra : undefined } : undefined))
-    return egoEntry($, c, run, e2e!, [...checks, ...extra], kept, from, lead)
+    return egoEntry($, c, run, e2e!, [...checks, ...extra], kept, from, lead, repos.find(r => configs[r]?.e2e !== undefined)!)
   }
 
   if (path === "aside") {
@@ -3683,7 +3684,7 @@ async function integrationEntry($: EngineInterface, c: Ctx, run: Run, configs: R
 // checks of the aside path, the run's spaces left from before are closed
 // (a failed check's kept tabs too), and each check to run gets its attempt
 // folder, its profile and its space's name. The caller holds the busy token.
-async function egoEntry($: EngineInterface, c: Ctx, run: Run, e2e: E2e, checks: Check[], kept: (k: Check) => CheckRun | undefined, from: "qa" | "qa-integration", lead: string): Promise<string> {
+async function egoEntry($: EngineInterface, c: Ctx, run: Run, e2e: E2e, checks: Check[], kept: (k: Check) => CheckRun | undefined, from: "qa" | "qa-integration", lead: string, e2eRepo: string): Promise<string> {
   const file = `${c.dir}/agent/e2e.md`
   const ready = (r: Run | undefined): r is Run => r?.stage === from && (from === "qa" || r.halt !== undefined || r.e2e?.path === "wait")
   const open = checks.filter(k => kept(k) === undefined)
@@ -3698,7 +3699,7 @@ async function egoEntry($: EngineInterface, c: Ctx, run: Run, e2e: E2e, checks: 
     const listed = await egoProfiles($)
     if (!listed) return halted({ rule: "ego-unavailable", reason: "`ego-browser nodejs` did not answer: ego lite is not running, or ego-browser was not on the PATH when Claude Code started" })
     const resolved = resolveProfiles(e2e, open, listed)
-    if ("missing" in resolved) return halted({ rule: "ego-profile-missing", reason: `the ego profiles are not set up: ${resolved.missing.join("; ")}` })
+    if ("missing" in resolved) return halted({ rule: "ego-profile-missing", reason: `the ego profiles are not set up: ${resolved.missing.map(m => (m.includes("e2e.apps.") ? `${m} of ${e2eRepo}/.rein/config.json` : m)).join("; ")}` })
     ids = resolved.ids
     const shot = marked((await egoRun($, SHOT_PROBE_SCRIPT, 60_000)) ?? "") as { ok?: boolean; error?: string } | undefined
     if (shot?.ok !== true) return halted({ rule: "ego-unavailable", reason: `a test screenshot in ego failed (${shot?.error ?? "no answer"}): ego's window is closed or minimized; it must stay open on screen (covered by other windows is fine)` })

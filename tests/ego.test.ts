@@ -336,7 +336,7 @@ describe("running checks in ego", () => {
   test("a check with no ego profile halts before anything runs (ego-profile-missing)", async ($, on) => {
     const files = filesWith({ ...E2E, apps: { ...APPS, admin: { ...APPS.admin, profiles: {} } } })
     world(on, files, () => undefined, RUN, host(files, []))
-    expect(context(await toEgo($))).toContain("ego-profile-missing: the user asked for e2e, but the ego profiles are not set up: check staff: account tester2 has no profile in e2e.apps.admin.profiles")
+    expect(context(await toEgo($))).toContain("ego-profile-missing: the user asked for e2e, but the ego profiles are not set up: check staff: account tester2 has no profile in e2e.apps.admin.profiles of E:/proj/.rein/config.json")
     expect(((await $.tool.call(ADVANCE)) as { result: string }).result).toContain('"rein:setup으로 채웠음, 다시 확인", "Aside로 실행", "e2e 없이 진행"')
     files["E:/proj/.rein/config.json"] = JSON.stringify({ qa: ["npm test"], e2e: E2E })
     await relay($, ADVANCE)
