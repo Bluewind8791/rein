@@ -30,7 +30,7 @@ The hook refuses to make `1-mockup.html` when a `.compare` has no marker, or a m
 
 - A screen of `## 화면`: a wireframe inside a `.canvas`, in the as-is's parts and look. Its styles are in `agent/asis.html` and come into the page; use them as they are, and write styles only for parts the as-is does not have, in the template's last `<style>` block, every selector under `.canvas`. Hard-coded colors, the same in light and dark.
   - Not a pixel copy: no icons or images, only the boxes, labels and colors that show the layout.
-  - A mobile screen sits in a `.phone` frame (`<div class="phone"><div class="canvas">`), as its as-is does.
+  - A mobile screen sits in a `.phone` frame (`<div class="phone"><div class="canvas">`), as its as-is does, with the same `style` width.
 - A flow, states, a structure or how data moves: an inline SVG diagram.
 - Every `.screen` section has an `id`: the screen's id in `## 화면` (`order0101`, a popup `order0101p01`) or a short Latin name for a flow. Questions point at `1-mockup.html#<id>`, so an `id` once given stays the same in later drawings.
 - Inside the to-be, each element a comment could be about (a region, a table, a column header, a field, a button) has a `data-id`: lowercase Latin, a dot-separated path unique within its screen (`search`, `search.status`, `search.submit`, `list`, `list.col.amount`). Comments point at the screen's `id` and this `data-id`, so a `data-id` once given stays the same in later drawings while the element is there. A line of `## 요구사항` ends with the element it is about, `[<data-id>]` (`[<screen id>/<data-id>]` when `## 화면` has several screens; `[-]` is the whole screen): give that element exactly this `data-id`. Name only the elements no line names.

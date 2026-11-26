@@ -25,8 +25,8 @@ Each screen whole, in the order its code renders it: every region, table, tab, f
 
 - A wireframe inside a `.canvas`, in the service's own parts and look: the boxes, labels and colors that show the layout. No icons or images, not a pixel copy. Values are examples.
 - The look comes from the service's stylesheets: colors, borders, font sizes, spacing. Write it in one `<style>` block at the top of the file, every selector under `.canvas`, with the stylesheet a group comes from as a comment above it. Hard-coded colors, the same in light and dark. The to-be uses these styles as they are, so cover every part you draw.
-- A mobile screen sits in a `.phone` frame (`<div class="phone"><div class="canvas">`); a desktop screen does not.
-- No `data-id`, and no pin but one: where you could not find how part of the screen looks now, a red pin there, `<span class="pins"><span class="pin open" tabindex="0"><span class="pin-note"><b>미해결</b>현행 배치 미확인</span></span></span>`, as the last child of that element.
+- A mobile or tablet screen sits in a `.phone` frame (`<div class="phone"><div class="canvas">`); a desktop screen does not. Find the width the app is built for (the viewport meta, the orientation the app shell locks, the stylesheets' breakpoints or fixed widths) and set it on the frame, `<div class="phone" style="width: 800px">`, with its source as a comment above it. When you find none, leave the frame's default width and put the red pin there with `화면 너비 미확인`.
+- No `data-id`, and no pin but one: where you could not find how part of the screen looks now, a red pin there, `<span class="pins"><span class="pin open" tabindex="0"><span class="pin-note"><b>미해결</b>현행 배치 미확인</span></span></span>`, as the last child of that element (`화면 너비 미확인` instead, on a frame whose width you did not find).
 - No script, no external fonts, images or CDN.
 
 ## The file

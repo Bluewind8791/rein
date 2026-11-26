@@ -118,7 +118,7 @@
   .muted { color: var(--muted); }
   /* the screen itself: the service's own look, the same in light and dark */
   .canvas { color-scheme: light; overflow-x: auto; background: #fff; color: #222; border: 1px solid #ccc; }
-  /* a mobile screen: the canvas inside a phone-width frame */
+  /* a mobile or tablet screen: the as-is sets the frame's width to the app's; 390px when unknown */
   .phone { width: 390px; max-width: 100%; margin: 0 auto; padding: 14px 10px 18px;
     border: 2px solid var(--muted); border-radius: 28px; background: var(--head); }
   .phone > .canvas { min-height: 480px; border-radius: 6px; }
