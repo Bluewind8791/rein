@@ -7,7 +7,8 @@ const CHAIN = ["spec", "plan", "dev", "review", "qa", "e2e", "land"]
 const KO = { spec: "명세", plan: "설계", dev: "구현", review: "리뷰", qa: "검증", e2e: "통합 확인", land: "반영" }
 const STATUS = { run: "진행 중", ask: "질문 대기", halt: "멈춤", done: "완료", defer: "보류", drop: "버림" }
 const TAB_ST = { ask: "질문", halt: "멈춤" }
-const ANIM = { run: "walk", ask: "idle", halt: "halt", done: "done", defer: "still", drop: "still" }
+// the status card crab's mood (crab.js)
+const CRAB = { run: "stab", ask: "angry", halt: "scowl", done: "happy", defer: "content", drop: "content" }
 const CARD = { run: "", ask: "ask", halt: "halt", done: "done", defer: "held", drop: "held" }
 // files every run is expected to write, shown dimmed until they exist
 const EXPECTED = { "1-spec": "spec", "2-plan": "plan", "5-checklist": "e2e", "6-land": "land" }
@@ -571,7 +572,7 @@ function statusCard(run) {
   }
   const s = run.summary
   const title = s && s.title ? Md.inline(s.title, { href: linkHref(run) }) : esc(run.slug)
-  return `<div class="scard"><canvas class="cv c48" width="24" height="24" data-anim="${ANIM[run.status]}"></canvas>` +
+  return `<div class="scard">${Crab.svg(CRAB[run.status], 48)}` +
     `<div class="shd"><b class="rtitle">${title}</b><div class="stage ${CARD[run.status]}">${what}</div></div>${summary(run)}${ag}</div>`
 }
 

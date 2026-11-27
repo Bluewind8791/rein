@@ -27,6 +27,7 @@ const STATIC = {
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/md.js": ["md.js", "text/javascript; charset=utf-8"],
   "/mascot.js": ["mascot.js", "text/javascript; charset=utf-8"],
+  "/crab.js": ["crab.js", "text/javascript; charset=utf-8"],
   "/app.css": ["app.css", "text/css; charset=utf-8"],
   // pdf.js draws the planning documents beside 1-mockup.html
   "/vendor/pdfjs/pdf.min.js": ["vendor/pdfjs/pdf.min.js", "text/javascript; charset=utf-8"],

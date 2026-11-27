@@ -48,7 +48,7 @@ for (const p of snap.projects) {
   }
 }
 
-for (const f of ["app.css", "md.js", "mascot.js"]) fs.copyFileSync(path.join(FRAME, f), path.join(out, f))
+for (const f of ["app.css", "md.js", "mascot.js", "crab.js"]) fs.copyFileSync(path.join(FRAME, f), path.join(out, f))
 // run files are read next to the page, not from the server's root
 const app = fs.readFileSync(path.join(FRAME, "app.js"), "utf8")
 fs.writeFileSync(path.join(out, "app.js"), swap(app, "`/files/${", "`files/${", "app.js"))

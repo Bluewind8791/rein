@@ -40,7 +40,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .frame { height: 100vh; display: grid; grid-template-rows: 40px minmax(0, 1fr) 26px; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
 .cv { display: block; image-rendering: pixelated; flex: none; }
 .c24 { width: 24px; height: 24px; }
-.c48 { width: 48px; height: 48px; }
+/* the status card's crab (crab.js): each group loops its --a to --b */
+svg.crab { display: block; flex: none; }
+.ck-y, .ck-x, .ck-o { animation-iteration-count: infinite; animation-direction: alternate; }
+@media (prefers-reduced-motion: no-preference) { .ck-y { animation-name: ck-y; } .ck-x { animation-name: ck-x; } .ck-o { animation-name: ck-o; } }
+@keyframes ck-y { from { transform: translateY(var(--a)); } to { transform: translateY(var(--b)); } }
+@keyframes ck-x { from { transform: translateX(var(--a)); } to { transform: translateX(var(--b)); } }
+@keyframes ck-o { from { opacity: var(--a); } to { opacity: var(--b); } }
 
 /* top bar: the brand over the icon rail, the open runs as tabs, the theme */
 .rtabs { display: flex; align-items: stretch; background: var(--chrome); border-bottom: 1px solid var(--line); min-width: 0; }
